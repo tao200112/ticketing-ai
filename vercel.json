@@ -1,6 +1,5 @@
-{
+﻿{
   "buildCommand": "npm run build",
   "framework": "nextjs",
-  "ignoreCommand": "echo ok",
-  "env": { }
+  "ignoreCommand": "exit 0"
 }

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '../../../../lib/db.js';
-import { verifyTicketQRPayload, extractTicketIdFromQR } from '../../../../lib/qr-crypto.js';
+import { prisma } from '@lib/db';
+import { verifyTicketQRPayload, extractTicketIdFromQR } from '@lib/qr-crypto';
 
 /**
  * 票据核销验证接口

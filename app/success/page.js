@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 
-export default function SuccessPage() {
+function SuccessContent() {
   const [sessionId, setSessionId] = useState(null);
   const [orderData, setOrderData] = useState(null);
   const [tickets, setTickets] = useState([]);
@@ -362,5 +362,23 @@ export default function SuccessPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function SuccessPage() {
+  return (
+    <Suspense fallback={
+      <div style={{
+        padding: '2rem',
+        maxWidth: '800px',
+        margin: '0 auto',
+        textAlign: 'center'
+      }}>
+        <h1>Loading...</h1>
+        <p>Please wait while we load your ticket information...</p>
+      </div>
+    }>
+      <SuccessContent />
+    </Suspense>
   );
 }

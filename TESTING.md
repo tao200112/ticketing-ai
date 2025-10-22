@@ -245,7 +245,7 @@ curl -X POST http://localhost:3000/api/tickets/verify \
 # 创建测试数据并运行所有测试
 $env:DATABASE_URL="file:./dev.db"; node -e "
 import { PrismaClient } from '@prisma/client';
-import { generateTicketQRPayload, calculateTicketExpiration } from './lib/qr-crypto.js';
+import { generateTicketQRPayload, calculateTicketExpiration } from './lib/qr-crypto';
 
 const prisma = new PrismaClient();
 

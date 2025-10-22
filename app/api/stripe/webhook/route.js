@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
-import { processPaidOrder } from '../../../lib/ticket-service.js';
+import { processPaidOrder } from '@lib/ticket-service';
 
 // 强制使用 Node.js runtime
 export const runtime = 'nodejs';

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '../../../../lib/db.js';
+import { prisma } from '@lib/db';
 
 /**
  * 根据 session_id 获取订单和票据信息

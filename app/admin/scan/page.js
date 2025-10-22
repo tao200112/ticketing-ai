@@ -1,62 +1,56 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 
-export default function ScanTicket() {
+export default function AdminScanTicket() {
   const [ticketId, setTicketId] = useState('');
   const [scanResult, setScanResult] = useState(null);
-  const [tickets, setTickets] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
 
-  useEffect(() => {
-    // Load tickets from localStorage
-    const savedTickets = JSON.parse(localStorage.getItem('tickets') || '[]');
-    setTickets(savedTickets);
-  }, []);
-
-  const handleScan = () => {
+  const handleScan = async () => {
     if (!ticketId.trim()) {
       alert('Please enter a ticket ID to scan.');
       return;
     }
 
-    // Find the ticket
-    const ticket = tickets.find(t => t.id === ticketId.trim());
-    
-    if (ticket) {
-      setScanResult({
-        valid: true,
-        ticket: ticket
-      });
-    } else {
-      setScanResult({
-        valid: false,
-        message: 'Ticket not found or invalid.'
-      });
-    }
-  };
+    setIsLoading(true);
+    setScanResult(null);
 
-  const handleQRScan = (qrData) => {
     try {
-      const data = JSON.parse(qrData);
-      const ticket = tickets.find(t => t.id === data.ticketId);
+      // 使用新的票据验证 API
+      const response = await fetch('/api/tickets/verify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          qr_payload: ticketId.trim()
+        }),
+      });
+
+      const data = await response.json();
       
-      if (ticket) {
+      if (response.ok && data.success) {
         setScanResult({
           valid: true,
-          ticket: ticket
+          ticket: data.ticket,
+          message: data.message
         });
       } else {
         setScanResult({
           valid: false,
-          message: 'Ticket not found in system.'
+          message: data.message || 'Ticket verification failed'
         });
       }
     } catch (error) {
+      console.error('Scan error:', error);
       setScanResult({
         valid: false,
-        message: 'Invalid QR code format.'
+        message: 'Network error. Please try again.'
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -73,37 +67,49 @@ export default function ScanTicket() {
       minHeight: '100vh',
       backgroundColor: '#f8f9fa'
     }}>
+      {/* 头部导航 */}
       <div style={{
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: '2rem'
+        marginBottom: '2rem',
+        paddingBottom: '1rem',
+        borderBottom: '2px solid #e9ecef'
       }}>
-        <h1 style={{
-          fontSize: '2.5rem',
-          fontWeight: 'bold',
-          color: '#333'
-        }}>
-          Ticket Scanner
-        </h1>
-        <Link href="/" style={{
-          padding: '0.5rem 1rem',
+        <div>
+          <h1 style={{
+            fontSize: '2.5rem',
+            fontWeight: 'bold',
+            color: '#333',
+            margin: '0 0 0.5rem 0'
+          }}>
+            Ticket Scanner
+          </h1>
+          <p style={{ color: '#666', margin: 0 }}>
+            Scan and verify tickets using QR codes
+          </p>
+        </div>
+        <Link href="/admin/dashboard" style={{
+          padding: '0.75rem 1.5rem',
           backgroundColor: '#6c757d',
           color: 'white',
           textDecoration: 'none',
-          borderRadius: '6px',
-          fontSize: '0.9rem'
+          borderRadius: '8px',
+          fontSize: '1rem',
+          fontWeight: '500'
         }}>
-          Back to Home
+          ← Back to Dashboard
         </Link>
       </div>
 
+      {/* 扫描界面 */}
       <div style={{
         backgroundColor: 'white',
         padding: '2rem',
         borderRadius: '12px',
         boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-        marginBottom: '2rem'
+        marginBottom: '2rem',
+        border: '1px solid #e9ecef'
       }}>
         <h2 style={{
           fontSize: '1.5rem',
@@ -122,7 +128,7 @@ export default function ScanTicket() {
             marginBottom: '0.5rem',
             color: '#333'
           }}>
-            Ticket ID
+            QR Code Data or Ticket ID
           </label>
           <input
             type="text"
@@ -137,50 +143,55 @@ export default function ScanTicket() {
               outline: 'none',
               marginBottom: '1rem'
             }}
-            placeholder="Enter ticket ID or scan QR code"
+            placeholder="Enter QR code data or ticket ID"
             onKeyPress={(e) => e.key === 'Enter' && handleScan()}
           />
           
-          <button
-            onClick={handleScan}
-            style={{
-              padding: '0.75rem 1.5rem',
-              backgroundColor: '#007bff',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              fontSize: '1rem',
-              cursor: 'pointer',
-              marginRight: '1rem'
-            }}
-          >
-            Scan Ticket
-          </button>
-          
-          <button
-            onClick={resetScan}
-            style={{
-              padding: '0.75rem 1.5rem',
-              backgroundColor: '#6c757d',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              fontSize: '1rem',
-              cursor: 'pointer'
-            }}
-          >
-            Reset
-          </button>
+          <div style={{ display: 'flex', gap: '1rem' }}>
+            <button
+              onClick={handleScan}
+              disabled={isLoading}
+              style={{
+                padding: '0.75rem 1.5rem',
+                backgroundColor: isLoading ? '#6c757d' : '#007bff',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                fontSize: '1rem',
+                cursor: isLoading ? 'not-allowed' : 'pointer',
+                transition: 'background-color 0.3s'
+              }}
+            >
+              {isLoading ? 'Scanning...' : 'Scan Ticket'}
+            </button>
+            
+            <button
+              onClick={resetScan}
+              style={{
+                padding: '0.75rem 1.5rem',
+                backgroundColor: '#6c757d',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                fontSize: '1rem',
+                cursor: 'pointer'
+              }}
+            >
+              Reset
+            </button>
+          </div>
         </div>
       </div>
 
+      {/* 扫描结果 */}
       {scanResult && (
         <div style={{
           backgroundColor: 'white',
           padding: '2rem',
           borderRadius: '12px',
           boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-          marginBottom: '2rem'
+          marginBottom: '2rem',
+          border: '1px solid #e9ecef'
         }}>
           {scanResult.valid ? (
             <div>
@@ -212,12 +223,15 @@ export default function ScanTicket() {
               }}>
                 <h3 style={{ margin: '0 0 0.5rem 0', color: '#155724' }}>Ticket Details</h3>
                 <div style={{ color: '#155724', fontSize: '0.9rem' }}>
-                  <p><strong>ID:</strong> {scanResult.ticket.id}</p>
-                  <p><strong>Type:</strong> {scanResult.ticket.name}</p>
-                  <p><strong>Customer:</strong> {scanResult.ticket.customerName}</p>
-                  <p><strong>Email:</strong> {scanResult.ticket.customerEmail}</p>
-                  <p><strong>Price:</strong> ${scanResult.ticket.price}</p>
-                  <p><strong>Date:</strong> {new Date(scanResult.ticket.date).toLocaleString()}</p>
+                  <p><strong>ID:</strong> {scanResult.ticket?.shortId}</p>
+                  <p><strong>Event:</strong> {scanResult.ticket?.eventId}</p>
+                  <p><strong>Tier:</strong> {scanResult.ticket?.tier}</p>
+                  <p><strong>Email:</strong> {scanResult.ticket?.holderEmail}</p>
+                  <p><strong>Status:</strong> {scanResult.ticket?.status}</p>
+                  <p><strong>Issued:</strong> {new Date(scanResult.ticket?.issuedAt).toLocaleString()}</p>
+                  {scanResult.ticket?.usedAt && (
+                    <p><strong>Used:</strong> {new Date(scanResult.ticket.usedAt).toLocaleString()}</p>
+                  )}
                 </div>
               </div>
               
@@ -228,7 +242,7 @@ export default function ScanTicket() {
                 color: '#856404',
                 fontSize: '0.9rem'
               }}>
-                <strong>Entry Status:</strong> This ticket is valid for entry. Customer can proceed to the venue.
+                <strong>Entry Status:</strong> {scanResult.message}
               </div>
             </div>
           ) : (
@@ -266,18 +280,21 @@ export default function ScanTicket() {
         </div>
       )}
 
+      {/* 使用说明 */}
       <div style={{
         backgroundColor: 'white',
         padding: '1.5rem',
         borderRadius: '12px',
-        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+        border: '1px solid #e9ecef'
       }}>
         <h3 style={{ margin: '0 0 1rem 0', color: '#333' }}>Scanner Instructions</h3>
         <ul style={{ color: '#666', lineHeight: '1.6', paddingLeft: '1.5rem' }}>
-          <li>Enter the ticket ID manually or scan the QR code</li>
+          <li>Enter the QR code data or ticket ID manually</li>
           <li>Valid tickets will show customer details and entry confirmation</li>
           <li>Invalid tickets will be rejected with an error message</li>
-          <li>All ticket data is stored locally for verification</li>
+          <li>All ticket data is verified against the database</li>
+          <li>First scan marks the ticket as used, subsequent scans will show "already used"</li>
         </ul>
       </div>
     </div>

@@ -1,0 +1,47 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Order {
+  id             String    @id @default(cuid())
+  sessionId      String    @unique @map("session_id")
+  paymentIntent  String?   @map("payment_intent")
+  email          String
+  eventId        String    @map("event_id")
+  tier           String
+  amount         Int       // 金额以分为单位
+  currency       String    @default("usd")
+  status         String    @default("paid") // paid, refunded
+  createdAt      DateTime  @default(now()) @map("created_at")
+  
+  // 关联
+  tickets        Ticket[]
+  
+  @@map("orders")
+}
+
+model Ticket {
+  id           String    @id @default(cuid())
+  shortId      String    @unique @map("short_id") // 短可读 ID
+  orderId      String    @map("order_id")
+  eventId      String    @map("event_id")
+  tier         String
+  holderEmail  String    @map("holder_email")
+  status       String    @default("unused") // unused, used, refunded
+  issuedAt     DateTime  @default(now()) @map("issued_at")
+  usedAt       DateTime? @map("used_at")
+  qrPayload    String?   @map("qr_payload") // HMAC 签名的二维码载荷
+  
+  // 关联
+  order        Order     @relation(fields: [orderId], references: [id])
+  
+  @@map("tickets")
+}

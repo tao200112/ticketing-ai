@@ -26,3 +26,5 @@
 - `{PreviewURL}/api/hello` - API 测试
 - `{PreviewURL}/events` - 事件页面（Mock 数据）
 - `{PreviewURL}/test` - Supabase 连接诊断
+
+

@@ -61,20 +61,17 @@ export default function RootLayout({ children }) {
             <Link href="/events" style={{ textDecoration: 'none', color: '#666', padding: '0.5rem 1rem', borderRadius: '4px' }}>
               Events
             </Link>
-            <Link href="/event/demo" style={{ textDecoration: 'none', color: '#666', padding: '0.5rem 1rem', borderRadius: '4px' }}>
-              Buy Demo
-            </Link>
-            <Link href="/scan" style={{ textDecoration: 'none', color: '#666', padding: '0.5rem 1rem', borderRadius: '4px' }}>
-              Scan
-            </Link>
-            <Link href="/dashboard" style={{ textDecoration: 'none', color: '#666', padding: '0.5rem 1rem', borderRadius: '4px' }}>
-              Dashboard
-            </Link>
-            <Link href="/success" style={{ textDecoration: 'none', color: '#666', padding: '0.5rem 1rem', borderRadius: '4px' }}>
-              Success
-            </Link>
             <Link href="/merchant" style={{ textDecoration: 'none', color: '#8b5cf6', padding: '0.5rem 1rem', borderRadius: '4px', fontWeight: '600' }}>
-              Merchant
+              Merchant Console
+            </Link>
+            <Link href="/auth/login" style={{ textDecoration: 'none', color: '#666', padding: '0.5rem 1rem', borderRadius: '4px' }}>
+              Login
+            </Link>
+            <Link href="/auth/register" style={{ textDecoration: 'none', color: '#666', padding: '0.5rem 1rem', borderRadius: '4px' }}>
+              Register
+            </Link>
+            <Link href="/account" style={{ textDecoration: 'none', color: '#666', padding: '0.5rem 1rem', borderRadius: '4px' }}>
+              Account
             </Link>
           </div>
         </nav>

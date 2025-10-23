@@ -1,15 +1,32 @@
 import { NextResponse } from 'next/server'
 import { getSupabaseClient } from '../../../../lib/supabase'
 import { hasSupabase } from '../../../../lib/safeEnv'
+import bcrypt from 'bcryptjs'
+import localUserStorage from '../../../../lib/user-storage'
 
 export async function POST(request) {
   try {
-    const { email, name, age } = await request.json()
+    const { email, name, age, password } = await request.json()
 
     // 基本验证
-    if (!email || !name || !age) {
+    if (!email || !name || !age || !password) {
       return NextResponse.json(
         { message: '缺少必填字段' },
+        { status: 400 }
+      )
+    }
+
+    // 密码强度验证
+    if (password.length < 8) {
+      return NextResponse.json(
+        { message: '密码至少需要8个字符' },
+        { status: 400 }
+      )
+    }
+
+    if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(password)) {
+      return NextResponse.json(
+        { message: '密码必须包含大小写字母和数字' },
         { status: 400 }
       )
     }
@@ -49,6 +66,10 @@ export async function POST(request) {
           )
         }
 
+        // 哈希密码
+        const saltRounds = 12
+        const hashedPassword = await bcrypt.hash(password, saltRounds)
+
         // 创建新用户
         const { data: newUser, error: insertError } = await supabase
           .from('users')
@@ -57,6 +78,7 @@ export async function POST(request) {
               email: email,
               name: name,
               age: parseInt(age),
+              password_hash: hashedPassword,
               created_at: new Date().toISOString()
             }
           ])
@@ -79,7 +101,7 @@ export async function POST(request) {
           throw new Error('数据库插入失败')
         }
 
-        // 返回 Supabase 成功响应
+        // 返回 Supabase 成功响应（不包含密码哈希）
         return NextResponse.json({
           ok: true,
           source: 'supabase',
@@ -94,24 +116,46 @@ export async function POST(request) {
         })
 
       } catch (dbError) {
-        console.error('Supabase 操作失败，降级到本地模拟:', dbError)
+        console.error('Supabase 操作失败，降级到本地存储:', dbError)
         
-        // 任何 Supabase 错误都降级到本地模拟
+      try {
+        // 使用本地存储
+        const user = await localUserStorage.createUser({ email, name, age, password })
+        console.log('✅ 本地存储注册成功:', user)
         return NextResponse.json({
           ok: true,
           source: 'local',
-          message: '注册成功（本地模拟）',
+          message: '注册成功（本地存储）',
+          user,
           fallback_reason: dbError.message
         })
+      } catch (localError) {
+          console.error('本地存储也失败:', localError)
+          return NextResponse.json({
+            message: localError.message || '注册失败',
+            source: 'error'
+          }, { status: 500 })
+        }
       }
     } else {
-      // Supabase 不可用，直接使用本地模拟
-      console.log('🔄 Supabase 不可用，使用本地模拟模式')
-      return NextResponse.json({
-        ok: true,
-        source: 'local',
-        message: '注册成功（本地模拟）'
-      })
+      // Supabase 不可用，使用本地存储
+      console.log('🔄 Supabase 不可用，使用本地存储模式')
+      try {
+        const user = await localUserStorage.createUser({ email, name, age, password })
+        console.log('✅ 本地存储注册成功:', user)
+        return NextResponse.json({
+          ok: true,
+          source: 'local',
+          message: '注册成功（本地存储）',
+          user
+        })
+      } catch (error) {
+        console.error('本地存储失败:', error)
+        return NextResponse.json({
+          message: error.message || '注册失败',
+          source: 'error'
+        }, { status: 500 })
+      }
     }
 
   } catch (error) {

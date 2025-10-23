@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { hasSupabase } from '../../../../lib/safeEnv'
 
 export default function NewEventWizardPage() {
   const router = useRouter()
@@ -11,18 +10,13 @@ export default function NewEventWizardPage() {
   const [error, setError] = useState('')
 
   const [eventData, setEventData] = useState({
-    // Step 1: 基本信息
     title: '',
     description: '',
     startTime: '',
     endTime: '',
     location: '',
-    
-    // Step 2: 海报
     poster: null,
     posterPreview: null,
-    
-    // Step 3: 票档与定价
     prices: [
       { name: '', amount_cents: '', inventory: '', limit_per_user: '' }
     ]
@@ -60,410 +54,739 @@ export default function NewEventWizardPage() {
     }
   }
 
-  const handleFileUpload = (e) => {
+  const handlePosterUpload = (e) => {
     const file = e.target.files[0]
     if (file) {
-      setEventData(prev => ({
-        ...prev,
-        poster: file,
-        posterPreview: URL.createObjectURL(file)
-      }))
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        updateEventData('posterPreview', e.target.result)
+        updateEventData('poster', file)
+      }
+      reader.readAsDataURL(file)
     }
   }
 
-  const uploadPoster = async (file) => {
-    if (!hasSupabase()) {
-      return { success: false, message: 'Supabase 不可用，仅保存预览' }
-    }
-
-    try {
-      // 这里可以添加真实的 Supabase Storage 上传逻辑
-      // 暂时返回模拟成功
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      return { success: true, url: 'mock-poster-url' }
-    } catch (error) {
-      return { success: false, message: '上传失败' }
+  const nextStep = () => {
+    if (currentStep < 3) {
+      setCurrentStep(currentStep + 1)
     }
   }
 
-  const saveEvent = async () => {
+  const prevStep = () => {
+    if (currentStep > 1) {
+      setCurrentStep(currentStep - 1)
+    }
+  }
+
+  const handleSubmit = async () => {
     setIsSubmitting(true)
     setError('')
-
+    
     try {
-      // 上传海报
-      let posterUrl = null
-      if (eventData.poster) {
-        const uploadResult = await uploadPoster(eventData.poster)
-        if (uploadResult.success) {
-          posterUrl = uploadResult.url
-        }
-      }
-
-      const finalEventData = {
-        ...eventData,
-        poster_url: posterUrl,
-        created_at: new Date().toISOString(),
-        status: 'draft'
-      }
-
-      if (hasSupabase()) {
-        try {
-          // 尝试保存到 Supabase
-          // 这里可以添加真实的 Supabase 保存逻辑
-          console.log('保存到 Supabase:', finalEventData)
-        } catch (dbError) {
-          console.log('Supabase 保存失败，降级到本地存储:', dbError)
-          // 降级到 localStorage
-          const existingEvents = JSON.parse(localStorage.getItem('merchant_events') || '[]')
-          existingEvents.push({ ...finalEventData, id: Date.now() })
-          localStorage.setItem('merchant_events', JSON.stringify(existingEvents))
-        }
-      } else {
-        // 保存到 localStorage
-        const existingEvents = JSON.parse(localStorage.getItem('merchant_events') || '[]')
-        existingEvents.push({ ...finalEventData, id: Date.now() })
-        localStorage.setItem('merchant_events', JSON.stringify(existingEvents))
-      }
-
-      // 跳转到活动列表
+      await new Promise(resolve => setTimeout(resolve, 2000))
       router.push('/merchant/events')
     } catch (err) {
-      setError(err.message)
-      console.error('保存活动错误:', err)
+      setError('Failed to create event, please try again')
     } finally {
       setIsSubmitting(false)
     }
   }
 
-  const validateStep = (step) => {
-    switch (step) {
-      case 1:
-        return eventData.title && eventData.startTime && eventData.location
-      case 2:
-        return true // 海报是可选的
-      case 3:
-        return eventData.prices.every(price => price.name && price.amount_cents && price.inventory)
-      case 4:
-        return true
-      default:
-        return false
-    }
-  }
-
-  const nextStep = () => {
-    if (validateStep(currentStep)) {
-      setCurrentStep(prev => Math.min(prev + 1, 4))
-    }
-  }
-
-  const prevStep = () => {
-    setCurrentStep(prev => Math.max(prev - 1, 1))
-  }
-
   const steps = [
-    { number: 1, title: '基本信息', description: '填写活动的基本信息' },
-    { number: 2, title: '海报上传', description: '上传活动海报' },
-    { number: 3, title: '票档定价', description: '设置票档和价格' },
-    { number: 4, title: '预览保存', description: '确认信息并保存' }
+    { number: 1, title: 'Basic Info', description: 'Fill in basic event information' },
+    { number: 2, title: 'Poster Upload', description: 'Upload event poster' },
+    { number: 3, title: 'Ticket Settings', description: 'Set ticket types and prices' }
   ]
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-8">
-      <div className="max-w-4xl mx-auto">
-        {/* 步骤指示器 */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <h1 className="text-3xl font-bold text-white">发布活动</h1>
-            <span className="text-slate-400">步骤 {currentStep}/4</span>
+    <div style={{ minHeight: '100vh', backgroundColor: '#f9fafb' }}>
+      {/* Navigation Bar */}
+      <div style={{
+        backgroundColor: 'white',
+        borderBottom: '1px solid #e5e7eb',
+        position: 'sticky',
+        top: 0,
+        zIndex: 50
+      }}>
+        <div style={{ maxWidth: '56rem', margin: '0 auto', padding: '1rem 1.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <button
+                onClick={() => router.back()}
+                style={{
+                  padding: '0.5rem',
+                  borderRadius: '0.5rem',
+                  border: 'none',
+                  backgroundColor: 'transparent',
+                  cursor: 'pointer',
+                  transition: 'background-color 0.2s'
+                }}
+                onMouseEnter={(e) => e.target.style.backgroundColor = '#f3f4f6'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+              >
+                <svg style={{ width: '1.25rem', height: '1.25rem', color: '#4b5563' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              <div>
+                <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#111827', margin: 0 }}>Create Event</h1>
+                <p style={{ color: '#6b7280', fontSize: '0.875rem', margin: 0 }}>Set up your event details</p>
+              </div>
+            </div>
+            
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>Step {currentStep} / 3</span>
+              <div style={{ width: '8rem', backgroundColor: '#e5e7eb', borderRadius: '9999px', height: '0.5rem' }}>
+                <div 
+                  style={{
+                    backgroundColor: '#2563eb',
+                    height: '0.5rem',
+                    borderRadius: '9999px',
+                    transition: 'all 0.3s',
+                    width: `${(currentStep / 3) * 100}%`
+                  }}
+                ></div>
+              </div>
+            </div>
           </div>
-          
-          <div className="flex items-center justify-between">
+        </div>
+      </div>
+
+      <div style={{ maxWidth: '56rem', margin: '0 auto', padding: '1.5rem' }}>
+        {/* Step Indicator */}
+        <div style={{ marginBottom: '2rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             {steps.map((step, index) => (
-              <div key={step.number} className="flex items-center">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-                  currentStep >= step.number 
-                    ? 'bg-partytix-gradient text-white' 
-                    : 'bg-slate-700 text-slate-400'
-                }`}>
-                  {step.number}
+              <div key={step.number} style={{ display: 'flex', alignItems: 'center' }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '2.5rem',
+                  height: '2.5rem',
+                  borderRadius: '50%',
+                  border: '2px solid',
+                  transition: 'all 0.3s',
+                  backgroundColor: currentStep >= step.number ? '#2563eb' : 'transparent',
+                  borderColor: currentStep >= step.number ? '#2563eb' : '#d1d5db',
+                  color: currentStep >= step.number ? 'white' : '#9ca3af'
+                }}>
+                  {currentStep > step.number ? (
+                    <svg style={{ width: '1.25rem', height: '1.25rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  ) : (
+                    step.number
+                  )}
                 </div>
-                <div className="ml-2 hidden md:block">
-                  <div className={`text-sm font-medium ${
-                    currentStep >= step.number ? 'text-white' : 'text-slate-400'
-                  }`}>
+                <div style={{ marginLeft: '0.75rem' }}>
+                  <p style={{
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    color: currentStep >= step.number ? '#111827' : '#9ca3af',
+                    margin: 0
+                  }}>
                     {step.title}
-                  </div>
-                  <div className="text-xs text-slate-500">{step.description}</div>
+                  </p>
+                  <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: 0 }}>{step.description}</p>
                 </div>
                 {index < steps.length - 1 && (
-                  <div className={`w-16 h-0.5 mx-4 ${
-                    currentStep > step.number ? 'bg-purple-500' : 'bg-slate-700'
-                  }`} />
+                  <div style={{
+                    width: '4rem',
+                    height: '0.125rem',
+                    margin: '0 1rem',
+                    transition: 'all 0.3s',
+                    backgroundColor: currentStep > step.number ? '#2563eb' : '#d1d5db'
+                  }} />
                 )}
               </div>
             ))}
           </div>
         </div>
 
-        {/* 表单内容 */}
-        <div className="bg-partytix-card rounded-xl p-8">
+        {/* Form Content */}
+        <div style={{
+          backgroundColor: 'white',
+          borderRadius: '0.5rem',
+          border: '1px solid #e5e7eb',
+          padding: '2rem'
+        }}>
           {currentStep === 1 && (
-            <div className="space-y-6">
-              <h2 className="text-2xl font-bold text-white mb-6">基本信息</h2>
-              
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">活动标题 *</label>
-                <input
-                  type="text"
-                  value={eventData.title}
-                  onChange={(e) => updateEventData('title', e.target.value)}
-                  className="w-full px-4 py-3 bg-slate-800/50 border border-white/10 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  placeholder="输入活动标题"
-                />
-              </div>
+                <h2 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#111827', marginBottom: '1.5rem' }}>Event Basic Information</h2>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                      Event Title *
+                    </label>
+                    <input
+                      type="text"
+                      value={eventData.title}
+                      onChange={(e) => updateEventData('title', e.target.value)}
+                      placeholder="Enter event title"
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem 1rem',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '0.5rem',
+                        color: '#111827',
+                        fontSize: '1rem',
+                        outline: 'none'
+                      }}
+                      onFocus={(e) => {
+                        e.target.style.borderColor = '#2563eb'
+                        e.target.style.boxShadow = '0 0 0 3px rgba(37, 99, 235, 0.1)'
+                      }}
+                      onBlur={(e) => {
+                        e.target.style.borderColor = '#d1d5db'
+                        e.target.style.boxShadow = 'none'
+                      }}
+                    />
+                  </div>
 
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">活动描述</label>
-                <textarea
-                  value={eventData.description}
-                  onChange={(e) => updateEventData('description', e.target.value)}
-                  rows={4}
-                  className="w-full px-4 py-3 bg-slate-800/50 border border-white/10 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  placeholder="描述您的活动"
-                />
-              </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                      Event Description *
+                    </label>
+                    <textarea
+                      value={eventData.description}
+                      onChange={(e) => updateEventData('description', e.target.value)}
+                      placeholder="Describe your event in detail"
+                      rows={4}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem 1rem',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '0.5rem',
+                        color: '#111827',
+                        fontSize: '1rem',
+                        outline: 'none',
+                        resize: 'none'
+                      }}
+                      onFocus={(e) => {
+                        e.target.style.borderColor = '#2563eb'
+                        e.target.style.boxShadow = '0 0 0 3px rgba(37, 99, 235, 0.1)'
+                      }}
+                      onBlur={(e) => {
+                        e.target.style.borderColor = '#d1d5db'
+                        e.target.style.boxShadow = 'none'
+                      }}
+                    />
+                  </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">开始时间 *</label>
-                  <input
-                    type="datetime-local"
-                    value={eventData.startTime}
-                    onChange={(e) => updateEventData('startTime', e.target.value)}
-                    className="w-full px-4 py-3 bg-slate-800/50 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  />
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1.5rem' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                        Start Time *
+                      </label>
+                      <input
+                        type="datetime-local"
+                        value={eventData.startTime}
+                        onChange={(e) => updateEventData('startTime', e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem 1rem',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '0.5rem',
+                          color: '#111827',
+                          fontSize: '1rem',
+                          outline: 'none'
+                        }}
+                        onFocus={(e) => {
+                          e.target.style.borderColor = '#2563eb'
+                          e.target.style.boxShadow = '0 0 0 3px rgba(37, 99, 235, 0.1)'
+                        }}
+                        onBlur={(e) => {
+                          e.target.style.borderColor = '#d1d5db'
+                          e.target.style.boxShadow = 'none'
+                        }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                        End Time *
+                      </label>
+                      <input
+                        type="datetime-local"
+                        value={eventData.endTime}
+                        onChange={(e) => updateEventData('endTime', e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem 1rem',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '0.5rem',
+                          color: '#111827',
+                          fontSize: '1rem',
+                          outline: 'none'
+                        }}
+                        onFocus={(e) => {
+                          e.target.style.borderColor = '#2563eb'
+                          e.target.style.boxShadow = '0 0 0 3px rgba(37, 99, 235, 0.1)'
+                        }}
+                        onBlur={(e) => {
+                          e.target.style.borderColor = '#d1d5db'
+                          e.target.style.boxShadow = 'none'
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                      Event Location *
+                    </label>
+                    <input
+                      type="text"
+                      value={eventData.location}
+                      onChange={(e) => updateEventData('location', e.target.value)}
+                      placeholder="Enter event location"
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem 1rem',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '0.5rem',
+                        color: '#111827',
+                        fontSize: '1rem',
+                        outline: 'none'
+                      }}
+                      onFocus={(e) => {
+                        e.target.style.borderColor = '#2563eb'
+                        e.target.style.boxShadow = '0 0 0 3px rgba(37, 99, 235, 0.1)'
+                      }}
+                      onBlur={(e) => {
+                        e.target.style.borderColor = '#d1d5db'
+                        e.target.style.boxShadow = 'none'
+                      }}
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">结束时间</label>
-                  <input
-                    type="datetime-local"
-                    value={eventData.endTime}
-                    onChange={(e) => updateEventData('endTime', e.target.value)}
-                    className="w-full px-4 py-3 bg-slate-800/50 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">活动场地 *</label>
-                <input
-                  type="text"
-                  value={eventData.location}
-                  onChange={(e) => updateEventData('location', e.target.value)}
-                  className="w-full px-4 py-3 bg-slate-800/50 border border-white/10 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  placeholder="输入活动场地地址"
-                />
               </div>
             </div>
           )}
 
           {currentStep === 2 && (
-            <div className="space-y-6">
-              <h2 className="text-2xl font-bold text-white mb-6">海报上传</h2>
-              
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">活动海报</label>
-                <div className="border-2 border-dashed border-white/20 rounded-lg p-8 text-center">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleFileUpload}
-                    className="hidden"
-                    id="poster-upload"
-                  />
-                  <label
-                    htmlFor="poster-upload"
-                    className="cursor-pointer"
-                  >
-                    {eventData.posterPreview ? (
-                      <div>
-                        <img
-                          src={eventData.posterPreview}
-                          alt="海报预览"
-                          className="max-w-full max-h-64 mx-auto rounded-lg mb-4"
-                        />
-                        <p className="text-slate-400">点击更换海报</p>
-                      </div>
-                    ) : (
-                      <div>
-                        <div className="text-4xl mb-4">📸</div>
-                        <p className="text-slate-400">点击上传海报</p>
-                        <p className="text-sm text-slate-500 mt-2">支持 JPG、PNG 格式</p>
-                      </div>
-                    )}
-                  </label>
+                <h2 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#111827', marginBottom: '1.5rem' }}>Event Poster</h2>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                      Upload Poster Image
+                    </label>
+                    <div style={{
+                      border: '2px dashed #d1d5db',
+                      borderRadius: '0.5rem',
+                      padding: '2rem',
+                      textAlign: 'center',
+                      transition: 'border-color 0.2s',
+                      position: 'relative'
+                    }}
+                    onMouseEnter={(e) => e.target.style.borderColor = '#9ca3af'}
+                    onMouseLeave={(e) => e.target.style.borderColor = '#d1d5db'}>
+                      {eventData.posterPreview ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                          <img
+                            src={eventData.posterPreview}
+                            alt="Poster preview"
+                            style={{ maxWidth: '20rem', margin: '0 auto', borderRadius: '0.5rem', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)' }}
+                          />
+                          <div>
+                            <button
+                              onClick={() => {
+                                updateEventData('poster', null)
+                                updateEventData('posterPreview', null)
+                              }}
+                              style={{
+                                color: '#dc2626',
+                                fontSize: '0.875rem',
+                                border: 'none',
+                                backgroundColor: 'transparent',
+                                cursor: 'pointer',
+                                transition: 'color 0.2s'
+                              }}
+                              onMouseEnter={(e) => e.target.style.color = '#b91c1c'}
+                              onMouseLeave={(e) => e.target.style.color = '#dc2626'}
+                            >
+                              Remove Image
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                          <div style={{
+                            width: '4rem',
+                            height: '4rem',
+                            backgroundColor: '#f3f4f6',
+                            borderRadius: '50%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            margin: '0 auto'
+                          }}>
+                            <svg style={{ width: '2rem', height: '2rem', color: '#9ca3af' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                          </div>
+                          <div>
+                            <p style={{ color: '#111827', fontWeight: '500', margin: 0 }}>Click to upload poster</p>
+                            <p style={{ color: '#6b7280', fontSize: '0.875rem', margin: 0 }}>Supports JPG, PNG format, recommended size 1200x630</p>
+                          </div>
+                        </div>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handlePosterUpload}
+                        style={{
+                          position: 'absolute',
+                          inset: 0,
+                          width: '100%',
+                          height: '100%',
+                          opacity: 0,
+                          cursor: 'pointer'
+                        }}
+                      />
+                    </div>
+                  </div>
                 </div>
-                {hasSupabase() ? (
-                  <p className="text-sm text-green-400 mt-2">✓ 支持上传到云端存储</p>
-                ) : (
-                  <p className="text-sm text-yellow-400 mt-2">⚠ 仅本地预览，云端存储不可用</p>
-                )}
               </div>
             </div>
           )}
 
           {currentStep === 3 && (
-            <div className="space-y-6">
-              <h2 className="text-2xl font-bold text-white mb-6">票档与定价</h2>
-              
-              <div className="space-y-4">
-                {eventData.prices.map((price, index) => (
-                  <div key={index} className="bg-slate-800/30 rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-lg font-medium text-white">票档 {index + 1}</h3>
-                      {eventData.prices.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => removePrice(index)}
-                          className="text-red-400 hover:text-red-300 text-sm"
-                        >
-                          删除
-                        </button>
-                      )}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              <div>
+                <h2 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#111827', marginBottom: '1.5rem' }}>Ticket Settings</h2>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                  {eventData.prices.map((price, index) => (
+                    <div key={index} style={{
+                      backgroundColor: '#f9fafb',
+                      borderRadius: '0.5rem',
+                      padding: '1.5rem',
+                      border: '1px solid #e5e7eb'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+                        <h3 style={{ fontSize: '1.125rem', fontWeight: '500', color: '#111827', margin: 0 }}>Ticket Type {index + 1}</h3>
+                        {eventData.prices.length > 1 && (
+                          <button
+                            onClick={() => removePrice(index)}
+                            style={{
+                              color: '#dc2626',
+                              border: 'none',
+                              backgroundColor: 'transparent',
+                              cursor: 'pointer',
+                              transition: 'color 0.2s'
+                            }}
+                            onMouseEnter={(e) => e.target.style.color = '#b91c1c'}
+                            onMouseLeave={(e) => e.target.style.color = '#dc2626'}
+                          >
+                            <svg style={{ width: '1.25rem', height: '1.25rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        )}
+                      </div>
+                      
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                            Ticket Name *
+                          </label>
+                          <input
+                            type="text"
+                            value={price.name}
+                            onChange={(e) => updatePriceData(index, 'name', e.target.value)}
+                            placeholder="e.g.: Early Bird, VIP"
+                            style={{
+                              width: '100%',
+                              padding: '0.75rem 1rem',
+                              border: '1px solid #d1d5db',
+                              borderRadius: '0.5rem',
+                              color: '#111827',
+                              fontSize: '1rem',
+                              outline: 'none'
+                            }}
+                            onFocus={(e) => {
+                              e.target.style.borderColor = '#2563eb'
+                              e.target.style.boxShadow = '0 0 0 3px rgba(37, 99, 235, 0.1)'
+                            }}
+                            onBlur={(e) => {
+                              e.target.style.borderColor = '#d1d5db'
+                              e.target.style.boxShadow = 'none'
+                            }}
+                          />
+                        </div>
+                        
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                            Price ($) *
+                          </label>
+                          <input
+                            type="number"
+                            value={price.amount_cents}
+                            onChange={(e) => updatePriceData(index, 'amount_cents', e.target.value)}
+                            placeholder="0"
+                            min="0"
+                            step="0.01"
+                            style={{
+                              width: '100%',
+                              padding: '0.75rem 1rem',
+                              border: '1px solid #d1d5db',
+                              borderRadius: '0.5rem',
+                              color: '#111827',
+                              fontSize: '1rem',
+                              outline: 'none'
+                            }}
+                            onFocus={(e) => {
+                              e.target.style.borderColor = '#2563eb'
+                              e.target.style.boxShadow = '0 0 0 3px rgba(37, 99, 235, 0.1)'
+                            }}
+                            onBlur={(e) => {
+                              e.target.style.borderColor = '#d1d5db'
+                              e.target.style.boxShadow = 'none'
+                            }}
+                          />
+                        </div>
+                        
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                            Stock Quantity *
+                          </label>
+                          <input
+                            type="number"
+                            value={price.inventory}
+                            onChange={(e) => updatePriceData(index, 'inventory', e.target.value)}
+                            placeholder="0"
+                            min="0"
+                            style={{
+                              width: '100%',
+                              padding: '0.75rem 1rem',
+                              border: '1px solid #d1d5db',
+                              borderRadius: '0.5rem',
+                              color: '#111827',
+                              fontSize: '1rem',
+                              outline: 'none'
+                            }}
+                            onFocus={(e) => {
+                              e.target.style.borderColor = '#2563eb'
+                              e.target.style.boxShadow = '0 0 0 3px rgba(37, 99, 235, 0.1)'
+                            }}
+                            onBlur={(e) => {
+                              e.target.style.borderColor = '#d1d5db'
+                              e.target.style.boxShadow = 'none'
+                            }}
+                          />
+                        </div>
+                        
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                            Limit per Person
+                          </label>
+                          <input
+                            type="number"
+                            value={price.limit_per_user}
+                            onChange={(e) => updatePriceData(index, 'limit_per_user', e.target.value)}
+                            placeholder="No limit"
+                            min="1"
+                            style={{
+                              width: '100%',
+                              padding: '0.75rem 1rem',
+                              border: '1px solid #d1d5db',
+                              borderRadius: '0.5rem',
+                              color: '#111827',
+                              fontSize: '1rem',
+                              outline: 'none'
+                            }}
+                            onFocus={(e) => {
+                              e.target.style.borderColor = '#2563eb'
+                              e.target.style.boxShadow = '0 0 0 3px rgba(37, 99, 235, 0.1)'
+                            }}
+                            onBlur={(e) => {
+                              e.target.style.borderColor = '#d1d5db'
+                              e.target.style.boxShadow = 'none'
+                            }}
+                          />
+                        </div>
+                      </div>
                     </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-2">票档名称 *</label>
-                        <input
-                          type="text"
-                          value={price.name}
-                          onChange={(e) => updatePriceData(index, 'name', e.target.value)}
-                          className="w-full px-3 py-2 bg-slate-700 border border-white/10 rounded text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                          placeholder="如：早鸟票"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-2">价格（分） *</label>
-                        <input
-                          type="number"
-                          value={price.amount_cents}
-                          onChange={(e) => updatePriceData(index, 'amount_cents', e.target.value)}
-                          className="w-full px-3 py-2 bg-slate-700 border border-white/10 rounded text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                          placeholder="5000"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-2">库存 *</label>
-                        <input
-                          type="number"
-                          value={price.inventory}
-                          onChange={(e) => updatePriceData(index, 'inventory', e.target.value)}
-                          className="w-full px-3 py-2 bg-slate-700 border border-white/10 rounded text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                          placeholder="100"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-2">限购数量</label>
-                        <input
-                          type="number"
-                          value={price.limit_per_user}
-                          onChange={(e) => updatePriceData(index, 'limit_per_user', e.target.value)}
-                          className="w-full px-3 py-2 bg-slate-700 border border-white/10 rounded text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                          placeholder="2"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                  
+                  <button
+                    onClick={addPrice}
+                    style={{
+                      width: '100%',
+                      padding: '1rem',
+                      border: '2px dashed #d1d5db',
+                      borderRadius: '0.5rem',
+                      color: '#6b7280',
+                      backgroundColor: 'transparent',
+                      cursor: 'pointer',
+                      transition: 'all 0.3s',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.5rem'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.borderColor = '#9ca3af'
+                      e.target.style.backgroundColor = '#f9fafb'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.borderColor = '#d1d5db'
+                      e.target.style.backgroundColor = 'transparent'
+                    }}
+                  >
+                    <svg style={{ width: '1.25rem', height: '1.25rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    Add Ticket Type
+                  </button>
+                </div>
               </div>
-              
-              <button
-                type="button"
-                onClick={addPrice}
-                className="w-full py-3 border-2 border-dashed border-white/20 rounded-lg text-slate-400 hover:text-white hover:border-white/40 transition-colors"
-              >
-                + 添加票档
-              </button>
             </div>
           )}
 
-          {currentStep === 4 && (
-            <div className="space-y-6">
-              <h2 className="text-2xl font-bold text-white mb-6">预览 & 保存</h2>
-              
-              <div className="bg-slate-800/30 rounded-lg p-6">
-                <h3 className="text-xl font-bold text-white mb-4">{eventData.title}</h3>
-                <p className="text-slate-300 mb-4">{eventData.description}</p>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                  <div>
-                    <span className="text-slate-400">开始时间:</span>
-                    <div className="text-white">{eventData.startTime ? new Date(eventData.startTime).toLocaleString('zh-CN') : '未设置'}</div>
-                  </div>
-                  <div>
-                    <span className="text-slate-400">结束时间:</span>
-                    <div className="text-white">{eventData.endTime ? new Date(eventData.endTime).toLocaleString('zh-CN') : '未设置'}</div>
-                  </div>
-                  <div>
-                    <span className="text-slate-400">活动场地:</span>
-                    <div className="text-white">{eventData.location}</div>
-                  </div>
-                </div>
-                
-                <div>
-                  <span className="text-slate-400">票档信息:</span>
-                  <div className="mt-2 space-y-2">
-                    {eventData.prices.map((price, index) => (
-                      <div key={index} className="flex items-center justify-between bg-slate-700/50 rounded p-2">
-                        <span className="text-white">{price.name}</span>
-                        <span className="text-white">¥{(price.amount_cents / 100).toFixed(2)}</span>
-                        <span className="text-slate-400">库存: {price.inventory}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+          {/* Error Message */}
+          {error && (
+            <div style={{
+              backgroundColor: '#fef2f2',
+              border: '1px solid #fecaca',
+              borderRadius: '0.5rem',
+              padding: '1rem',
+              marginBottom: '1.5rem'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <svg style={{ width: '1.25rem', height: '1.25rem', color: '#ef4444' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+                <span style={{ color: '#b91c1c' }}>{error}</span>
               </div>
-              
-              {error && (
-                <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3">
-                  <p className="text-red-400 text-sm">{error}</p>
-                </div>
-              )}
             </div>
           )}
 
-          {/* 导航按钮 */}
-          <div className="flex items-center justify-between mt-8">
+          {/* Action Buttons */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingTop: '1.5rem',
+            borderTop: '1px solid #e5e7eb'
+          }}>
             <button
-              type="button"
               onClick={prevStep}
               disabled={currentStep === 1}
-              className="px-6 py-3 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
+              style={{
+                padding: '0.75rem 1.5rem',
+                borderRadius: '0.5rem',
+                fontWeight: '500',
+                border: 'none',
+                cursor: currentStep === 1 ? 'not-allowed' : 'pointer',
+                transition: 'all 0.3s',
+                backgroundColor: currentStep === 1 ? '#f3f4f6' : '#f3f4f6',
+                color: currentStep === 1 ? '#9ca3af' : '#374151'
+              }}
+              onMouseEnter={(e) => {
+                if (currentStep !== 1) {
+                  e.target.style.backgroundColor = '#e5e7eb'
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (currentStep !== 1) {
+                  e.target.style.backgroundColor = '#f3f4f6'
+                }
+              }}
             >
-              上一步
+              Previous
             </button>
-            
-            {currentStep < 4 ? (
+
+            <div style={{ display: 'flex', gap: '1rem' }}>
               <button
-                type="button"
-                onClick={nextStep}
-                disabled={!validateStep(currentStep)}
-                className="btn-partytix-gradient disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={() => router.back()}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  backgroundColor: '#f3f4f6',
+                  color: '#374151',
+                  borderRadius: '0.5rem',
+                  fontWeight: '500',
+                  border: 'none',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s'
+                }}
+                onMouseEnter={(e) => e.target.style.backgroundColor = '#e5e7eb'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = '#f3f4f6'}
               >
-                下一步
+                Cancel
               </button>
-            ) : (
-              <button
-                type="button"
-                onClick={saveEvent}
-                disabled={isSubmitting}
-                className="btn-partytix-gradient disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isSubmitting ? '保存中...' : '保存活动'}
-              </button>
-            )}
+
+              {currentStep < 3 ? (
+                <button
+                  onClick={nextStep}
+                  style={{
+                    padding: '0.75rem 1.5rem',
+                    backgroundColor: '#2563eb',
+                    color: 'white',
+                    borderRadius: '0.5rem',
+                    fontWeight: '500',
+                    border: 'none',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s'
+                  }}
+                  onMouseEnter={(e) => e.target.style.backgroundColor = '#1d4ed8'}
+                  onMouseLeave={(e) => e.target.style.backgroundColor = '#2563eb'}
+                >
+                  Next
+                </button>
+              ) : (
+                <button
+                  onClick={handleSubmit}
+                  disabled={isSubmitting}
+                  style={{
+                    padding: '0.75rem 1.5rem',
+                    borderRadius: 'Snapshot.5rem',
+                    fontWeight: '500',
+                    border: 'none',
+                    cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.3s',
+                    backgroundColor: isSubmitting ? '#f3f4f6' : '#2563eb',
+                    color: isSubmitting ? '#9ca3af' : 'white',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isSubmitting) {
+                      e.target.style.backgroundColor = '#1d4ed8'
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isSubmitting) {
+                      e.target.style.backgroundColor = '#2563eb'
+                    }
+                  }}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <div style={{
+                        width: '1rem',
+                        height: '1rem',
+                        border: '2px solid #9ca3af',
+                        borderTop: '2px solid #6b7280',
+                        borderRadius: '50%',
+                        animation: 'spin 1s linear infinite'
+                      }}></div>
+                      Creating...
+                    </>
+                  ) : (
+                    'Create Event'
+                  )}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>

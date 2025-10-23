@@ -103,6 +103,51 @@ async function handleCheckoutSessionCompleted(session) {
   });
   
   try {
+    // 根据价格判断票种类型
+    let ticketType = '';
+    let eventName = 'Ridiculous Chicken Night Event';
+    
+    if (session.amount_total === 1500) { // $15.00 in cents
+      ticketType = 'Regular Ticket (21+)';
+    } else if (session.amount_total === 3000) { // $30.00 in cents
+      ticketType = 'Special Ticket (18-20)';
+    }
+    
+    // 生成票券数据
+    const ticket = {
+      id: `ticket_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      eventName: eventName,
+      ticketType: ticketType,
+      price: (session.amount_total / 100).toFixed(2),
+      purchaseDate: new Date().toLocaleDateString('en-US'),
+      status: 'valid',
+      customerEmail: session.customer_email,
+      sessionId: session.id
+    };
+    
+    // 生成二维码数据
+    const qrData = {
+      ticketId: ticket.id,
+      eventName: ticket.eventName,
+      ticketType: ticket.ticketType,
+      purchaseDate: ticket.purchaseDate,
+      price: ticket.price,
+      customerEmail: ticket.customerEmail
+    };
+    
+    ticket.qrCode = JSON.stringify(qrData);
+    
+    console.log('[StripeWebhook] Ticket generated:', {
+      ticketId: ticket.id,
+      ticketType: ticket.ticketType,
+      price: ticket.price,
+      customerEmail: ticket.customerEmail
+    });
+    
+    // 这里可以保存到数据库或发送给用户
+    // 为了演示，我们记录到日志中
+    console.log('[StripeWebhook] QR Code generated for ticket:', ticket.qrCode);
+    
     // 处理支付完成的订单，创建订单和票务
     const result = await processPaidOrder(session);
     

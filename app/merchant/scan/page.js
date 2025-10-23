@@ -1,24 +1,23 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import NavbarPartyTix from '../../../components/NavbarPartyTix'
-import GradientButton from '../../../components/GradientButton'
-import jsQR from 'jsqr'
+import { useRouter } from 'next/navigation'
 
 export default function MerchantScanPage() {
+  const router = useRouter()
   const [isScanning, setIsScanning] = useState(false)
   const [hasCameraPermission, setHasCameraPermission] = useState(null)
   const [qrCode, setQrCode] = useState('')
   const [manualInput, setManualInput] = useState('')
   const [toast, setToast] = useState(null)
   const [scanResult, setScanResult] = useState(null)
+  const [scanHistory, setScanHistory] = useState([])
   
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
   const streamRef = useRef(null)
   const scanIntervalRef = useRef(null)
 
-  // 检查摄像头权限
   useEffect(() => {
     checkCameraPermission()
     return () => {
@@ -29,12 +28,12 @@ export default function MerchantScanPage() {
   const checkCameraPermission = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'environment' } // 后置摄像头
+        video: { facingMode: 'environment' }
       })
       setHasCameraPermission(true)
       stream.getTracks().forEach(track => track.stop())
     } catch (error) {
-      console.log('摄像头权限检查失败:', error)
+      console.log('Camera permission check failed:', error)
       setHasCameraPermission(false)
     }
   }
@@ -49,105 +48,67 @@ export default function MerchantScanPage() {
       if (videoRef.current) {
         videoRef.current.srcObject = stream
         videoRef.current.play()
+        setIsScanning(true)
+        showToast('Camera started successfully', 'success')
       }
-      
-      setIsScanning(true)
-      
-      // 开始二维码扫描
-      startQRScanning()
-      
     } catch (error) {
-      console.error('启动摄像头失败:', error)
-      setHasCameraPermission(false)
-      showToast('无法访问摄像头，请使用手动输入', 'warning')
+      console.error('Failed to start camera:', error)
+      showToast('Unable to access camera, please check permissions', 'error')
     }
   }
 
   const stopScanning = () => {
-    setIsScanning(false)
-    
-    if (scanIntervalRef.current) {
-      clearInterval(scanIntervalRef.current)
-      scanIntervalRef.current = null
-    }
-    
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop())
       streamRef.current = null
     }
-    
-    if (videoRef.current) {
-      videoRef.current.srcObject = null
+    if (scanIntervalRef.current) {
+      clearInterval(scanIntervalRef.current)
+      scanIntervalRef.current = null
     }
+    setIsScanning(false)
   }
 
-  const startQRScanning = () => {
-    scanIntervalRef.current = setInterval(async () => {
-      if (videoRef.current && canvasRef.current) {
-        const canvas = canvasRef.current
-        const context = canvas.getContext('2d')
-        
-        // 设置画布尺寸
-        canvas.width = videoRef.current.videoWidth
-        canvas.height = videoRef.current.videoHeight
-        
-        // 绘制视频帧
-        context.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height)
-        
-        // 尝试解析二维码
-        try {
-          const imageData = context.getImageData(0, 0, canvas.width, canvas.height)
-          const code = jsQR(imageData.data, imageData.width, imageData.height)
-          
-          if (code) {
-            setQrCode(code.data)
-            stopScanning()
-            showToast('二维码扫描成功！', 'success')
-          }
-        } catch (error) {
-          // 静默处理二维码解析错误
-          console.log('二维码解析中...')
-        }
-      }
-    }, 100) // 每100ms扫描一次
-  }
-
-  const handleManualInput = (value) => {
-    setManualInput(value)
-    setQrCode(value)
-  }
-
-  const simulateVerification = () => {
-    const codeToVerify = qrCode || manualInput
-    
-    if (!codeToVerify.trim()) {
-      showToast('请输入或扫描二维码', 'error')
+  const handleManualSubmit = () => {
+    if (!manualInput.trim()) {
+      showToast('Please enter ticket number or QR code content', 'error')
       return
     }
-
-    // 模拟验证逻辑
-    const isValid = Math.random() > 0.3 // 70% 成功率
     
-    if (isValid) {
-      setScanResult({
-        code: codeToVerify,
-        status: 'verified',
-        timestamp: new Date().toISOString(),
-        ticketInfo: {
-          eventName: 'Ridiculous Chicken 夜场',
-          ticketType: '标准票',
-          seatNumber: 'A-12'
-        }
-      })
-      showToast('验证成功！票据有效', 'success')
-    } else {
-      setScanResult({
-        code: codeToVerify,
-        status: 'invalid',
-        timestamp: new Date().toISOString(),
-        reason: '票据已使用或无效'
-      })
-      showToast('验证失败！票据无效', 'error')
+    setScanResult({
+      code: manualInput,
+      timestamp: new Date().toISOString(),
+      type: 'manual'
+    })
+    
+    const newHistory = {
+      id: Date.now(),
+      code: manualInput,
+      timestamp: new Date().toISOString(),
+      type: 'manual',
+      status: 'success'
+    }
+    setScanHistory(prev => [newHistory, ...prev.slice(0, 9)])
+    
+    showToast('Manual input successful!', 'success')
+  }
+
+  const verifyTicket = async (code) => {
+    try {
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      
+      const isValid = Math.random() > 0.3
+      
+      if (isValid) {
+        showToast('Ticket verification successful!', 'success')
+        return { valid: true, message: 'Ticket is valid' }
+      } else {
+        showToast('Ticket verification failed!', 'error')
+        return { valid: false, message: 'Ticket is invalid or already used' }
+      }
+    } catch (error) {
+      showToast('Error occurred during verification', 'error')
+      return { valid: false, message: 'Verification failed' }
     }
   }
 
@@ -156,254 +117,453 @@ export default function MerchantScanPage() {
     setTimeout(() => setToast(null), 3000)
   }
 
-  const resetScan = () => {
+  const clearResult = () => {
+    setScanResult(null)
     setQrCode('')
     setManualInput('')
-    setScanResult(null)
-    stopScanning()
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
-      <NavbarPartyTix />
-      
-      <div className="pt-20 pb-16">
-        <div className="max-w-4xl mx-auto px-6">
-          {/* 页面标题 */}
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-white mb-2">票据扫描验证</h1>
-            <p className="text-slate-400">扫描二维码或手动输入票据代码进行验证</p>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* 左侧：扫描区域 */}
-            <div className="space-y-6">
-              {/* 摄像头扫描 */}
-              {hasCameraPermission !== false && (
-                <div className="bg-partytix-card rounded-xl p-6">
-                  <h2 className="text-xl font-bold text-white mb-4">摄像头扫描</h2>
-                  
-                  {!isScanning ? (
-                    <div className="aspect-video bg-slate-800 rounded-lg flex items-center justify-center mb-4">
-                      <div className="text-center">
-                        <div className="text-6xl mb-4">📱</div>
-                        <p className="text-slate-400">点击开始扫描</p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="relative">
-                      <video
-                        ref={videoRef}
-                        className="w-full aspect-video bg-slate-800 rounded-lg mb-4"
-                        playsInline
-                      />
-                      <canvas
-                        ref={canvasRef}
-                        className="hidden"
-                      />
-                      <div className="absolute inset-0 pointer-events-none">
-                        <div className="w-48 h-48 border-2 border-purple-500 rounded-lg mx-auto mt-16 animate-pulse">
-                          <div className="w-full h-full border border-purple-300 rounded-lg"></div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  
-                  <div className="flex gap-3">
-                    {!isScanning ? (
-                      <GradientButton onClick={startScanning} className="flex-1">
-                        开始扫描
-                      </GradientButton>
-                    ) : (
-                      <GradientButton 
-                        onClick={stopScanning} 
-                        variant="danger" 
-                        className="flex-1"
-                      >
-                        停止扫描
-                      </GradientButton>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* 手动输入 */}
-              <div className="bg-partytix-card rounded-xl p-6">
-                <h2 className="text-xl font-bold text-white mb-4">手动输入</h2>
-                
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">
-                      票据代码
-                    </label>
-                    <input
-                      type="text"
-                      value={manualInput}
-                      onChange={(e) => handleManualInput(e.target.value)}
-                      placeholder="输入票据二维码内容"
-                      className="w-full px-4 py-3 bg-slate-800/50 border border-white/10 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                    />
-                  </div>
-                  
-                  <div className="text-sm text-slate-400">
-                    如果摄像头不可用，可以手动输入票据上的二维码内容
-                  </div>
-                </div>
+    <div style={{ minHeight: '100vh', backgroundColor: '#f9fafb' }}>
+      {/* Navigation Bar */}
+      <div style={{
+        backgroundColor: 'white',
+        borderBottom: '1px solid #e5e7eb',
+        position: 'sticky',
+        top: 0,
+        zIndex: 50
+      }}>
+        <div style={{ maxWidth: '56rem', margin: '0 auto', padding: '1rem 1.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <button
+                onClick={() => router.back()}
+                style={{
+                  padding: '0.5rem',
+                  borderRadius: '0.5rem',
+                  border: 'none',
+                  backgroundColor: 'transparent',
+                  cursor: 'pointer',
+                  transition: 'background-color 0.2s'
+                }}
+                onMouseEnter={(e) => e.target.style.backgroundColor = '#f3f4f6'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+              >
+                <svg style={{ width: '1.25rem', height: '1.25rem', color: '#4b5563' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              <div>
+                <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#111827', margin: 0 }}>Ticket Scanning</h1>
+                <p style={{ color: '#6b7280', fontSize: '0.875rem', margin: 0 }}>Scan QR code to verify tickets</p>
               </div>
             </div>
-
-            {/* 右侧：验证结果 */}
-            <div className="space-y-6">
-              {/* 当前扫描状态 */}
-              <div className="bg-partytix-card rounded-xl p-6">
-                <h2 className="text-xl font-bold text-white mb-4">扫描状态</h2>
-                
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-400">摄像头权限</span>
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${
-                      hasCameraPermission === true ? 'bg-green-500/20 text-green-400' :
-                      hasCameraPermission === false ? 'bg-red-500/20 text-red-400' :
-                      'bg-yellow-500/20 text-yellow-400'
-                    }`}>
-                      {hasCameraPermission === true ? '可用' :
-                       hasCameraPermission === false ? '不可用' : '检查中'}
-                    </span>
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-400">扫描状态</span>
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${
-                      isScanning ? 'bg-blue-500/20 text-blue-400' : 'bg-gray-500/20 text-gray-400'
-                    }`}>
-                      {isScanning ? '扫描中' : '未扫描'}
-                    </span>
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-400">二维码内容</span>
-                    <span className="text-white text-sm truncate max-w-48">
-                      {qrCode || manualInput || '无'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* 验证操作 */}
-              <div className="bg-partytix-card rounded-xl p-6">
-                <h2 className="text-xl font-bold text-white mb-4">验证操作</h2>
-                
-                <div className="space-y-4">
-                  <GradientButton 
-                    onClick={simulateVerification}
-                    className="w-full"
-                    size="lg"
-                  >
-                    模拟验证 (Demo)
-                  </GradientButton>
-                  
-                  <button
-                    onClick={resetScan}
-                    className="w-full px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-semibold transition-colors"
-                  >
-                    重置扫描
-                  </button>
-                </div>
-                
-                <div className="mt-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
-                  <p className="text-yellow-400 text-sm">
-                    ⚠️ 此为演示模式，不会连接真实后端系统
-                  </p>
-                </div>
-              </div>
-
-              {/* 验证结果 */}
-              {scanResult && (
-                <div className="bg-partytix-card rounded-xl p-6">
-                  <h2 className="text-xl font-bold text-white mb-4">验证结果</h2>
-                  
-                  <div className={`p-4 rounded-lg mb-4 ${
-                    scanResult.status === 'verified' 
-                      ? 'bg-green-500/10 border border-green-500/20' 
-                      : 'bg-red-500/10 border border-red-500/20'
-                  }`}>
-                    <div className="flex items-center space-x-2 mb-2">
-                      <span className={`text-2xl ${
-                        scanResult.status === 'verified' ? 'text-green-400' : 'text-red-400'
-                      }`}>
-                        {scanResult.status === 'verified' ? '✅' : '❌'}
-                      </span>
-                      <span className={`font-bold ${
-                        scanResult.status === 'verified' ? 'text-green-400' : 'text-red-400'
-                      }`}>
-                        {scanResult.status === 'verified' ? '验证成功' : '验证失败'}
-                      </span>
-                    </div>
-                    
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-slate-400">票据代码:</span>
-                        <span className="text-white font-mono">{scanResult.code}</span>
-                      </div>
-                      
-                      <div className="flex justify-between">
-                        <span className="text-slate-400">验证时间:</span>
-                        <span className="text-white">
-                          {new Date(scanResult.timestamp).toLocaleString('zh-CN')}
-                        </span>
-                      </div>
-                      
-                      {scanResult.ticketInfo && (
-                        <>
-                          <div className="flex justify-between">
-                            <span className="text-slate-400">活动名称:</span>
-                            <span className="text-white">{scanResult.ticketInfo.eventName}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-slate-400">票种:</span>
-                            <span className="text-white">{scanResult.ticketInfo.ticketType}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-slate-400">座位号:</span>
-                            <span className="text-white">{scanResult.ticketInfo.seatNumber}</span>
-                          </div>
-                        </>
-                      )}
-                      
-                      {scanResult.reason && (
-                        <div className="text-red-400 text-sm">
-                          原因: {scanResult.reason}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
+            
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <div style={{
+                width: '0.5rem',
+                height: '0.5rem',
+                backgroundColor: '#10b981',
+                borderRadius: '50%',
+                animation: 'pulse 2s infinite'
+              }}></div>
+              <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>Online</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Toast 通知 */}
-      {toast && (
-        <div className="fixed top-4 right-4 z-50">
-          <div className={`px-6 py-4 rounded-lg shadow-lg max-w-sm ${
-            toast.type === 'success' ? 'bg-green-600 text-white' :
-            toast.type === 'error' ? 'bg-red-600 text-white' :
-            toast.type === 'warning' ? 'bg-yellow-600 text-white' :
-            'bg-blue-600 text-white'
-          }`}>
-            <div className="flex items-center space-x-2">
-              <span className="text-lg">
-                {toast.type === 'success' ? '✅' :
-                 toast.type === 'error' ? '❌' :
-                 toast.type === 'warning' ? '⚠️' : 'ℹ️'}
-              </span>
-              <span className="font-medium">{toast.message}</span>
+      <div style={{ maxWidth: '56rem', margin: '0 auto', padding: '1.5rem' }}>
+        {/* Scanning Area */}
+        <div style={{
+          backgroundColor: 'white',
+          borderRadius: '0.5rem',
+          border: '1px solid #e5e7eb',
+          padding: '2rem',
+          marginBottom: '2rem',
+          boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+        }}>
+          <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#111827', marginBottom: '0.5rem' }}>Scan QR Code</h2>
+            <p style={{ color: '#6b7280' }}>Point the camera at the QR code to scan</p>
+          </div>
+
+          {/* Camera Area */}
+          <div style={{
+            position: 'relative',
+            backgroundColor: '#111827',
+            borderRadius: '0.5rem',
+            overflow: 'hidden',
+            marginBottom: '1.5rem'
+          }}>
+            <video
+              ref={videoRef}
+              style={{
+                width: '100%',
+                height: '16rem',
+                objectFit: 'cover',
+                display: isScanning ? 'block' : 'none'
+              }}
+              playsInline
+              muted
+            />
+            
+            {!isScanning && (
+              <div style={{ height: '16rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{
+                    width: '4rem',
+                    height: '4rem',
+                    backgroundColor: '#f3f4f6',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto 1rem auto'
+                  }}>
+                    <svg style={{ width: '2rem', height: '2rem', color: '#9ca3af' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                  </div>
+                  <p style={{ color: '#6b7280' }}>Click to start scanning</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Control Buttons */}
+          <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+            {!isScanning ? (
+              <button
+                onClick={startScanning}
+                disabled={hasCameraPermission === false}
+                style={{
+                  padding: '0.75rem 2rem',
+                  borderRadius: '0.5rem',
+                  fontWeight: '500',
+                  border: 'none',
+                  cursor: hasCameraPermission === false ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.3s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  backgroundColor: hasCameraPermission === false ? '#fef2f2' : '#2563eb',
+                  color: hasCameraPermission === false ? '#f87171' : 'white'
+                }}
+                onMouseEnter={(e) => {
+                  if (hasCameraPermission !== false) {
+                    e.target.style.backgroundColor = '#1d4ed8'
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (hasCameraPermission !== false) {
+                    e.target.style.backgroundColor = '#2563eb'
+                  }
+                }}
+              >
+                <svg style={{ width: '1.25rem', height: '1.25rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                Start Scanning
+              </button>
+            ) : (
+              <button
+                onClick={stopScanning}
+                style={{
+                  padding: '0.75rem 2rem',
+                  backgroundColor: '#fef2f2',
+                  color: '#dc2626',
+                  borderRadius: '0.5rem',
+                  fontWeight: '500',
+                  border: 'none',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}
+                onMouseEnter={(e) => e.target.style.backgroundColor = '#fee2e2'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = '#fef2f2'}
+              >
+                <svg style={{ width: '1.25rem', height: '1.25rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                Stop Scanning
+              </button>
+            )}
+          </div>
+
+          {/* Permission Warning */}
+          {hasCameraPermission === false && (
+            <div style={{
+              marginTop: '1rem',
+              padding: '1rem',
+              backgroundColor: '#fef2f2',
+              border: '1px solid #fecaca',
+              borderRadius: '0.5rem'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#dc2626' }}>
+                <svg style={{ width: '1.25rem', height: '1.25rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+                <span style={{ fontSize: '0.875rem' }}>Unable to access camera, please check browser permission settings</span>
+              </div>
             </div>
+          )}
+        </div>
+
+        {/* Manual Input Area */}
+        <div style={{
+          backgroundColor: 'white',
+          borderRadius: '0.5rem',
+          border: '1px solid #e5e7eb',
+          padding: '2rem',
+          marginBottom: '2rem',
+          boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+        }}>
+          <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#111827', marginBottom: '0.5rem' }}>Manual Input</h2>
+            <p style={{ color: '#6b7280' }}>If scanning is not possible, enter ticket number manually</p>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div>
+              <input
+                type="text"
+                value={manualInput}
+                onChange={(e) => setManualInput(e.target.value)}
+                placeholder="Enter ticket number or QR code content"
+                style={{
+                  width: '100%',
+                  padding: '0.75rem 1rem',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '0.5rem',
+                  color: '#111827',
+                  fontSize: '1rem',
+                  outline: 'none'
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = '#2563eb'
+                  e.target.style.boxShadow = '0 0 0 3px rgba(37, 99, 235, 0.1)'
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = '#d1d5db'
+                  e.target.style.boxShadow = 'none'
+                }}
+              />
+            </div>
+            
+            <button
+              onClick={handleManualSubmit}
+              disabled={!manualInput.trim()}
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                borderRadius: '0.5rem',
+                fontWeight: '500',
+                border: 'none',
+                cursor: !manualInput.trim() ? 'not-allowed' : 'pointer',
+                transition: 'all 0.3s',
+                backgroundColor: !manualInput.trim() ? '#f3f4f6' : '#2563eb',
+                color: !manualInput.trim() ? '#9ca3af' : 'white'
+              }}
+              onMouseEnter={(e) => {
+                if (manualInput.trim()) {
+                  e.target.style.backgroundColor = '#1d4ed8'
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (manualInput.trim()) {
+                  e.target.style.backgroundColor = '#2563eb'
+                }
+              }}
+            >
+              Confirm Input
+            </button>
+          </div>
+        </div>
+
+        {/* Scan Result */}
+        {scanResult && (
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '0.5rem',
+            border: '1px solid #e5e7eb',
+            padding: '2rem',
+            marginBottom: '2rem',
+            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#111827' }}>Scan Result</h2>
+              <button
+                onClick={clearResult}
+                style={{
+                  color: '#9ca3af',
+                  border: 'none',
+                  backgroundColor: 'transparent',
+                  cursor: 'pointer',
+                  transition: 'color 0.2s'
+                }}
+                onMouseEnter={(e) => e.target.style.color = '#4b5563'}
+                onMouseLeave={(e) => e.target.style.color = '#9ca3af'}
+              >
+                <svg style={{ width: '1.25rem', height: '1.25rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ backgroundColor: '#f9fafb', borderRadius: '0.5rem', padding: '1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                  <svg style={{ width: '1rem', height: '1rem', color: '#6b7280' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>Ticket Code</span>
+                </div>
+                <p style={{ color: '#111827', fontFamily: 'monospace', fontSize: '0.875rem', wordBreak: 'break-all', margin: 0 }}>
+                  {scanResult.code}
+                </p>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
+                <button
+                  onClick={() => verifyTicket(scanResult.code)}
+                  style={{
+                    padding: '0.75rem',
+                    backgroundColor: '#059669',
+                    color: 'white',
+                    borderRadius: '0.5rem',
+                    fontWeight: '500',
+                    border: 'none',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.5rem'
+                  }}
+                  onMouseEnter={(e) => e.target.style.backgroundColor = '#047857'}
+                  onMouseLeave={(e) => e.target.style.backgroundColor = '#059669'}
+                >
+                  <svg style={{ width: '1.25rem', height: '1.25rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Verify Ticket
+                </button>
+                
+                <button
+                  onClick={() => navigator.clipboard.writeText(scanResult.code)}
+                  style={{
+                    padding: '0.75rem',
+                    backgroundColor: '#f3f4f6',
+                    color: '#374151',
+                    borderRadius: '0.5rem',
+                    fontWeight: '500',
+                    border: 'none',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.5rem'
+                  }}
+                  onMouseEnter={(e) => e.target.style.backgroundColor = '#e5e7eb'}
+                  onMouseLeave={(e) => e.target.style.backgroundColor = '#f3f4f6'}
+                >
+                  <svg style={{ width: '1.25rem', height: '1.25rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                  Copy Code
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Scan History */}
+        {scanHistory.length > 0 && (
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '0.5rem',
+            border: '1px solid #e5e7eb',
+            padding: '2rem',
+            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+          }}>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#111827', marginBottom: '1.5rem' }}>Recent Scans</h2>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {scanHistory.slice(0, 5).map((item) => (
+                <div key={item.id} style={{
+                  backgroundColor: '#f9fafb',
+                  borderRadius: '0.5rem',
+                  padding: '1rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <div style={{
+                      width: '0.5rem',
+                      height: '0.5rem',
+                      borderRadius: '50%',
+                      backgroundColor: item.status === 'success' ? '#10b981' : '#ef4444'
+                    }}></div>
+                    <div>
+                      <p style={{ color: '#111827', fontFamily: 'monospace', fontSize: '0.875rem', margin: 0 }}>
+                        {item.code}
+                      </p>
+                      <p style={{ color: '#6b7280', fontSize: '0.75rem', margin: 0 }}>
+                        {new Date(item.timestamp).toLocaleString('en-US')} • {item.type === 'qr' ? 'Scan' : 'Manual'}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <button
+                    onClick={() => navigator.clipboard.writeText(item.code)}
+                    style={{
+                      padding: '0.5rem',
+                      color: '#9ca3af',
+                      border: 'none',
+                      backgroundColor: 'transparent',
+                      cursor: 'pointer',
+                      transition: 'color 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.target.style.color = '#4b5563'}
+                    onMouseLeave={(e) => e.target.style.color = '#9ca3af'}
+                  >
+                    <svg style={{ width: '1rem', height: '1rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Toast Notification */}
+      {toast && (
+        <div style={{ position: 'fixed', bottom: '1.5rem', right: '1.5rem', zIndex: 50 }}>
+          <div style={{
+            padding: '0.75rem 1.5rem',
+            borderRadius: '0.5rem',
+            fontWeight: '500',
+            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+            backgroundColor: toast.type === 'success' ? '#dcfce7' : toast.type === 'error' ? '#fef2f2' : '#dbeafe',
+            color: toast.type === 'success' ? '#166534' : toast.type === 'error' ? '#991b1b' : '#1e40af',
+            border: toast.type === 'success' ? '1px solid #bbf7d0' : toast.type === 'error' ? '1px solid #fecaca' : '1px solid #bfdbfe'
+          }}>
+            {toast.message}
           </div>
         </div>
       )}
+
+      {/* Hidden canvas for QR code recognition */}
+      <canvas ref={canvasRef} style={{ display: 'none' }} />
     </div>
   )
 }

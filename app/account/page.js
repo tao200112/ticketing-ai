@@ -1,175 +1,327 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { hasSupabase } from '../../lib/safeEnv'
+import { useRouter } from 'next/navigation'
 
 export default function AccountPage() {
+  const router = useRouter()
   const [userData, setUserData] = useState(null)
+  const [tickets, setTickets] = useState([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
 
   useEffect(() => {
-    loadUserData()
-  }, [])
-
-  const loadUserData = async () => {
-    try {
-      if (hasSupabase()) {
-        // 从 Supabase 获取用户数据
-        // 注意：这里需要用户认证，暂时使用示例数据
-        // 在实际应用中，应该从认证状态或 token 中获取用户 ID
-        setUserData({
-          source: 'supabase',
-          message: 'Supabase 连接正常，但需要用户认证才能获取具体数据'
-        })
-      } else {
-        // 从 localStorage 获取用户数据
-        const storedData = localStorage.getItem('partyTix_user')
-        if (storedData) {
-          const parsedData = JSON.parse(storedData)
-          setUserData({
-            ...parsedData,
-            source: 'localStorage'
-          })
-        } else {
-          setUserData(null)
-        }
-      }
-    } catch (err) {
-      setError('加载用户数据时出错')
-      console.error('加载用户数据错误:', err)
-    } finally {
-      setLoading(false)
+    // 检查用户是否已登录
+    const storedUserData = localStorage.getItem('userData')
+    if (!storedUserData || !JSON.parse(storedUserData).isLoggedIn) {
+      router.push('/auth/login')
+      return
     }
+
+    const user = JSON.parse(storedUserData)
+    setUserData(user)
+
+    // 从用户存储中获取购票记录
+    const storedUsers = JSON.parse(localStorage.getItem('localUsers') || '[]')
+    const userRecord = storedUsers.find(u => u.email === user.email)
+    if (userRecord && userRecord.tickets) {
+      setTickets(userRecord.tickets)
+    }
+
+    setLoading(false)
+  }, [router])
+
+  const handleLogout = () => {
+    localStorage.removeItem('userData')
+    router.push('/')
+  }
+
+  const generateQRCode = (ticket) => {
+    // Generate QR code data
+    const qrData = {
+      ticketId: ticket.id,
+      eventName: ticket.eventName,
+      ticketType: ticket.ticketType,
+      purchaseDate: ticket.purchaseDate,
+      price: ticket.price
+    }
+    return JSON.stringify(qrData)
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
-        <div className="bg-partytix-card backdrop-blur-sm rounded-2xl shadow-2xl p-8 w-full max-w-md text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto mb-4"></div>
-          <p className="text-slate-400">加载中...</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4">
-        <div className="bg-partytix-card backdrop-blur-sm rounded-2xl shadow-2xl p-8 w-full max-w-md text-center">
-          <div className="text-red-400 mb-4">
-            <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-            </svg>
-          </div>
-          <h2 className="text-xl font-bold text-white mb-2">加载失败</h2>
-          <p className="text-slate-400 mb-6">{error}</p>
-          <button 
-            onClick={loadUserData}
-            className="btn-partytix-gradient"
-          >
-            重试
-          </button>
-        </div>
+      <div style={{
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #0f172a 0%, #7c3aed 50%, #0f172a 100%)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}>
+        <div style={{
+          width: '3rem',
+          height: '3rem',
+          border: '4px solid #f3f4f6',
+          borderTopColor: '#7c3aed',
+          borderRadius: '50%',
+          animation: 'spin 1s linear infinite'
+        }}></div>
       </div>
     )
   }
 
   if (!userData) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4">
-        <div className="bg-partytix-card backdrop-blur-sm rounded-2xl shadow-2xl p-8 w-full max-w-md text-center">
-          <div className="text-purple-400 mb-4">
-            <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-            </svg>
-          </div>
-          <h2 className="text-xl font-bold text-white mb-2">欢迎来到 PartyTix</h2>
-          <p className="text-slate-400 mb-6">您还没有账户，请先注册</p>
-          <a 
-            href="/auth/register"
-            className="btn-partytix-gradient"
-          >
-            立即注册
-          </a>
-        </div>
-      </div>
-    )
+    return null
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4">
-      <div className="bg-partytix-card backdrop-blur-sm rounded-2xl shadow-2xl p-8 w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="bg-partytix-gradient w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-            <span className="text-white text-xl font-bold">
-              {userData.name ? userData.name.charAt(0).toUpperCase() : 'U'}
-            </span>
-          </div>
-          <h1 className="text-2xl font-bold text-white mb-2">账户信息</h1>
-          <p className="text-slate-400">您的 PartyTix 账户详情</p>
-        </div>
-
-        <div className="space-y-4">
-          {userData.email && (
-            <div className="bg-slate-800/30 rounded-lg p-4">
-              <label className="block text-sm font-medium text-slate-400 mb-1">邮箱</label>
-              <p className="text-white">{userData.email}</p>
+    <div style={{
+      minHeight: '100vh',
+      background: 'linear-gradient(135deg, #0f172a 0%, #7c3aed 50%, #0f172a 100%)',
+      padding: '32px'
+    }}>
+      <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+        {/* Header */}
+        <div style={{
+          background: 'rgba(15, 23, 42, 0.6)',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          borderRadius: '16px',
+          padding: '32px',
+          marginBottom: '32px'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+            <div>
+              <h1 style={{
+                fontSize: '2rem',
+                fontWeight: 'bold',
+                color: 'white',
+                marginBottom: '8px'
+              }}>
+                Welcome, {userData.name}!
+              </h1>
+              <p style={{ color: '#94a3b8' }}>Manage your account and view your tickets</p>
             </div>
-          )}
-
-          {userData.name && (
-            <div className="bg-slate-800/30 rounded-lg p-4">
-              <label className="block text-sm font-medium text-slate-400 mb-1">姓名</label>
-              <p className="text-white">{userData.name}</p>
-            </div>
-          )}
-
-          {userData.age && (
-            <div className="bg-slate-800/30 rounded-lg p-4">
-              <label className="block text-sm font-medium text-slate-400 mb-1">年龄</label>
-              <p className="text-white">{userData.age} 岁</p>
-            </div>
-          )}
-
-          {userData.registered_at && (
-            <div className="bg-slate-800/30 rounded-lg p-4">
-              <label className="block text-sm font-medium text-slate-400 mb-1">注册时间</label>
-              <p className="text-white">{new Date(userData.registered_at).toLocaleString('zh-CN')}</p>
-            </div>
-          )}
-
-          <div className="bg-slate-800/30 rounded-lg p-4">
-            <label className="block text-sm font-medium text-slate-400 mb-1">数据来源</label>
-            <p className="text-white capitalize">{userData.source}</p>
-          </div>
-
-          {userData.message && (
-            <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
-              <p className="text-blue-400 text-sm">{userData.message}</p>
-            </div>
-          )}
-        </div>
-
-        <div className="mt-8 space-y-3">
-          <a 
-            href="/"
-            className="block w-full text-center px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
-          >
-            返回首页
-          </a>
-          
-          {userData.source === 'localStorage' && (
-            <button 
-              onClick={() => {
-                localStorage.removeItem('partyTix_user')
-                setUserData(null)
+            <button
+              onClick={handleLogout}
+              style={{
+                padding: '12px 24px',
+                backgroundColor: '#ef4444',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontWeight: '500',
+                cursor: 'pointer',
+                transition: 'background-color 0.2s'
               }}
-              className="block w-full text-center px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+              onMouseEnter={(e) => e.target.style.backgroundColor = '#dc2626'}
+              onMouseLeave={(e) => e.target.style.backgroundColor = '#ef4444'}
             >
-              清除本地数据
+              Logout
             </button>
+          </div>
+
+          {/* User Info */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+            gap: '16px'
+          }}>
+            <div style={{
+              backgroundColor: 'rgba(55, 65, 81, 0.3)',
+              borderRadius: '8px',
+              padding: '16px'
+            }}>
+              <p style={{ color: '#94a3b8', fontSize: '0.875rem', marginBottom: '4px' }}>Email</p>
+              <p style={{ color: 'white', fontWeight: '500' }}>{userData.email}</p>
+            </div>
+            <div style={{
+              backgroundColor: 'rgba(55, 65, 81, 0.3)',
+              borderRadius: '8px',
+              padding: '16px'
+            }}>
+              <p style={{ color: '#94a3b8', fontSize: '0.875rem', marginBottom: '4px' }}>Age</p>
+              <p style={{ color: 'white', fontWeight: '500' }}>{userData.age}</p>
+            </div>
+            <div style={{
+              backgroundColor: 'rgba(55, 65, 81, 0.3)',
+              borderRadius: '8px',
+              padding: '16px'
+            }}>
+              <p style={{ color: '#94a3b8', fontSize: '0.875rem', marginBottom: '4px' }}>Account Type</p>
+              <p style={{ color: 'white', fontWeight: '500' }}>{userData.source || 'Local'}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Tickets Section */}
+        <div style={{
+          background: 'rgba(15, 23, 42, 0.6)',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          borderRadius: '16px',
+          padding: '32px'
+        }}>
+          <h2 style={{
+            fontSize: '1.5rem',
+            fontWeight: 'bold',
+            color: 'white',
+            marginBottom: '24px'
+          }}>
+            My Tickets ({tickets.length})
+          </h2>
+
+          {tickets.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '64px 0' }}>
+              <div style={{
+                width: '6rem',
+                height: '6rem',
+                backgroundColor: 'rgba(55, 65, 81, 0.3)',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 24px auto'
+              }}>
+                <svg style={{ width: '3rem', height: '3rem', color: '#9ca3af' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
+                </svg>
+              </div>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: '600', color: 'white', marginBottom: '8px' }}>
+                No Tickets Found
+              </h3>
+              <p style={{ color: '#94a3b8', marginBottom: '24px' }}>
+                You haven't purchased any tickets yet
+              </p>
+              <a
+                href="/events"
+                style={{
+                  display: 'inline-block',
+                  padding: '12px 24px',
+                  background: 'linear-gradient(135deg, #7C3AED 0%, #22D3EE 100%)',
+                  color: 'white',
+                  textDecoration: 'none',
+                  borderRadius: '8px',
+                  fontWeight: '500'
+                }}
+              >
+                Browse Events
+              </a>
+            </div>
+          ) : (
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+              gap: '24px'
+            }}>
+              {tickets.map((ticket) => (
+                <div key={ticket.id} style={{
+                  backgroundColor: 'rgba(55, 65, 81, 0.3)',
+                  borderRadius: '12px',
+                  padding: '24px',
+                  border: '1px solid rgba(255, 255, 255, 0.1)'
+                }}>
+                  <div style={{ marginBottom: '16px' }}>
+                    <h3 style={{
+                      fontSize: '1.125rem',
+                      fontWeight: '600',
+                      color: 'white',
+                      marginBottom: '4px'
+                    }}>
+                      {ticket.eventName}
+                    </h3>
+                    <p style={{ color: '#94a3b8', fontSize: '0.875rem' }}>
+                      {ticket.ticketType}
+                    </p>
+                  </div>
+
+                  <div style={{ marginBottom: '16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                      <span style={{ color: '#94a3b8', fontSize: '0.875rem' }}>Price:</span>
+                      <span style={{ color: '#22c55e', fontWeight: '500' }}>${ticket.price}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                      <span style={{ color: '#94a3b8', fontSize: '0.875rem' }}>Purchase Date:</span>
+                      <span style={{ color: 'white', fontSize: '0.875rem' }}>
+                        {new Date(ticket.purchaseDate).toLocaleDateString()}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* QR Code Display */}
+                  <div style={{ marginBottom: '16px' }}>
+                    <h4 style={{
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      color: 'white',
+                      marginBottom: '12px'
+                    }}>
+                      QR Code for Entry
+                    </h4>
+                    <div style={{
+                      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                      borderRadius: '8px',
+                      padding: '16px',
+                      textAlign: 'center'
+                    }}>
+                      <div style={{
+                        width: '8rem',
+                        height: '8rem',
+                        backgroundColor: 'white',
+                        borderRadius: '8px',
+                        margin: '0 auto 12px auto',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        <svg style={{ width: '4rem', height: '4rem', color: '#9ca3af' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                        </svg>
+                      </div>
+                      <p style={{
+                        fontSize: '0.75rem',
+                        color: '#94a3b8',
+                        fontFamily: 'monospace',
+                        wordBreak: 'break-all'
+                      }}>
+                        {generateQRCode(ticket)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button style={{
+                      flex: 1,
+                      padding: '8px 16px',
+                      backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                      color: '#60a5fa',
+                      border: '1px solid rgba(59, 130, 246, 0.3)',
+                      borderRadius: '6px',
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      cursor: 'pointer',
+                      transition: 'background-color 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(59, 130, 246, 0.3)'}
+                    onMouseLeave={(e) => e.target.style.backgroundColor = 'rgba(59, 130, 246, 0.2)'}>
+                      Download PDF
+                    </button>
+                    <button style={{
+                      flex: 1,
+                      padding: '8px 16px',
+                      backgroundColor: 'rgba(107, 114, 128, 0.2)',
+                      color: '#9ca3af',
+                      border: '1px solid rgba(107, 114, 128, 0.3)',
+                      borderRadius: '6px',
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      cursor: 'pointer',
+                      transition: 'background-color 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(107, 114, 128, 0.3)'}
+                    onMouseLeave={(e) => e.target.style.backgroundColor = 'rgba(107, 114, 128, 0.2)'}>
+                      Share
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       </div>

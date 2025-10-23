@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { hasSupabase } from '../../lib/safeEnv'
+import Link from 'next/link'
 
 export default function MerchantOverviewPage() {
   const [stats, setStats] = useState(null)
@@ -59,19 +60,66 @@ export default function MerchantOverviewPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="mb-8">
-            <div className="h-8 bg-slate-700 rounded w-48 animate-pulse mb-2"></div>
-            <div className="h-4 bg-slate-700 rounded w-96 animate-pulse"></div>
+      <div style={{
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #0f172a 0%, #7c3aed 50%, #0f172a 100%)',
+        padding: '32px'
+      }}>
+        <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+          <div style={{ marginBottom: '32px' }}>
+            <div style={{
+              height: '32px',
+              backgroundColor: '#374151',
+              borderRadius: '8px',
+              width: '192px',
+              marginBottom: '8px',
+              animation: 'pulse 2s infinite'
+            }}></div>
+            <div style={{
+              height: '16px',
+              backgroundColor: '#374151',
+              borderRadius: '8px',
+              width: '384px',
+              animation: 'pulse 2s infinite'
+            }}></div>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+            gap: '24px',
+            marginBottom: '32px'
+          }}>
             {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="bg-partytix-card rounded-xl p-6">
-                <div className="h-4 bg-slate-700 rounded w-24 animate-pulse mb-2"></div>
-                <div className="h-8 bg-slate-700 rounded w-16 animate-pulse mb-2"></div>
-                <div className="h-3 bg-slate-700 rounded w-32 animate-pulse"></div>
+              <div key={i} style={{
+                background: 'rgba(15, 23, 42, 0.6)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '12px',
+                padding: '24px'
+              }}>
+                <div style={{
+                  height: '16px',
+                  backgroundColor: '#374151',
+                  borderRadius: '8px',
+                  width: '96px',
+                  marginBottom: '8px',
+                  animation: 'pulse 2s infinite'
+                }}></div>
+                <div style={{
+                  height: '32px',
+                  backgroundColor: '#374151',
+                  borderRadius: '8px',
+                  width: '64px',
+                  marginBottom: '8px',
+                  animation: 'pulse 2s infinite'
+                }}></div>
+                <div style={{
+                  height: '12px',
+                  backgroundColor: '#374151',
+                  borderRadius: '8px',
+                  width: '128px',
+                  animation: 'pulse 2s infinite'
+                }}></div>
               </div>
             ))}
           </div>
@@ -82,15 +130,31 @@ export default function MerchantOverviewPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-8">
-        <div className="bg-partytix-card rounded-xl p-8 max-w-md text-center">
-          <div className="text-red-400 mb-4">
-            <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div style={{
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #0f172a 0%, #7c3aed 50%, #0f172a 100%)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '32px'
+      }}>
+        <div style={{
+          background: 'rgba(15, 23, 42, 0.6)',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          borderRadius: '12px',
+          padding: '32px',
+          maxWidth: '448px',
+          textAlign: 'center'
+        }}>
+          <div style={{ color: '#ef4444', marginBottom: '16px' }}>
+            <svg style={{ width: '48px', height: '48px', margin: '0 auto' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
             </svg>
           </div>
-          <h2 className="text-xl font-bold text-white mb-2">加载失败</h2>
-          <p className="text-slate-400 mb-6">{error}</p>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: 'white', marginBottom: '8px' }}>
+            加载失败
+          </h2>
+          <p style={{ color: '#94a3b8', marginBottom: '24px' }}>{error}</p>
           <button 
             onClick={loadStats}
             className="btn-partytix-gradient"
@@ -102,99 +166,377 @@ export default function MerchantOverviewPage() {
     )
   }
 
-  const statCards = [
+    const statCards = [
     {
-      title: '今日售出',
+      title: 'Tickets Sold Today',
       value: stats?.todaySold || 0,
-      subtitle: '张票',
+      subtitle: 'tickets',
       icon: '🎫',
-      color: 'text-green-400'
+      color: '#22c55e'
     },
     {
-      title: '已核销',
+      title: 'Verified Today',
       value: stats?.todayVerified || 0,
-      subtitle: '张票',
+      subtitle: 'tickets',
       icon: '✅',
-      color: 'text-blue-400'
+      color: '#3b82f6'
     },
     {
-      title: '总收入',
+      title: 'Total Revenue',
       value: `¥${(stats?.totalRevenue || 0).toLocaleString()}`,
-      subtitle: '今日',
+      subtitle: 'today',
       icon: '💰',
-      color: 'text-yellow-400'
+      color: '#eab308'
     },
     {
-      title: '余票预警',
+      title: 'Low Stock Alerts',
       value: stats?.lowStockAlerts || 0,
-      subtitle: '个活动',
+      subtitle: 'events',
       icon: '⚠️',
-      color: 'text-orange-400'
+      color: '#f97316'
     }
   ]
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-8">
-      <div className="max-w-7xl mx-auto">
+    <div style={{
+      minHeight: '100vh',
+      background: 'linear-gradient(135deg, #0f172a 0%, #7c3aed 50%, #0f172a 100%)',
+      padding: '32px'
+    }}>
+      <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
         {/* 页面标题 */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">商家控制台</h1>
-          <p className="text-slate-400">管理您的活动和票务数据</p>
+        <div style={{ marginBottom: '32px' }}>
+          <h1 style={{
+            fontSize: '1.875rem',
+            fontWeight: 'bold',
+            color: 'white',
+            marginBottom: '8px'
+          }}>
+            Merchant Console
+          </h1>
+          <p style={{ color: '#94a3b8' }}>Manage your events and ticket data</p>
           {stats?.source && (
-            <p className="text-xs text-slate-500 mt-1">数据来源: {stats.source}</p>
+            <p style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '4px' }}>
+              Data Source: {stats.source}
+            </p>
           )}
         </div>
 
         {/* 统计卡片 */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+          gap: '24px',
+          marginBottom: '32px'
+        }}>
           {statCards.map((card, index) => (
-            <div key={index} className="bg-partytix-card rounded-xl p-6 hover:bg-slate-800/70 transition-colors">
-              <div className="flex items-center justify-between mb-4">
-                <div className="text-2xl">{card.icon}</div>
-                <div className={`text-sm font-medium ${card.color}`}>{card.title}</div>
+            <div key={index} style={{
+              background: 'rgba(15, 23, 42, 0.6)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              borderRadius: '12px',
+              padding: '24px',
+              transition: 'background-color 0.3s ease'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(30, 41, 59, 0.7)'}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'rgba(15, 23, 42, 0.6)'}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: '16px'
+              }}>
+                <div style={{ fontSize: '1.5rem' }}>{card.icon}</div>
+                <div style={{
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  color: card.color
+                }}>
+                  {card.title}
+                </div>
               </div>
-              <div className="text-2xl font-bold text-white mb-1">{card.value}</div>
-              <div className="text-sm text-slate-400">{card.subtitle}</div>
+              <div style={{
+                fontSize: '1.5rem',
+                fontWeight: 'bold',
+                color: 'white',
+                marginBottom: '4px'
+              }}>
+                {card.value}
+              </div>
+              <div style={{ fontSize: '0.875rem', color: '#94a3b8' }}>
+                {card.subtitle}
+              </div>
             </div>
           ))}
         </div>
 
         {/* 快速操作 */}
-        <div className="bg-partytix-card rounded-xl p-6">
-          <h2 className="text-xl font-bold text-white mb-6">快速操作</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <a 
+        <div style={{
+          background: 'rgba(15, 23, 42, 0.6)',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          borderRadius: '12px',
+          padding: '24px'
+        }}>
+          <h2 style={{
+            fontSize: '1.25rem',
+            fontWeight: 'bold',
+            color: 'white',
+            marginBottom: '24px'
+          }}>
+            Quick Actions
+          </h2>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+            gap: '24px'
+          }}>
+            {/* Manage Events Card */}
+            <Link 
               href="/merchant/events"
-              className="flex items-center p-4 bg-slate-800/50 rounded-lg hover:bg-slate-700/50 transition-colors"
+              style={{
+                display: 'block',
+                background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(147, 51, 234, 0.1) 100%)',
+                border: '1px solid rgba(59, 130, 246, 0.2)',
+                borderRadius: '16px',
+                padding: '24px',
+                textDecoration: 'none',
+                transition: 'all 0.3s ease',
+                position: 'relative',
+                overflow: 'hidden'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-4px)'
+                e.currentTarget.style.boxShadow = '0 20px 40px rgba(59, 130, 246, 0.15)'
+                e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.4)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)'
+                e.currentTarget.style.boxShadow = 'none'
+                e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.2)'
+              }}
             >
-              <div className="text-2xl mr-4">📅</div>
-              <div>
-                <div className="font-medium text-white">管理活动</div>
-                <div className="text-sm text-slate-400">查看和编辑活动</div>
+              <div style={{
+                position: 'absolute',
+                top: '-20px',
+                right: '-20px',
+                width: '80px',
+                height: '80px',
+                background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(147, 51, 234, 0.1) 100%)',
+                borderRadius: '50%',
+                opacity: '0.3'
+              }}></div>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                marginBottom: '16px'
+              }}>
+                <div style={{
+                  width: '48px',
+                  height: '48px',
+                  background: 'linear-gradient(135deg, #3b82f6 0%, #9333ea 100%)',
+                  borderRadius: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '1.5rem',
+                  marginRight: '16px',
+                  boxShadow: '0 8px 16px rgba(59, 130, 246, 0.3)'
+                }}>
+                  📅
+                </div>
+                <div>
+                  <h3 style={{
+                    fontSize: '1.25rem',
+                    fontWeight: 'bold',
+                    color: 'white',
+                    marginBottom: '4px'
+                  }}>
+                    Manage Events
+                  </h3>
+                  <p style={{
+                    fontSize: '0.875rem',
+                    color: '#94a3b8',
+                    margin: '0'
+                  }}>
+                    View and edit your events
+                  </p>
+                </div>
               </div>
-            </a>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                color: '#3b82f6',
+                fontSize: '0.875rem',
+                fontWeight: '500'
+              }}>
+                <span>Access Events →</span>
+              </div>
+            </Link>
             
-            <a 
+            {/* Create Event Card */}
+            <Link 
               href="/merchant/events/new"
-              className="flex items-center p-4 bg-slate-800/50 rounded-lg hover:bg-slate-700/50 transition-colors"
+              style={{
+                display: 'block',
+                background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, rgba(16, 185, 129, 0.1) 100%)',
+                border: '1px solid rgba(34, 197, 94, 0.2)',
+                borderRadius: '16px',
+                padding: '24px',
+                textDecoration: 'none',
+                transition: 'all 0.3s ease',
+                position: 'relative',
+                overflow: 'hidden'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-4px)'
+                e.currentTarget.style.boxShadow = '0 20px 40px rgba(34, 197, 94, 0.15)'
+                e.currentTarget.style.borderColor = 'rgba(34, 197, 94, 0.4)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)'
+                e.currentTarget.style.boxShadow = 'none'
+                e.currentTarget.style.borderColor = 'rgba(34, 197, 94, 0.2)'
+              }}
             >
-              <div className="text-2xl mr-4">➕</div>
-              <div>
-                <div className="font-medium text-white">发布活动</div>
-                <div className="text-sm text-slate-400">创建新活动</div>
+              <div style={{
+                position: 'absolute',
+                top: '-20px',
+                right: '-20px',
+                width: '80px',
+                height: '80px',
+                background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, rgba(16, 185, 129, 0.1) 100%)',
+                borderRadius: '50%',
+                opacity: '0.3'
+              }}></div>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                marginBottom: '16px'
+              }}>
+                <div style={{
+                  width: '48px',
+                  height: '48px',
+                  background: 'linear-gradient(135deg, #22c55e 0%, #10b981 100%)',
+                  borderRadius: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '1.5rem',
+                  marginRight: '16px',
+                  boxShadow: '0 8px 16px rgba(34, 197, 94, 0.3)'
+                }}>
+                  ➕
+                </div>
+                <div>
+                  <h3 style={{
+                    fontSize: '1.25rem',
+                    fontWeight: 'bold',
+                    color: 'white',
+                    marginBottom: '4px'
+                  }}>
+                    Create Event
+                  </h3>
+                  <p style={{
+                    fontSize: '0.875rem',
+                    color: '#94a3b8',
+                    margin: '0'
+                  }}>
+                    Launch a new event
+                  </p>
+                </div>
               </div>
-            </a>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                color: '#22c55e',
+                fontSize: '0.875rem',
+                fontWeight: '500'
+              }}>
+                <span>Start Creating →</span>
+              </div>
+            </Link>
             
-            <a 
-              href="/scan"
-              className="flex items-center p-4 bg-slate-800/50 rounded-lg hover:bg-slate-700/50 transition-colors"
+            {/* Scan Tickets Card */}
+            <Link 
+              href="/merchant/scan"
+              style={{
+                display: 'block',
+                background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(251, 191, 36, 0.1) 100%)',
+                border: '1px solid rgba(245, 158, 11, 0.2)',
+                borderRadius: '16px',
+                padding: '24px',
+                textDecoration: 'none',
+                transition: 'all 0.3s ease',
+                position: 'relative',
+                overflow: 'hidden'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-4px)'
+                e.currentTarget.style.boxShadow = '0 20px 40px rgba(245, 158, 11, 0.15)'
+                e.currentTarget.style.borderColor = 'rgba(245, 158, 11, 0.4)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)'
+                e.currentTarget.style.boxShadow = 'none'
+                e.currentTarget.style.borderColor = 'rgba(245, 158, 11, 0.2)'
+              }}
             >
-              <div className="text-2xl mr-4">📱</div>
-              <div>
-                <div className="font-medium text-white">核销票据</div>
-                <div className="text-sm text-slate-400">扫描二维码</div>
+              <div style={{
+                position: 'absolute',
+                top: '-20px',
+                right: '-20px',
+                width: '80px',
+                height: '80px',
+                background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(251, 191, 36, 0.1) 100%)',
+                borderRadius: '50%',
+                opacity: '0.3'
+              }}></div>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                marginBottom: '16px'
+              }}>
+                <div style={{
+                  width: '48px',
+                  height: '48px',
+                  background: 'linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)',
+                  borderRadius: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '1.5rem',
+                  marginRight: '16px',
+                  boxShadow: '0 8px 16px rgba(245, 158, 11, 0.3)'
+                }}>
+                  📱
+                </div>
+                <div>
+                  <h3 style={{
+                    fontSize: '1.25rem',
+                    fontWeight: 'bold',
+                    color: 'white',
+                    marginBottom: '4px'
+                  }}>
+                    Scan Tickets
+                  </h3>
+                  <p style={{
+                    fontSize: '0.875rem',
+                    color: '#94a3b8',
+                    margin: '0'
+                  }}>
+                    Verify QR codes
+                  </p>
+                </div>
               </div>
-            </a>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                color: '#f59e0b',
+                fontSize: '0.875rem',
+                fontWeight: '500'
+              }}>
+                <span>Start Scanning →</span>
+              </div>
+            </Link>
           </div>
         </div>
       </div>

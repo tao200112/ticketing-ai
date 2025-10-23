@@ -1,3 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
@@ -41,38 +45,160 @@ a {
   }
 }
 
-/* PartyTix 渐变主题工具类 */
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/* PartyTix 自定义样式 */
+.partytix-gradient {
+  background: linear-gradient(135deg, #7C3AED 0%, #22D3EE 100%);
+}
 
-@layer components {
-  /* PartyTix 品牌渐变背景 */
-  .bg-partytix-gradient {
-    background: linear-gradient(135deg, #7C3AED 0%, #22D3EE 100%);
-  }
-  
-  /* 卡片暗底样式 */
-  .bg-partytix-card {
-    @apply bg-slate-900/60 border border-white/10;
-  }
-  
-  /* 渐变文字效果 */
-  .text-partytix-gradient {
-    background: linear-gradient(135deg, #7C3AED 0%, #22D3EE 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
-  
-  /* 渐变边框效果 */
-  .border-partytix-gradient {
-    border: 1px solid;
-    border-image: linear-gradient(135deg, #7C3AED 0%, #22D3EE 100%) 1;
-  }
-  
-  /* 悬浮渐变按钮 */
+.partytix-card {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+}
+
+.text-partytix-gradient {
+  background: linear-gradient(135deg, #7C3AED 0%, #22D3EE 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.btn-partytix-gradient {
+  background: linear-gradient(135deg, #7C3AED 0%, #22D3EE 100%);
+  color: white;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-weight: 600;
+  text-decoration: none;
+  display: inline-block;
+  transition: all 0.3s ease;
+  border: none;
+  cursor: pointer;
+}
+
+.btn-partytix-gradient:hover {
+  transform: scale(1.02);
+  box-shadow: 0 10px 25px rgba(124, 58, 237, 0.3);
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
   .btn-partytix-gradient {
-    @apply bg-partytix-gradient text-white px-6 py-3 rounded-lg font-semibold transition-all duration-300 hover:shadow-lg hover:scale-105;
+    padding: 10px 20px;
+    font-size: 14px;
   }
+}
+
+/* 动画 */
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* 文本截断 */
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* 自定义滚动条 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.3);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(124, 58, 237, 0.5);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(124, 58, 237, 0.7);
+}
+
+/* 选择框样式 */
+select {
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 0.5rem center;
+  background-repeat: no-repeat;
+  background-size: 1.5em 1.5em;
+  padding-right: 2.5rem;
+}
+
+/* 复选框样式 */
+input[type="checkbox"] {
+  appearance: none;
+  background-color: transparent;
+  border: 2px solid #475569;
+  border-radius: 0.25rem;
+  width: 1rem;
+  height: 1rem;
+  position: relative;
+  cursor: pointer;
+}
+
+input[type="checkbox"]:checked {
+  background-color: #7c3aed;
+  border-color: #7c3aed;
+}
+
+input[type="checkbox"]:checked::after {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: -1px;
+  width: 4px;
+  height: 8px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+/* 响应式设计增强 */
+@media (max-width: 640px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .flex-wrap {
+    flex-wrap: wrap;
+  }
+  
+  .text-sm {
+    font-size: 0.75rem;
+  }
+}
+
+/* 悬停效果增强 */
+.hover-lift {
+  transition: transform 0.2s ease-in-out;
+}
+
+.hover-lift:hover {
+  transform: translateY(-2px);
+}
+
+/* 渐变背景增强 */
+.bg-gradient-enhanced {
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 25%, #7c3aed 50%, #22d3ee 75%, #0f172a 100%);
+  background-size: 400% 400%;
+  animation: gradientShift 15s ease infinite;
+}
+
+@keyframes gradientShift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
 }

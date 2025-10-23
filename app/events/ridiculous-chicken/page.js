@@ -1,297 +1,346 @@
-'use client';
+'use client'
 
-import { useState } from 'react';
-import Link from 'next/link';
+import { useState } from 'react'
+import Link from 'next/link'
 
 export default function RidiculousChickenEvent() {
-  const [selectedTicket, setSelectedTicket] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [quantity, setQuantity] = useState(1)
+  const [selectedPrice, setSelectedPrice] = useState('regular')
 
-  const ticketTypes = [
+  const event = {
+    name: "Ridiculous Chicken Night Event",
+    description: "Enjoy delicious chicken and an amazing night at Virginia Tech's most popular event. We provide the freshest ingredients, the most unique cooking methods, and the warmest service.",
+    time: "October 25, 2025 8:00 PM",
+    venue: "Shanghai Concert Hall",
+    duration: "3 hours",
+    ageRestriction: "18+"
+  }
+
+  const prices = [
     {
       id: 'regular',
-      name: 'Regular Ticket',
+      name: 'Regular Ticket (21+)',
       price: 15,
-      description: 'Standard entry ticket',
-      features: ['General admission', 'Basic amenities', 'Standard seating']
+      description: 'For ages 21 and above',
+      stripeUrl: 'https://buy.stripe.com/test_28E4gz5Osd7qgCq0nh4Rq01',
+      available: true
     },
     {
       id: 'special',
-      name: 'Special Ticket',
+      name: 'Special Ticket (18-20)',
       price: 30,
-      description: 'Premium entry ticket',
-      features: ['VIP access', 'Premium amenities', 'Priority seating', 'Special perks']
+      description: 'For ages 18-20 only',
+      stripeUrl: 'https://buy.stripe.com/test_aFa7sL6Sw0kE71Q3zt4Rq00',
+      available: true
     }
-  ];
+  ]
 
-  const handleTicketSelect = (ticket) => {
-    setSelectedTicket(ticket);
-  };
+  const selectedPriceData = prices.find(p => p.id === selectedPrice)
+  const totalPrice = selectedPriceData ? selectedPriceData.price * quantity : 0
 
-  const handlePurchase = async () => {
-    if (!selectedTicket) {
-      alert('Please select a ticket type.');
-      return;
+  const handleBuyTickets = () => {
+    // Redirect to Stripe payment page
+    if (selectedPriceData && selectedPriceData.stripeUrl) {
+      window.open(selectedPriceData.stripeUrl, '_blank')
     }
-
-    setIsLoading(true);
-    
-    try {
-      // 根据票务类型设置 priceId 和 metadata
-      // 使用 Stripe Payment Links 作为临时解决方案
-      const ticketConfig = {
-        regular: {
-          // 使用 Payment Link 重定向
-          usePaymentLink: true,
-          paymentLink: 'https://buy.stripe.com/test_28E4gz5Osd7qgCq0nh4Rq01', // 15元票
-          metadata: {
-            event_id: 'ridiculous-chicken',
-            tier: 'basic',
-            quantity: '1'
-          }
-        },
-        special: {
-          // 使用 Payment Link 重定向
-          usePaymentLink: true,
-          paymentLink: 'https://buy.stripe.com/test_aFa7sL6Sw0kE71Q3zt4Rq00', // 30元票
-          metadata: {
-            event_id: 'ridiculous-chicken',
-            tier: 'vip',
-            quantity: '1'
-          }
-        }
-      };
-      
-      const config = ticketConfig[selectedTicket.id];
-      
-      if (!config) {
-        throw new Error('Ticket configuration not found');
-      }
-      
-      console.log(`Processing purchase for ${selectedTicket.name}:`, config);
-      console.log('Selected ticket ID:', selectedTicket.id);
-      console.log('Config found:', !!config);
-      console.log('Use payment link:', config?.usePaymentLink);
-      console.log('Payment link:', config?.paymentLink);
-      
-      if (config.usePaymentLink && config.paymentLink) {
-        // 使用 Stripe Payment Link 重定向
-        console.log('✅ Redirecting to Stripe Payment Link:', config.paymentLink);
-        console.log('Current window location:', window.location.href);
-        
-        // 添加延迟以确保日志输出
-        setTimeout(() => {
-          window.location.href = config.paymentLink;
-        }, 100);
-      } else {
-        // 调用 API 创建 checkout session
-        const response = await fetch('/api/checkout_sessions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            priceId: config.priceId,
-            quantity: 1,
-            metadata: config.metadata
-          }),
-        });
-
-        const data = await response.json();
-        
-        if (response.ok && data.url) {
-          console.log('Checkout session created, redirecting to:', data.url);
-          // 重定向到 Stripe Checkout
-          window.location.href = data.url;
-        } else {
-          throw new Error(data.error || 'Failed to create checkout session');
-        }
-      }
-    } catch (error) {
-      console.error('Purchase error:', error);
-      alert(`Failed to process purchase: ${error.message}. Please try again.`);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  }
 
   return (
     <div style={{
-      padding: '2rem',
-      maxWidth: '1000px',
-      margin: '0 auto',
       minHeight: '100vh',
-      backgroundColor: '#f8f9fa'
+      background: 'linear-gradient(135deg, #0f172a 0%, #7c3aed 50%, #0f172a 100%)',
+      padding: '32px'
     }}>
-      <div style={{ marginBottom: '2rem', textAlign: 'center' }}>
-        <h1 style={{
-          fontSize: '3rem',
-          fontWeight: 'bold',
-          marginBottom: '1rem',
-          color: '#333'
-        }}>
-          🐔 Ridiculous Chicken Event
-        </h1>
-        
-        <p style={{
-          fontSize: '1.2rem',
-          color: '#666',
-          marginBottom: '1rem'
-        }}>
-          Join us for an unforgettable night of entertainment!
-        </p>
-        
-        <div style={{
-          backgroundColor: '#fff3cd',
-          padding: '1rem',
-          borderRadius: '8px',
-          marginBottom: '2rem',
-          border: '1px solid #ffeaa7'
-        }}>
-          <p style={{ margin: 0, color: '#856404' }}>
-            📍 <strong>Venue:</strong> 201 N Main St SUITE A, Blacksburg, VA 24060<br/>
-            🕕 <strong>Time:</strong> 6:00 PM - 3:00 AM<br/>
-            🎫 <strong>Choose your ticket type below</strong>
-          </p>
+      <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
+        {/* 返回按钮 */}
+        <div style={{ marginBottom: '24px' }}>
+          <Link href="/events" style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            color: '#22D3EE',
+            textDecoration: 'none',
+            fontSize: '0.875rem',
+            fontWeight: '500'
+          }}>
+            ← Back to Events
+          </Link>
         </div>
 
+        {/* 活动详情 */}
         <div style={{
-          backgroundColor: '#d1ecf1',
-          padding: '1rem',
-          borderRadius: '8px',
-          marginBottom: '2rem',
-          border: '1px solid #bee5eb'
+          background: 'rgba(15, 23, 42, 0.6)',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          borderRadius: '16px',
+          padding: '32px',
+          marginBottom: '24px'
         }}>
-          <p style={{ margin: 0, color: '#0c5460', fontSize: '0.9rem' }}>
-            <strong>⚠️ Development Mode:</strong> This page uses placeholder Price IDs. 
-            To enable real payments, replace the Price IDs in the code with actual Stripe Price IDs.
+          <h1 style={{
+            fontSize: '2.5rem',
+            fontWeight: 'bold',
+            color: 'white',
+            marginBottom: '16px'
+          }}>
+            {event.name}
+          </h1>
+
+          <p style={{
+            color: '#cbd5e1',
+            fontSize: '1.1rem',
+            lineHeight: '1.6',
+            marginBottom: '24px'
+          }}>
+            {event.description}
           </p>
-        </div>
 
-        <Link href="/" style={{
-          color: '#007bff',
-          textDecoration: 'none',
-          fontSize: '1rem'
-        }}>
-          ← Back to Home
-        </Link>
-      </div>
-
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-        gap: '2rem',
-        marginBottom: '2rem'
-      }}>
-        {ticketTypes.map((ticket) => (
-          <div
-            key={ticket.id}
-            onClick={() => handleTicketSelect(ticket)}
-            style={{
-              backgroundColor: selectedTicket?.id === ticket.id ? '#e3f2fd' : 'white',
-              border: selectedTicket?.id === ticket.id ? '3px solid #2196f3' : '2px solid #e9ecef',
-              borderRadius: '12px',
-              padding: '1.5rem',
-              cursor: 'pointer',
-              transition: 'all 0.3s',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-            }}
-          >
-            <h3 style={{
-              fontSize: '1.5rem',
-              fontWeight: 'bold',
-              marginBottom: '0.5rem',
-              color: '#333'
-            }}>
-              {ticket.name}
-            </h3>
+          {/* 活动信息 */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+            gap: '16px',
+            marginBottom: '24px'
+          }}>
             <div style={{
-              fontSize: '2rem',
-              fontWeight: 'bold',
-              color: '#28a745',
-              marginBottom: '1rem'
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              padding: '12px',
+              backgroundColor: 'rgba(55, 65, 81, 0.3)',
+              borderRadius: '8px'
             }}>
-              ${ticket.price}
+              <div style={{ fontSize: '1.5rem' }}>📅</div>
+              <div>
+                <div style={{ color: '#94a3b8', fontSize: '0.875rem' }}>Time</div>
+                <div style={{ color: 'white', fontWeight: '500' }}>{event.time}</div>
+              </div>
             </div>
-            <p style={{
-              color: '#666',
-              marginBottom: '1rem'
-            }}>
-              {ticket.description}
-            </p>
-            <ul style={{ padding: 0, listStyle: 'none' }}>
-              {ticket.features.map((feature, index) => (
-                <li key={index} style={{
-                  padding: '0.25rem 0',
-                  color: '#555'
-                }}>
-                  ✓ {feature}
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
-      </div>
 
-      {selectedTicket && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              padding: '12px',
+              backgroundColor: 'rgba(55, 65, 81, 0.3)',
+              borderRadius: '8px'
+            }}>
+              <div style={{ fontSize: '1.5rem' }}>📍</div>
+              <div>
+                <div style={{ color: '#94a3b8', fontSize: '0.875rem' }}>Venue</div>
+                <div style={{ color: 'white', fontWeight: '500' }}>{event.venue}</div>
+              </div>
+            </div>
+
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              padding: '12px',
+              backgroundColor: 'rgba(55, 65, 81, 0.3)',
+              borderRadius: '8px'
+            }}>
+              <div style={{ fontSize: '1.5rem' }}>⏱️</div>
+              <div>
+                <div style={{ color: '#94a3b8', fontSize: '0.875rem' }}>Duration</div>
+                <div style={{ color: 'white', fontWeight: '500' }}>{event.duration}</div>
+              </div>
+            </div>
+
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              padding: '12px',
+              backgroundColor: 'rgba(55, 65, 81, 0.3)',
+              borderRadius: '8px'
+            }}>
+              <div style={{ fontSize: '1.5rem' }}>🔞</div>
+              <div>
+                <div style={{ color: '#94a3b8', fontSize: '0.875rem' }}>Age Restriction</div>
+                <div style={{ color: 'white', fontWeight: '500' }}>{event.ageRestriction}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 购票区域 */}
         <div style={{
-          backgroundColor: 'white',
-          padding: '2rem',
-          borderRadius: '12px',
-          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-          textAlign: 'center'
+          background: 'rgba(15, 23, 42, 0.6)',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          borderRadius: '16px',
+          padding: '32px'
         }}>
           <h2 style={{
             fontSize: '1.5rem',
             fontWeight: 'bold',
-            marginBottom: '1rem',
-            color: '#333'
+            color: 'white',
+            marginBottom: '24px'
           }}>
-            Ready to Purchase?
+            Select Ticket Type
           </h2>
-          
+
+          {/* 票种选择 */}
+          <div style={{ marginBottom: '24px' }}>
+            {prices.map((price) => (
+              <div key={price.id} style={{
+                marginBottom: '16px',
+                padding: '16px',
+                backgroundColor: selectedPrice === price.id ? 'rgba(124, 58, 237, 0.2)' : 'rgba(55, 65, 81, 0.3)',
+                border: selectedPrice === price.id ? '2px solid #7c3aed' : '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '12px',
+                cursor: 'pointer',
+                transition: 'all 0.3s ease'
+              }}
+              onClick={() => setSelectedPrice(price.id)}>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}>
+                  <div>
+                    <h3 style={{
+                      fontSize: '1.125rem',
+                      fontWeight: 'bold',
+                      color: 'white',
+                      marginBottom: '4px'
+                    }}>
+                      {price.name}
+                    </h3>
+                    <p style={{
+                      color: '#94a3b8',
+                      fontSize: '0.875rem',
+                      marginBottom: '8px'
+                    }}>
+                      {price.description}
+                    </p>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}>
+                      <span style={{
+                        fontSize: '1.25rem',
+                        fontWeight: 'bold',
+                        color: '#22c55e'
+                      }}>
+                        ${price.price}
+                      </span>
+                      {price.originalPrice && (
+                        <span style={{
+                          fontSize: '0.875rem',
+                          color: '#6b7280',
+                          textDecoration: 'line-through'
+                        }}>
+                          ¥{price.originalPrice}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div style={{
+                    width: '20px',
+                    height: '20px',
+                    borderRadius: '50%',
+                    border: selectedPrice === price.id ? '2px solid #7c3aed' : '2px solid #6b7280',
+                    backgroundColor: selectedPrice === price.id ? '#7c3aed' : 'transparent',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    {selectedPrice === price.id && (
+                      <div style={{
+                        width: '8px',
+                        height: '8px',
+                        borderRadius: '50%',
+                        backgroundColor: 'white'
+                      }}></div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* 数量选择 */}
+          <div style={{ marginBottom: '24px' }}>
+            <label style={{
+              display: 'block',
+              color: 'white',
+              fontSize: '0.875rem',
+              fontWeight: '500',
+              marginBottom: '8px'
+            }}>
+                          Quantity
+            </label>
+            <select
+              value={quantity}
+              onChange={(e) => setQuantity(parseInt(e.target.value))}
+              style={{
+                width: '100%',
+                padding: '12px 16px',
+                backgroundColor: 'rgba(55, 65, 81, 0.5)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '8px',
+                color: 'white',
+                fontSize: '1rem',
+                outline: 'none'
+              }}
+            >
+              {[1, 2, 3, 4, 5].map(num => (
+                <option key={num} value={num}>{num} ticket{num > 1 ? 's' : ''}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* 总价 */}
           <div style={{
-            backgroundColor: '#f8f9fa',
-            padding: '1rem',
+            backgroundColor: 'rgba(55, 65, 81, 0.3)',
             borderRadius: '8px',
-            marginBottom: '1.5rem'
+            padding: '16px',
+            marginBottom: '24px'
           }}>
-            <h3 style={{ margin: '0 0 0.5rem 0', color: '#333' }}>Order Summary</h3>
-            <div style={{ color: '#666', fontSize: '0.9rem' }}>
-              <p><strong>Event:</strong> Ridiculous Chicken</p>
-              <p><strong>Ticket:</strong> {selectedTicket.name}</p>
-              <p><strong>Price:</strong> ${selectedTicket.price}</p>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <span style={{ color: '#94a3b8' }}>Total</span>
+              <span style={{
+                fontSize: '1.5rem',
+                fontWeight: 'bold',
+                color: '#22c55e'
+              }}>
+                ${totalPrice}
+              </span>
             </div>
           </div>
 
+          {/* 购票按钮 */}
           <button
-            onClick={handlePurchase}
-            disabled={isLoading}
+            onClick={handleBuyTickets}
             style={{
-              padding: '1rem 2rem',
-              backgroundColor: isLoading ? '#6c757d' : '#28a745',
+              width: '100%',
+              padding: '16px',
+              background: 'linear-gradient(135deg, #7C3AED 0%, #22D3EE 100%)',
               color: 'white',
               border: 'none',
-              borderRadius: '8px',
-              fontSize: '1.1rem',
+              borderRadius: '12px',
+              fontSize: '1.125rem',
               fontWeight: 'bold',
-              cursor: isLoading ? 'not-allowed' : 'pointer',
-              transition: 'background-color 0.3s',
-              minWidth: '200px',
-              opacity: isLoading ? 0.7 : 1
+              cursor: 'pointer',
+              transition: 'all 0.3s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.transform = 'scale(1.02)'
+              e.target.style.boxShadow = '0 10px 25px rgba(124, 58, 237, 0.3)'
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.transform = 'scale(1)'
+              e.target.style.boxShadow = 'none'
             }}
           >
-            {isLoading ? (
-              <>
-                <span style={{ marginRight: '0.5rem' }}>⏳</span>
-                Processing...
-              </>
-            ) : (
-              `Purchase - $${selectedTicket.price}`
-            )}
+            Buy Tickets Now
           </button>
         </div>
-      )}
+      </div>
     </div>
-  );
+  )
 }

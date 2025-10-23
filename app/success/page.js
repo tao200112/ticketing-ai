@@ -1,384 +1,170 @@
-'use client';
+'use client'
 
-import { useState, useEffect, Suspense } from 'react';
-import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
-
-function SuccessContent() {
-  const [sessionId, setSessionId] = useState(null);
-  const [orderData, setOrderData] = useState(null);
-  const [tickets, setTickets] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const searchParams = useSearchParams();
-
-  useEffect(() => {
-    // 从 URL 参数读取 session_id
-    const sessionIdFromUrl = searchParams.get('session_id');
-    
-    if (sessionIdFromUrl) {
-      setSessionId(sessionIdFromUrl);
-      fetchOrderData(sessionIdFromUrl);
-    } else {
-      setError('No session ID provided');
-      setIsLoading(false);
-    }
-  }, [searchParams]);
-
-  const fetchOrderData = async (sessionId) => {
-    try {
-      console.log('Fetching order data for session:', sessionId);
-      
-      const response = await fetch(`/api/orders/by-session?session_id=${sessionId}`);
-      const data = await response.json();
-      
-      if (data.success) {
-        setOrderData(data.order);
-        setTickets(data.tickets);
-        console.log('Order data loaded:', data);
-      } else {
-        setError(data.error || 'Failed to load order data');
-      }
-    } catch (error) {
-      console.error('Error fetching order data:', error);
-      setError('Failed to load order data');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleSaveImage = (ticket) => {
-    // 保存图片功能 - 这里可以生成包含二维码的图片
-    console.log('Save image for ticket:', ticket.id);
-    alert(`保存票据 ${ticket.id} 的图片功能待实现`);
-  };
-
-  const handlePrint = () => {
-    // 打印功能
-    window.print();
-  };
-
-  if (isLoading) {
-    return (
-      <div style={{
-        padding: '2rem',
-        maxWidth: '600px',
-        margin: '0 auto',
-        textAlign: 'center',
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center'
-      }}>
-        <div>
-          <div style={{
-            fontSize: '2rem',
-            marginBottom: '1rem'
-          }}>
-            ⏳
-          </div>
-          <h2>Loading your tickets...</h2>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div style={{
-        padding: '2rem',
-        maxWidth: '600px',
-        margin: '0 auto',
-        textAlign: 'center',
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center'
-      }}>
-        <div>
-          <div style={{
-            fontSize: '2rem',
-            marginBottom: '1rem',
-            color: '#dc3545'
-          }}>
-            ❌
-          </div>
-          <h2>Error</h2>
-          <p style={{ color: '#666', marginBottom: '2rem' }}>{error}</p>
-          <Link href="/" style={{
-            padding: '1rem 2rem',
-            backgroundColor: '#007bff',
-            color: 'white',
-            textDecoration: 'none',
-            borderRadius: '8px',
-            fontSize: '1.1rem',
-            fontWeight: 'bold'
-          }}>
-            Back to Home
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div style={{
-      padding: '2rem',
-      maxWidth: '1000px',
-      margin: '0 auto',
-      minHeight: '100vh',
-      backgroundColor: '#f8f9fa'
-    }}>
-      {/* 成功页面头部 */}
-      <div style={{
-        backgroundColor: 'white',
-        padding: '3rem',
-        borderRadius: '12px',
-        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-        textAlign: 'center',
-        marginBottom: '2rem'
-      }}>
-        <div style={{
-          fontSize: '4rem',
-          marginBottom: '1rem'
-        }}>
-          🎉
-        </div>
-        
-        <h1 style={{
-          fontSize: '2.5rem',
-          fontWeight: 'bold',
-          marginBottom: '1rem',
-          color: '#28a745'
-        }}>
-          Payment Successful!
-        </h1>
-        
-        <p style={{
-          fontSize: '1.2rem',
-          color: '#666',
-          marginBottom: '2rem'
-        }}>
-          Thank you for your purchase. Your tickets are ready!
-        </p>
-
-        {/* 订单信息 */}
-        {orderData && (
-          <div style={{
-            backgroundColor: '#f8f9fa',
-            padding: '1.5rem',
-            borderRadius: '8px',
-            marginBottom: '2rem',
-            textAlign: 'left'
-          }}>
-            <h3 style={{ margin: '0 0 1rem 0', color: '#333' }}>Order Details</h3>
-            <div style={{ color: '#666', fontSize: '0.9rem' }}>
-              <p><strong>Order ID:</strong> {orderData.id}</p>
-              <p><strong>Event:</strong> {orderData.eventId}</p>
-              <p><strong>Tier:</strong> {orderData.tier}</p>
-              <p><strong>Amount:</strong> ${(orderData.amount / 100).toFixed(2)} {orderData.currency.toUpperCase()}</p>
-              <p><strong>Email:</strong> {orderData.email}</p>
-              <p><strong>Tickets:</strong> {orderData.ticketCount}</p>
-            </div>
-          </div>
-        )}
-
-        {/* 操作按钮 */}
-        <div style={{
-          display: 'flex',
-          gap: '1rem',
-          justifyContent: 'center',
-          flexWrap: 'wrap'
-        }}>
-          <button
-            onClick={handlePrint}
-            style={{
-              padding: '1rem 2rem',
-              backgroundColor: '#28a745',
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              fontSize: '1.1rem',
-              fontWeight: 'bold',
-              cursor: 'pointer',
-              transition: 'background-color 0.3s'
-            }}
-            onMouseOver={(e) => e.target.style.backgroundColor = '#218838'}
-            onMouseOut={(e) => e.target.style.backgroundColor = '#28a745'}
-          >
-            🖨️ Print Tickets
-          </button>
-          
-          <Link href="/events" style={{
-            padding: '1rem 2rem',
-            backgroundColor: '#007bff',
-            color: 'white',
-            textDecoration: 'none',
-            borderRadius: '8px',
-            fontSize: '1.1rem',
-            fontWeight: 'bold',
-            transition: 'background-color 0.3s'
-          }}>
-            🎫 View Events
-          </Link>
-        </div>
-      </div>
-
-      {/* 票据卡片列表 */}
-      <div style={{
-        backgroundColor: 'white',
-        padding: '2rem',
-        borderRadius: '12px',
-        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
-      }}>
-        <h2 style={{ 
-          margin: '0 0 2rem 0', 
-          color: '#333',
-          textAlign: 'center',
-          fontSize: '1.8rem'
-        }}>
-          Your Digital Tickets ({tickets.length})
-        </h2>
-
-        {tickets.length === 0 ? (
-          <div style={{
-            textAlign: 'center',
-            padding: '2rem',
-            color: '#666'
-          }}>
-            <p>No tickets found for this order.</p>
-          </div>
-        ) : (
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-            gap: '1.5rem'
-          }}>
-            {tickets.map((ticket, index) => (
-              <div key={ticket.id} style={{
-                border: '2px solid #e9ecef',
-                borderRadius: '12px',
-                padding: '1.5rem',
-                backgroundColor: '#f8f9fa',
-                position: 'relative'
-              }}>
-                {/* 票据状态标签 */}
-                <div style={{
-                  position: 'absolute',
-                  top: '1rem',
-                  right: '1rem',
-                  padding: '0.25rem 0.75rem',
-                  borderRadius: '20px',
-                  fontSize: '0.8rem',
-                  fontWeight: 'bold',
-                  backgroundColor: ticket.status === 'used' ? '#dc3545' : 
-                                 ticket.status === 'unused' ? '#28a745' : '#6c757d',
-                  color: 'white'
-                }}>
-                  {ticket.status.toUpperCase()}
-                </div>
-
-                {/* 票据信息 */}
-                <div style={{ marginBottom: '1rem' }}>
-                  <h3 style={{ 
-                    margin: '0 0 0.5rem 0', 
-                    color: '#333',
-                    fontSize: '1.2rem'
-                  }}>
-                    Ticket #{index + 1}
-                  </h3>
-                  
-                  <div style={{ color: '#666', fontSize: '0.9rem', marginBottom: '0.5rem' }}>
-                    <p><strong>ID:</strong> {ticket.id}</p>
-                    <p><strong>Event:</strong> {ticket.eventId}</p>
-                    <p><strong>Tier:</strong> {ticket.tier}</p>
-                    <p><strong>Holder:</strong> {ticket.holderEmail}</p>
-                    <p><strong>Issued:</strong> {new Date(ticket.issuedAt).toLocaleString()}</p>
-                    {ticket.usedAt && (
-                      <p><strong>Used:</strong> {new Date(ticket.usedAt).toLocaleString()}</p>
-                    )}
-                  </div>
-                </div>
-
-                {/* 二维码载荷显示 */}
-                {ticket.qrPayload && (
-                  <div style={{
-                    backgroundColor: 'white',
-                    padding: '1rem',
-                    borderRadius: '8px',
-                    border: '1px solid #dee2e6',
-                    marginBottom: '1rem'
-                  }}>
-                    <p style={{ 
-                      margin: '0 0 0.5rem 0', 
-                      fontSize: '0.9rem',
-                      fontWeight: 'bold',
-                      color: '#333'
-                    }}>
-                      QR Code Data:
-                    </p>
-                    <div style={{
-                      fontFamily: 'monospace',
-                      fontSize: '0.8rem',
-                      color: '#666',
-                      wordBreak: 'break-all',
-                      backgroundColor: '#f8f9fa',
-                      padding: '0.5rem',
-                      borderRadius: '4px',
-                      border: '1px solid #e9ecef'
-                    }}>
-                      {ticket.qrPayload}
-                    </div>
-                  </div>
-                )}
-
-                {/* 操作按钮 */}
-                <div style={{
-                  display: 'flex',
-                  gap: '0.5rem',
-                  justifyContent: 'center'
-                }}>
-                  <button
-                    onClick={() => handleSaveImage(ticket)}
-                    style={{
-                      padding: '0.5rem 1rem',
-                      backgroundColor: '#17a2b8',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '6px',
-                      fontSize: '0.9rem',
-                      cursor: 'pointer',
-                      transition: 'background-color 0.3s'
-                    }}
-                    onMouseOver={(e) => e.target.style.backgroundColor = '#138496'}
-                    onMouseOut={(e) => e.target.style.backgroundColor = '#17a2b8'}
-                  >
-                    💾 Save
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
+import { useState, useEffect } from 'react'
 
 export default function SuccessPage() {
-  return (
-    <Suspense fallback={
-      <div style={{
-        padding: '2rem',
-        maxWidth: '800px',
-        margin: '0 auto',
-        textAlign: 'center'
-      }}>
-        <h1>Loading...</h1>
-        <p>Please wait while we load your ticket information...</p>
+  const [ticket, setTicket] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    // 从 URL 参数或 localStorage 获取票券信息
+    const urlParams = new URLSearchParams(window.location.search)
+    const sessionId = urlParams.get('session_id')
+    
+    if (sessionId) {
+      // 模拟从服务器获取票券信息
+      const mockTicket = {
+        id: `ticket_${Date.now()}`,
+        eventName: 'Ridiculous Chicken Night Event',
+        ticketType: sessionId.includes('28E4gz5Osd7qgCq0nh4Rq01') ? 'Regular Ticket (21+)' : 'Special Ticket (18-20)',
+        price: sessionId.includes('28E4gz5Osd7qgCq0nh4Rq01') ? '15.00' : '30.00',
+        purchaseDate: new Date().toLocaleDateString('en-US'),
+        status: 'valid',
+        sessionId: sessionId
+      }
+      
+      setTicket(mockTicket)
+      
+      // 保存到 localStorage 以便在账户页面显示
+      const existingTickets = JSON.parse(localStorage.getItem('userTickets') || '[]')
+      existingTickets.push(mockTicket)
+      localStorage.setItem('userTickets', JSON.stringify(existingTickets))
+    }
+    
+    setLoading(false)
+  }, [])
+
+  const generateQRCode = (ticket) => {
+    const qrData = {
+      ticketId: ticket.id,
+      eventName: ticket.eventName,
+      ticketType: ticket.ticketType,
+      purchaseDate: ticket.purchaseDate,
+      price: ticket.price
+    }
+    return JSON.stringify(qrData)
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
       </div>
-    }>
-      <SuccessContent />
-    </Suspense>
-  );
+    )
+  }
+
+  if (!ticket) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">Payment Not Found</h1>
+          <p className="text-gray-600 mb-6">We couldn't find your payment information.</p>
+          <a
+            href="/events"
+            className="bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors"
+          >
+            Browse Events
+          </a>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-2xl mx-auto px-6 py-8">
+        {/* Success Header */}
+        <div className="text-center mb-8">
+          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Payment Successful!</h1>
+          <p className="text-gray-600">Your ticket has been generated and saved to your account.</p>
+        </div>
+
+        {/* Ticket Display */}
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm mb-8">
+          <div className="p-6">
+            <div className="flex items-start justify-between mb-6">
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900 mb-1">{ticket.eventName}</h2>
+                <p className="text-gray-500">{ticket.ticketType}</p>
+              </div>
+              <span className="px-3 py-1 rounded-full text-xs font-medium border bg-green-100 text-green-800 border-green-200">
+                Valid
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              <div className="flex items-center gap-2 text-gray-600">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                </svg>
+                <span className="text-sm">${ticket.price}</span>
+              </div>
+              
+              <div className="flex items-center gap-2 text-gray-600">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <span className="text-sm">{ticket.purchaseDate}</span>
+              </div>
+            </div>
+
+            {/* QR Code Display */}
+            <div className="mb-6">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Entry QR Code</h3>
+              <div className="bg-gray-50 rounded-lg p-6 text-center">
+                <div className="w-48 h-48 bg-white rounded-lg border-2 border-gray-200 mx-auto mb-4 flex items-center justify-center">
+                  <svg className="w-32 h-32 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                  </svg>
+                </div>
+                <p className="text-xs text-gray-500 font-mono break-all bg-white p-2 rounded border">
+                  {generateQRCode(ticket)}
+                </p>
+                <p className="text-sm text-gray-600 mt-2">Show this QR code at the event entrance</p>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="grid grid-cols-2 gap-4">
+              <a
+                href="/account"
+                className="bg-blue-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-blue-700 transition-colors text-center"
+              >
+                View All Tickets
+              </a>
+              <button className="bg-gray-100 text-gray-700 py-3 px-4 rounded-lg font-medium hover:bg-gray-200 transition-colors">
+                Download PDF
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Additional Information */}
+        <div className="bg-blue-50 rounded-lg p-6 mb-8">
+          <h3 className="text-lg font-medium text-blue-900 mb-2">Important Information</h3>
+          <ul className="text-sm text-blue-800 space-y-1">
+            <li>• Your ticket has been saved to your account</li>
+            <li>• Bring a valid ID to the event for age verification</li>
+            <li>• The QR code is valid for entry at Shanghai Concert Hall</li>
+            <li>• Event date: October 25, 2025 at 8:00 PM</li>
+          </ul>
+        </div>
+
+        {/* Navigation */}
+        <div className="text-center">
+          <a
+            href="/events"
+            className="text-blue-600 hover:text-blue-800 font-medium"
+          >
+            ← Back to Events
+          </a>
+        </div>
+      </div>
+    </div>
+  )
 }

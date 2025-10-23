@@ -73,6 +73,9 @@ export default function RootLayout({ children }) {
             <Link href="/success" style={{ textDecoration: 'none', color: '#666', padding: '0.5rem 1rem', borderRadius: '4px' }}>
               Success
             </Link>
+            <Link href="/merchant" style={{ textDecoration: 'none', color: '#8b5cf6', padding: '0.5rem 1rem', borderRadius: '4px', fontWeight: '600' }}>
+              Merchant
+            </Link>
           </div>
         </nav>
         {children}

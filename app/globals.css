@@ -40,3 +40,39 @@ a {
     color-scheme: dark;
   }
 }
+
+/* PartyTix 渐变主题工具类 */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  /* PartyTix 品牌渐变背景 */
+  .bg-partytix-gradient {
+    background: linear-gradient(135deg, #7C3AED 0%, #22D3EE 100%);
+  }
+  
+  /* 卡片暗底样式 */
+  .bg-partytix-card {
+    @apply bg-slate-900/60 border border-white/10;
+  }
+  
+  /* 渐变文字效果 */
+  .text-partytix-gradient {
+    background: linear-gradient(135deg, #7C3AED 0%, #22D3EE 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  
+  /* 渐变边框效果 */
+  .border-partytix-gradient {
+    border: 1px solid;
+    border-image: linear-gradient(135deg, #7C3AED 0%, #22D3EE 100%) 1;
+  }
+  
+  /* 悬浮渐变按钮 */
+  .btn-partytix-gradient {
+    @apply bg-partytix-gradient text-white px-6 py-3 rounded-lg font-semibold transition-all duration-300 hover:shadow-lg hover:scale-105;
+  }
+}

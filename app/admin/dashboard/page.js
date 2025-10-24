@@ -569,9 +569,11 @@ export default function AdminDashboard() {
                   )}
                 </div>
               </div>
-      </div>
+            </div>
+          </div>
+        </div>
 
-      {/* Event Modal */}
+        {/* Event Modal */}
       {showEventModal && (
         <div style={{
           position: 'fixed',

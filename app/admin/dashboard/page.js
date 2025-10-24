@@ -20,6 +20,18 @@ export default function AdminDashboard() {
   const [customers, setCustomers] = useState([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('overview')
+  const [showEventModal, setShowEventModal] = useState(false)
+  const [editingEvent, setEditingEvent] = useState(null)
+  const [eventForm, setEventForm] = useState({
+    title: '',
+    description: '',
+    startDate: '',
+    endDate: '',
+    location: '',
+    maxAttendees: '',
+    ticketTypes: [],
+    merchantId: ''
+  })
   const router = useRouter()
 
   useEffect(() => {
@@ -108,6 +120,84 @@ export default function AdminDashboard() {
     } catch (error) {
       console.error('Generate invite code error:', error)
       alert('Failed to generate invite code, please try again')
+    }
+  }
+
+  const handleEventSubmit = async (e) => {
+    e.preventDefault()
+    
+    try {
+      const url = editingEvent 
+        ? `/api/admin/events/${editingEvent.id}`
+        : '/api/admin/events/create'
+      
+      const method = editingEvent ? 'PUT' : 'POST'
+      
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(eventForm)
+      })
+
+      if (response.ok) {
+        setShowEventModal(false)
+        setEditingEvent(null)
+        setEventForm({
+          title: '',
+          description: '',
+          startDate: '',
+          endDate: '',
+          location: '',
+          maxAttendees: '',
+          ticketTypes: [],
+          merchantId: ''
+        })
+        loadData() // Reload data
+      } else {
+        const error = await response.json()
+        alert(error.error || 'Failed to save event')
+      }
+    } catch (error) {
+      console.error('Event save error:', error)
+      alert('Failed to save event, please try again')
+    }
+  }
+
+  const handleEditEvent = (event) => {
+    setEditingEvent(event)
+    setEventForm({
+      title: event.title || '',
+      description: event.description || '',
+      startDate: event.start_date ? event.start_date.split('T')[0] : '',
+      endDate: event.end_date ? event.end_date.split('T')[0] : '',
+      location: event.location || '',
+      maxAttendees: event.max_attendees || '',
+      ticketTypes: event.ticket_types || [],
+      merchantId: event.merchant_id || ''
+    })
+    setShowEventModal(true)
+  }
+
+  const handleDeleteEvent = async (eventId) => {
+    if (!confirm('Are you sure you want to delete this event?')) {
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/admin/events/${eventId}`, {
+        method: 'DELETE'
+      })
+
+      if (response.ok) {
+        loadData() // Reload data
+      } else {
+        alert('Failed to delete event')
+      }
+    } catch (error) {
+      console.error('Event deletion error:', error)
+      alert('Failed to delete event, please try again')
     }
   }
 
@@ -345,13 +435,104 @@ export default function AdminDashboard() {
           )}
 
           {activeTab === 'events' && (
-                    <div>
-              <h2 style={{ color: 'white', marginBottom: '20px', fontSize: '20px' }}>Events</h2>
-              <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <h2 style={{ color: 'white', fontSize: '20px' }}>Events Management</h2>
+                <button
+                  onClick={() => {
+                    setEditingEvent(null)
+                    setEventForm({
+                      title: '',
+                      description: '',
+                      startDate: '',
+                      endDate: '',
+                      location: '',
+                      maxAttendees: '',
+                      ticketTypes: [],
+                      merchantId: ''
+                    })
+                    setShowEventModal(true)
+                  }}
+                  style={{
+                    background: 'linear-gradient(135deg, #7C3AED 0%, #22D3EE 100%)',
+                    color: 'white',
+                    border: 'none',
+                    padding: '8px 16px',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '500'
+                  }}
+                >
+                  Create Event
+                </button>
+              </div>
+              
+              <div style={{ color: 'rgba(255, 255, 255, 0.8)', marginBottom: '20px' }}>
                 {events.length} events created
-          </div>
-        </div>
-      )}
+              </div>
+
+              <div style={{ display: 'grid', gap: '16px' }}>
+                {events.map(event => (
+                  <div
+                    key={event.id}
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '8px',
+                      padding: '16px'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '12px' }}>
+                      <div>
+                        <h3 style={{ color: 'white', fontSize: '16px', marginBottom: '4px' }}>
+                          {event.title}
+                        </h3>
+                        <p style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '14px', marginBottom: '8px' }}>
+                          {event.description}
+                        </p>
+                        <div style={{ display: 'flex', gap: '16px', fontSize: '12px', color: 'rgba(255, 255, 255, 0.6)' }}>
+                          <span>📍 {event.location}</span>
+                          <span>📅 {new Date(event.start_date).toLocaleDateString()}</span>
+                          <span>👥 {event.max_attendees || 'Unlimited'}</span>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button
+                          onClick={() => handleEditEvent(event)}
+                          style={{
+                            background: 'rgba(34, 211, 238, 0.2)',
+                            border: '1px solid rgba(34, 211, 238, 0.3)',
+                            color: '#22D3EE',
+                            padding: '6px 12px',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '12px'
+                          }}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDeleteEvent(event.id)}
+                          style={{
+                            background: 'rgba(239, 68, 68, 0.2)',
+                            border: '1px solid rgba(239, 68, 68, 0.3)',
+                            color: '#ef4444',
+                            padding: '6px 12px',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '12px'
+                          }}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
       {activeTab === 'customers' && (
             <div>
@@ -388,6 +569,249 @@ export default function AdminDashboard() {
                   )}
                 </div>
               </div>
+      </div>
+
+      {/* Event Modal */}
+      {showEventModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.8)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '20px'
+        }}>
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.1)',
+            backdropFilter: 'blur(10px)',
+            borderRadius: '12px',
+            padding: '24px',
+            width: '100%',
+            maxWidth: '600px',
+            maxHeight: '90vh',
+            overflowY: 'auto'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h2 style={{ color: 'white', fontSize: '20px' }}>
+                {editingEvent ? 'Edit Event' : 'Create Event'}
+              </h2>
+              <button
+                onClick={() => setShowEventModal(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'white',
+                  fontSize: '24px',
+                  cursor: 'pointer'
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            <form onSubmit={handleEventSubmit}>
+              <div style={{ display: 'grid', gap: '16px' }}>
+                <div>
+                  <label style={{ display: 'block', color: 'white', marginBottom: '8px', fontWeight: '500' }}>
+                    Event Title *
+                  </label>
+                  <input
+                    type="text"
+                    value={eventForm.title}
+                    onChange={(e) => setEventForm(prev => ({ ...prev, title: e.target.value }))}
+                    required
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      borderRadius: '6px',
+                      border: '1px solid rgba(255, 255, 255, 0.2)',
+                      background: 'rgba(255, 255, 255, 0.1)',
+                      color: 'white',
+                      fontSize: '14px'
+                    }}
+                    placeholder="Enter event title"
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', color: 'white', marginBottom: '8px', fontWeight: '500' }}>
+                    Description *
+                  </label>
+                  <textarea
+                    value={eventForm.description}
+                    onChange={(e) => setEventForm(prev => ({ ...prev, description: e.target.value }))}
+                    required
+                    rows={3}
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      borderRadius: '6px',
+                      border: '1px solid rgba(255, 255, 255, 0.2)',
+                      background: 'rgba(255, 255, 255, 0.1)',
+                      color: 'white',
+                      fontSize: '14px',
+                      resize: 'vertical'
+                    }}
+                    placeholder="Enter event description"
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div>
+                    <label style={{ display: 'block', color: 'white', marginBottom: '8px', fontWeight: '500' }}>
+                      Start Date *
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={eventForm.startDate}
+                      onChange={(e) => setEventForm(prev => ({ ...prev, startDate: e.target.value }))}
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '12px',
+                        borderRadius: '6px',
+                        border: '1px solid rgba(255, 255, 255, 0.2)',
+                        background: 'rgba(255, 255, 255, 0.1)',
+                        color: 'white',
+                        fontSize: '14px'
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', color: 'white', marginBottom: '8px', fontWeight: '500' }}>
+                      End Date *
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={eventForm.endDate}
+                      onChange={(e) => setEventForm(prev => ({ ...prev, endDate: e.target.value }))}
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '12px',
+                        borderRadius: '6px',
+                        border: '1px solid rgba(255, 255, 255, 0.2)',
+                        background: 'rgba(255, 255, 255, 0.1)',
+                        color: 'white',
+                        fontSize: '14px'
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', color: 'white', marginBottom: '8px', fontWeight: '500' }}>
+                    Location *
+                  </label>
+                  <input
+                    type="text"
+                    value={eventForm.location}
+                    onChange={(e) => setEventForm(prev => ({ ...prev, location: e.target.value }))}
+                    required
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      borderRadius: '6px',
+                      border: '1px solid rgba(255, 255, 255, 0.2)',
+                      background: 'rgba(255, 255, 255, 0.1)',
+                      color: 'white',
+                      fontSize: '14px'
+                    }}
+                    placeholder="Enter event location"
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', color: 'white', marginBottom: '8px', fontWeight: '500' }}>
+                    Max Attendees
+                  </label>
+                  <input
+                    type="number"
+                    value={eventForm.maxAttendees}
+                    onChange={(e) => setEventForm(prev => ({ ...prev, maxAttendees: e.target.value }))}
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      borderRadius: '6px',
+                      border: '1px solid rgba(255, 255, 255, 0.2)',
+                      background: 'rgba(255, 255, 255, 0.1)',
+                      color: 'white',
+                      fontSize: '14px'
+                    }}
+                    placeholder="Leave empty for unlimited"
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', color: 'white', marginBottom: '8px', fontWeight: '500' }}>
+                    Merchant ID *
+                  </label>
+                  <select
+                    value={eventForm.merchantId}
+                    onChange={(e) => setEventForm(prev => ({ ...prev, merchantId: e.target.value }))}
+                    required
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      borderRadius: '6px',
+                      border: '1px solid rgba(255, 255, 255, 0.2)',
+                      background: 'rgba(255, 255, 255, 0.1)',
+                      color: 'white',
+                      fontSize: '14px'
+                    }}
+                  >
+                    <option value="">Select Merchant</option>
+                    {merchants.map(merchant => (
+                      <option key={merchant.id} value={merchant.id} style={{ color: 'black' }}>
+                        {merchant.name} ({merchant.contact_email})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px', marginTop: '24px', justifyContent: 'flex-end' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowEventModal(false)}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    color: 'white',
+                    padding: '10px 20px',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '14px'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  style={{
+                    background: 'linear-gradient(135deg, #7C3AED 0%, #22D3EE 100%)',
+                    color: 'white',
+                    border: 'none',
+                    padding: '10px 20px',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '500'
+                  }}
+                >
+                  {editingEvent ? 'Update Event' : 'Create Event'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -15,33 +15,17 @@ export default function MerchantRegisterPage() {
   const [errors, setErrors] = useState({})
   const [isLoading, setIsLoading] = useState(false)
   const [user, setUser] = useState(null)
-  const [isCheckingAuth, setIsCheckingAuth] = useState(true)
+  const [isCheckingAuth, setIsCheckingAuth] = useState(false)
+  const [showLoginForm, setShowLoginForm] = useState(false)
+  const [loginData, setLoginData] = useState({
+    email: '',
+    password: ''
+  })
 
   useEffect(() => {
-    checkAuth()
+    // 不再强制检查登录状态
+    setIsCheckingAuth(false)
   }, [])
-
-  const checkAuth = async () => {
-    try {
-      const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-      )
-      
-      const { data: { user }, error } = await supabase.auth.getUser()
-      
-      if (error || !user) {
-        setIsCheckingAuth(false)
-        return
-      }
-      
-      setUser(user)
-      setIsCheckingAuth(false)
-    } catch (error) {
-      console.error('Auth check error:', error)
-      setIsCheckingAuth(false)
-    }
-  }
 
   const handleChange = (e) => {
     const { name, value } = e.target
@@ -56,6 +40,45 @@ export default function MerchantRegisterPage() {
         ...prev,
         [name]: ''
       }))
+    }
+  }
+
+  const handleLoginChange = (e) => {
+    const { name, value } = e.target
+    setLoginData(prev => ({
+      ...prev,
+      [name]: value
+    }))
+  }
+
+  const handleLogin = async (e) => {
+    e.preventDefault()
+    setIsLoading(true)
+    setErrors({})
+
+    try {
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+      )
+
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: loginData.email,
+        password: loginData.password
+      })
+
+      if (error) {
+        setErrors({ general: 'Invalid email or password' })
+      } else {
+        setUser(data.user)
+        setShowLoginForm(false)
+        setLoginData({ email: '', password: '' })
+      }
+    } catch (error) {
+      console.error('Login error:', error)
+      setErrors({ general: 'Login failed, please try again' })
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -88,32 +111,79 @@ export default function MerchantRegisterPage() {
     setIsLoading(true)
 
     try {
-      const response = await fetch('/api/merchant/create', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...formData,
-          userId: user.id
-        }),
-      })
+      // 如果用户已登录，直接创建商家账户
+      if (user) {
+        const response = await fetch('/api/merchant/create', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            ...formData,
+            userId: user.id
+          }),
+        })
 
-      const data = await response.json()
+        const data = await response.json()
 
-      if (data.ok) {
-        // Success - redirect to merchant dashboard
-        router.push('/merchant')
-      } else {
-        // Handle different error types
-        if (data.reason === 'not_authenticated') {
-          setErrors({ general: 'Please login first before upgrading to merchant account' })
-        } else if (data.reason === 'invalid_invite') {
-          setErrors({ inviteCode: 'Invalid or expired invite code' })
-        } else if (data.reason === 'merchant_exists') {
-          setErrors({ general: 'You already have a merchant account' })
+        if (data.ok) {
+          router.push('/merchant')
         } else {
-          setErrors({ general: data.reason || 'Failed to create merchant account' })
+          if (data.reason === 'invalid_invite') {
+            setErrors({ inviteCode: 'Invalid or expired invite code' })
+          } else if (data.reason === 'merchant_exists') {
+            setErrors({ general: 'You already have a merchant account' })
+          } else {
+            setErrors({ general: data.reason || 'Failed to create merchant account' })
+          }
+        }
+      } else {
+        // 如果用户未登录，先注册用户，然后创建商家账户
+        const supabase = createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL,
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+        )
+
+        // 生成随机邮箱和密码
+        const tempEmail = `merchant_${Date.now()}@temp.com`
+        const tempPassword = Math.random().toString(36).slice(-8)
+
+        // 注册临时用户
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+          email: tempEmail,
+          password: tempPassword
+        })
+
+        if (authError) {
+          setErrors({ general: 'Failed to create account: ' + authError.message })
+          return
+        }
+
+        if (authData.user) {
+          // 创建商家账户
+          const response = await fetch('/api/merchant/create', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              ...formData,
+              userId: authData.user.id
+            }),
+          })
+
+          const data = await response.json()
+
+          if (data.ok) {
+            // 显示成功信息，包含临时登录凭据
+            setErrors({ 
+              success: `Merchant account created successfully! 
+              Temporary login: ${tempEmail} / ${tempPassword}
+              Please save these credentials and login to access your merchant dashboard.` 
+            })
+          } else {
+            setErrors({ general: data.reason || 'Failed to create merchant account' })
+          }
         }
       }
     } catch (error) {
@@ -141,64 +211,7 @@ export default function MerchantRegisterPage() {
           textAlign: 'center',
           color: 'white'
         }}>
-          <div style={{ fontSize: '18px' }}>Checking authentication...</div>
-        </div>
-      </div>
-    )
-  }
-
-  if (!user) {
-    return (
-      <div style={{
-        minHeight: '100vh',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center'
-      }}>
-        <div style={{
-          background: 'rgba(255, 255, 255, 0.1)',
-          backdropFilter: 'blur(10px)',
-          borderRadius: '20px',
-          padding: '40px',
-          textAlign: 'center',
-          color: 'white',
-          maxWidth: '500px'
-        }}>
-          <h1 style={{ fontSize: '28px', marginBottom: '20px' }}>Login Required</h1>
-          <p style={{ fontSize: '16px', marginBottom: '30px', opacity: 0.9 }}>
-            You need to login first before upgrading to a merchant account.
-          </p>
-          <div style={{ display: 'flex', gap: '16px', justifyContent: 'center' }}>
-            <Link 
-              href="/auth/login"
-              style={{
-                background: 'linear-gradient(135deg, #7C3AED 0%, #22D3EE 100%)',
-                color: 'white',
-                padding: '12px 24px',
-                borderRadius: '8px',
-                textDecoration: 'none',
-                fontWeight: '500',
-                transition: 'transform 0.2s ease'
-              }}
-            >
-              Login
-            </Link>
-            <Link 
-              href="/auth/register"
-              style={{
-                background: 'rgba(255, 255, 255, 0.2)',
-                color: 'white',
-                padding: '12px 24px',
-                borderRadius: '8px',
-                textDecoration: 'none',
-                fontWeight: '500',
-                transition: 'transform 0.2s ease'
-              }}
-            >
-              Register
-            </Link>
-          </div>
+          <div style={{ fontSize: '18px' }}>Loading...</div>
         </div>
       </div>
     )
@@ -244,15 +257,25 @@ export default function MerchantRegisterPage() {
             color: 'white', 
             marginBottom: '8px' 
           }}>
-            Upgrade to Merchant
+            {user ? 'Upgrade to Merchant' : 'Register as Merchant'}
           </h1>
-          <p style={{ 
-            color: 'rgba(255, 255, 255, 0.8)', 
-            fontSize: '16px',
-            marginBottom: '10px'
-          }}>
-            Welcome, {user.email}
-          </p>
+          {user ? (
+            <p style={{ 
+              color: 'rgba(255, 255, 255, 0.8)', 
+              fontSize: '16px',
+              marginBottom: '10px'
+            }}>
+              Welcome, {user.email}
+            </p>
+          ) : (
+            <p style={{ 
+              color: 'rgba(255, 255, 255, 0.8)', 
+              fontSize: '16px',
+              marginBottom: '10px'
+            }}>
+              Create your merchant account
+            </p>
+          )}
           <p style={{ 
             color: 'rgba(255, 255, 255, 0.7)', 
             fontSize: '14px' 
@@ -272,6 +295,21 @@ export default function MerchantRegisterPage() {
             fontSize: '14px'
           }}>
             {errors.general}
+          </div>
+        )}
+
+        {errors.success && (
+          <div style={{
+            background: 'rgba(34, 197, 94, 0.1)',
+            border: '1px solid rgba(34, 197, 94, 0.3)',
+            borderRadius: '8px',
+            padding: '12px',
+            marginBottom: '20px',
+            color: '#86efac',
+            fontSize: '14px',
+            whiteSpace: 'pre-line'
+          }}>
+            {errors.success}
           </div>
         )}
 
@@ -407,6 +445,25 @@ export default function MerchantRegisterPage() {
           color: 'rgba(255, 255, 255, 0.7)',
           fontSize: '14px'
         }}>
+          {!user && (
+            <button
+              type="button"
+              onClick={() => setShowLoginForm(!showLoginForm)}
+              style={{
+                background: 'rgba(255, 255, 255, 0.1)',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                color: 'white',
+                padding: '8px 16px',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                marginBottom: '10px'
+              }}
+            >
+              {showLoginForm ? 'Hide Login' : 'Already have an account? Login'}
+            </button>
+          )}
+          <br />
           <Link 
             href="/merchant/auth/login" 
             style={{ 
@@ -417,6 +474,74 @@ export default function MerchantRegisterPage() {
             Already have a merchant account? Login here
           </Link>
         </div>
+
+        {showLoginForm && !user && (
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.05)',
+            borderRadius: '8px',
+            padding: '20px',
+            marginTop: '20px',
+            border: '1px solid rgba(255, 255, 255, 0.1)'
+          }}>
+            <h3 style={{ color: 'white', marginBottom: '16px', fontSize: '16px' }}>Login to Existing Account</h3>
+            <form onSubmit={handleLogin}>
+              <div style={{ marginBottom: '16px' }}>
+                <input
+                  type="email"
+                  name="email"
+                  value={loginData.email}
+                  onChange={handleLoginChange}
+                  placeholder="Email"
+                  required
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    color: 'white',
+                    fontSize: '14px'
+                  }}
+                />
+              </div>
+              <div style={{ marginBottom: '16px' }}>
+                <input
+                  type="password"
+                  name="password"
+                  value={loginData.password}
+                  onChange={handleLoginChange}
+                  placeholder="Password"
+                  required
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    color: 'white',
+                    fontSize: '14px'
+                  }}
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={isLoading}
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  background: isLoading ? 'rgba(255, 255, 255, 0.3)' : 'linear-gradient(135deg, #7C3AED 0%, #22D3EE 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: isLoading ? 'not-allowed' : 'pointer',
+                  fontSize: '14px'
+                }}
+              >
+                {isLoading ? 'Logging in...' : 'Login'}
+              </button>
+            </form>
+          </div>
+        )}
       </div>
     </div>
   )

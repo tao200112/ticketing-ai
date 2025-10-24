@@ -44,7 +44,7 @@ export async function POST(request) {
           console.log('❌ Merchant not found in Supabase')
           return NextResponse.json(
             { error: 'User not found, please check email or register first' },
-            { status: 404 }
+            { status: 401 }
           )
         }
 
@@ -69,7 +69,7 @@ export async function POST(request) {
           console.log('❌ Merchant profile not found')
           return NextResponse.json(
             { error: 'Merchant profile not found' },
-            { status: 404 }
+            { status: 401 }
           )
         }
 
@@ -79,11 +79,13 @@ export async function POST(request) {
           name: userData.name,
           businessName: merchantData.name,
           phone: merchantData.contact_phone || '',
-          maxEvents: 10,
+          maxEvents: merchantData.max_events || 10,
           isActive: merchantData.status === 'active',
           verified: merchantData.verified,
           createdAt: userData.created_at
         }
+        
+        console.log('✅ Merchant login successful via Supabase:', user.email)
       }
     } else {
       console.log('⚠️ Supabase not available, using fallback method')

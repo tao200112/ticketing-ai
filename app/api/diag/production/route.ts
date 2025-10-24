@@ -45,7 +45,7 @@ export async function GET() {
     }
 
     // 检查邀请码
-    let inviteCodeCheck = {}
+    let inviteCodeCheck: any = {}
     try {
       const { data: codes } = await supabaseAdmin
         .from('admin_invite_codes')

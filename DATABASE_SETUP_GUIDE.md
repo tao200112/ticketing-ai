@@ -24,7 +24,16 @@ ADMIN_INVITE_CODES=[{"code":"WELCOME2024","isActive":true,"expiresAt":"2025-12-3
 3. 获取项目 URL 和 API Key
 
 ### 步骤 2: 运行数据库迁移
-在 Supabase SQL 编辑器中运行 `supabase/migrations/complete_database_setup.sql`
+在 Supabase SQL 编辑器中运行以下脚本之一：
+
+**选项 1: 简单初始化（推荐）**
+运行 `supabase/migrations/simple_database_init.sql`
+
+**选项 2: 修复现有表结构**
+如果表已存在但缺少列，运行 `supabase/migrations/fix_users_table.sql`
+
+**选项 3: 完整设置**
+运行 `supabase/migrations/complete_database_setup.sql`
 
 ### 步骤 3: 配置环境变量
 在 Vercel 项目设置中添加环境变量：

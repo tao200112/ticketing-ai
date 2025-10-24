@@ -14,7 +14,7 @@ export async function GET() {
     }
 
     // 检查数据库连接和统计
-    let dbStats = {}
+    let dbStats: any = {}
     try {
       const [
         { count: users },

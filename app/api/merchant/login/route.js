@@ -92,24 +92,49 @@ export async function POST(request) {
       console.log('📝 Simulating merchant login for:', email)
       
       // 模拟验证（在实际应用中，这应该从数据库获取）
-      if (email === 'test@merchant.com' && password === 'test123') {
-        user = {
-          id: 'test-merchant-123',
+      const testMerchants = [
+        {
           email: 'test@merchant.com',
-          name: 'Test Merchant',
-          businessName: 'Test Business',
-          phone: '1234567890',
-          maxEvents: 10,
-          isActive: true,
-          verified: true,
-          createdAt: new Date().toISOString()
+          password: 'test123',
+          user: {
+            id: 'test-merchant-123',
+            email: 'test@merchant.com',
+            name: 'Test Merchant',
+            businessName: 'Test Business',
+            phone: '1234567890',
+            maxEvents: 10,
+            isActive: true,
+            verified: true,
+            createdAt: new Date().toISOString()
+          }
+        },
+        {
+          email: 'taoliu0711@gmail.com',
+          password: 'test123',
+          user: {
+            id: 'test-merchant-456',
+            email: 'taoliu0711@gmail.com',
+            name: 'Tao Liu',
+            businessName: 'Tao Business',
+            phone: '1234567890',
+            maxEvents: 10,
+            isActive: true,
+            verified: true,
+            createdAt: new Date().toISOString()
+          }
         }
-        console.log('✅ Test merchant login successful')
+      ]
+      
+      const merchant = testMerchants.find(m => m.email === email && m.password === password)
+      
+      if (merchant) {
+        user = merchant.user
+        console.log('✅ Test merchant login successful for:', email)
       } else {
-        console.log('❌ Invalid credentials')
+        console.log('❌ Invalid credentials for:', email)
         return NextResponse.json(
           { error: 'User not found, please check email or register first' },
-          { status: 404 }
+          { status: 401 }
         )
       }
     }

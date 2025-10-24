@@ -74,7 +74,7 @@ export default function MerchantLoginPage() {
         // Navigate to merchant dashboard
         router.push('/merchant')
       } else {
-        setErrors({ general: data.message || 'Login failed' })
+        setErrors({ general: data.error || data.message || 'Login failed' })
       }
     } catch (error) {
       console.error('Login error:', error)

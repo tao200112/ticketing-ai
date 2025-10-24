@@ -1,6 +1,9 @@
 import Link from 'next/link'
+import { useState } from 'react'
 
 export default function NavbarPartyTix() {
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+
   return (
     <nav style={{
       position: 'fixed',
@@ -45,11 +48,9 @@ export default function NavbarPartyTix() {
             PartyTix
           </span>
         </Link>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '24px'
-        }}>
+        
+        {/* Desktop Navigation */}
+        <div className="hidden md:flex items-center gap-6">
           <Link 
             href="/events" 
             style={{ 
@@ -142,7 +143,77 @@ export default function NavbarPartyTix() {
             Account
           </Link>
         </div>
+
+        {/* Mobile Menu Button */}
+        <button
+          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          className="md:hidden bg-none border-none text-white text-2xl cursor-pointer p-2"
+          style={{
+            background: 'none',
+            border: 'none'
+          }}
+        >
+          {isMobileMenuOpen ? '✕' : '☰'}
+        </button>
       </div>
+
+      {/* Mobile Navigation Menu */}
+      {isMobileMenuOpen && (
+        <div className="md:hidden absolute top-full left-0 right-0 bg-black bg-opacity-90 backdrop-blur-lg border-t border-white border-opacity-10 p-5 flex flex-col gap-4">
+          <Link 
+            href="/events" 
+            className="text-white no-underline text-base py-2 transition-colors duration-300 hover:text-cyan-400"
+            onClick={() => setIsMobileMenuOpen(false)}
+          >
+            Events
+          </Link>
+          <Link 
+            href="/qr-scanner" 
+            className="text-white no-underline text-base py-2 flex items-center gap-2 transition-colors duration-300 hover:text-cyan-400"
+            onClick={() => setIsMobileMenuOpen(false)}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0 0v-4m0 0h4m-4 0H6m12 0h-2M7 7h10a2 2 0 012 2v10a2 2 0 01-2 2H7a2 2 0 01-2-2V9a2 2 0 012-2z" />
+            </svg>
+            QR Scanner
+          </Link>
+          <Link 
+            href="/merchant" 
+            className="text-white no-underline text-base py-2 transition-colors duration-300 hover:text-cyan-400"
+            onClick={() => setIsMobileMenuOpen(false)}
+          >
+            Merchant Console
+          </Link>
+          <Link 
+            href="/admin/login" 
+            className="text-yellow-400 no-underline text-base py-2 font-medium transition-colors duration-300 hover:text-yellow-300"
+            onClick={() => setIsMobileMenuOpen(false)}
+          >
+            Admin
+          </Link>
+          <Link 
+            href="/auth/login" 
+            className="text-white no-underline text-base py-2 transition-colors duration-300 hover:text-cyan-400"
+            onClick={() => setIsMobileMenuOpen(false)}
+          >
+            Login
+          </Link>
+          <Link 
+            href="/auth/register" 
+            className="text-white no-underline text-base py-2 transition-colors duration-300 hover:text-cyan-400"
+            onClick={() => setIsMobileMenuOpen(false)}
+          >
+            Register
+          </Link>
+          <Link 
+            href="/account" 
+            className="text-white no-underline text-base py-2 transition-colors duration-300 hover:text-cyan-400"
+            onClick={() => setIsMobileMenuOpen(false)}
+          >
+            Account
+          </Link>
+        </div>
+      )}
     </nav>
   )
 }

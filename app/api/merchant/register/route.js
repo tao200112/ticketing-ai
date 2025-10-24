@@ -5,12 +5,16 @@ import bcrypt from 'bcryptjs'
 
 export async function POST(request) {
   try {
+    console.log('🔍 Merchant registration attempt started')
     const { email, name, businessName, phone, password, inviteCode } = await request.json()
+    
+    console.log('📝 Registration data:', { email, name, businessName, phone, inviteCode })
 
     // 基本验证
     if (!email || !name || !businessName || !phone || !password || !inviteCode) {
+      console.log('❌ Missing required fields')
       return NextResponse.json(
-        { error: '所有字段都是必填的' },
+        { error: 'All fields are required' },
         { status: 400 }
       )
     }
@@ -18,15 +22,23 @@ export async function POST(request) {
     // 密码强度验证
     if (password.length < 8) {
       return NextResponse.json(
-        { error: '密码至少需要8个字符' },
+        { error: 'Password must be at least 8 characters' },
         { status: 400 }
       )
     }
+
+    // 检查Supabase配置
+    console.log('🔧 Supabase configuration check:', {
+      hasSupabase: hasSupabase(),
+      supabaseUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+      supabaseKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    })
 
     // 验证邀请码
     let validInviteCode = null
     
     if (hasSupabase()) {
+      console.log('✅ Using Supabase for invite code validation')
       // 使用 Supabase 验证邀请码
       if (supabase) {
         const { data: inviteCodeData, error } = await supabase
@@ -40,15 +52,18 @@ export async function POST(request) {
 
         if (error || !inviteCodeData) {
           return NextResponse.json(
-            { error: '无效或已过期的邀请码' },
+            { error: 'Invalid or expired invite code' },
             { status: 400 }
           )
         }
         validInviteCode = inviteCodeData
       }
     } else {
+      console.log('⚠️ Supabase not available, using fallback method')
       // 降级到环境变量存储（临时方案）
       const inviteCodes = JSON.parse(process.env.ADMIN_INVITE_CODES || '[]')
+      console.log('📋 Available invite codes:', inviteCodes.length)
+      
       validInviteCode = inviteCodes.find(code => 
         code.code === inviteCode && 
         code.isActive && 
@@ -57,11 +72,13 @@ export async function POST(request) {
       )
 
       if (!validInviteCode) {
+        console.log('❌ Invalid invite code:', inviteCode)
         return NextResponse.json(
-          { error: '无效或已过期的邀请码' },
+          { error: 'Invalid or expired invite code' },
           { status: 400 }
         )
       }
+      console.log('✅ Valid invite code found')
     }
 
     // 检查邮箱是否已存在
@@ -77,7 +94,7 @@ export async function POST(request) {
         
         if (merchantData) {
           return NextResponse.json(
-            { error: '该邮箱已被注册' },
+            { error: 'Email already registered' },
             { status: 400 }
           )
         }
@@ -87,7 +104,7 @@ export async function POST(request) {
       const existingMerchants = JSON.parse(process.env.MERCHANT_USERS || '[]')
       if (existingMerchants.find(merchant => merchant.email === email)) {
         return NextResponse.json(
-          { error: '该邮箱已被注册' },
+          { error: 'Email already registered' },
           { status: 400 }
         )
       }
@@ -119,7 +136,7 @@ export async function POST(request) {
         if (userError) {
           console.error('创建用户失败:', userError)
           return NextResponse.json(
-            { error: '注册失败，请重试' },
+            { error: 'Registration failed, please try again' },
             { status: 500 }
           )
         }
@@ -143,7 +160,7 @@ export async function POST(request) {
         if (merchantError) {
           console.error('创建商家失败:', merchantError)
           return NextResponse.json(
-            { error: '注册失败，请重试' },
+            { error: 'Registration failed, please try again' },
             { status: 500 }
           )
         }
@@ -221,7 +238,7 @@ export async function POST(request) {
 
     return NextResponse.json({
       success: true,
-      message: '商家注册成功',
+      message: 'Merchant registration successful',
       merchant: merchantInfo
     })
 

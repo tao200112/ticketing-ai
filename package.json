@@ -26,6 +26,7 @@
     "stripe": "^19.1.0"
   },
   "devDependencies": {
+    "@types/react": "19.2.2",
     "autoprefixer": "^10.4.21",
     "eslint": "^9",
     "eslint-config-next": "15.5.6",

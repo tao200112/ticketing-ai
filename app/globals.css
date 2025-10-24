@@ -202,3 +202,32 @@ input[type="checkbox"]:checked::after {
   50% { background-position: 100% 50%; }
   100% { background-position: 0% 50%; }
 }
+
+/* 成功页面动画 */
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+/* 成功页面样式增强 */
+.success-page {
+  animation: fadeIn 0.6s ease-out;
+}
+
+.success-card {
+  animation: slideIn 0.8s ease-out;
+}
+
+.success-icon {
+  animation: fadeIn 1s ease-out;
+}

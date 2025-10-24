@@ -10,26 +10,70 @@ export default function EventsPage() {
 
   useEffect(() => {
     loadEvents()
-  }, [])
+    
+    // 监听localStorage变化，当商家创建新事件时自动刷新
+    const handleStorageChange = (e) => {
+      if (e.key === 'merchantEvents') {
+        loadEvents()
+      }
+    }
+    
+    window.addEventListener('storage', handleStorageChange)
+    
+    // 定期检查localStorage变化（用于同一窗口内的变化）
+    const interval = setInterval(() => {
+      const currentEvents = JSON.parse(localStorage.getItem('merchantEvents') || '[]')
+      if (currentEvents.length !== events.length) {
+        loadEvents()
+      }
+    }, 2000)
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange)
+      clearInterval(interval)
+    }
+  }, [events.length])
 
   const loadEvents = async () => {
     try {
       setLoading(true)
-      // 模拟数据加载
-      await new Promise(resolve => setTimeout(resolve, 1000))
       
-      setEvents([
-        {
-          id: 1,
-          name: 'Ridiculous Chicken Night Event',
-          description: 'Enjoy delicious chicken and an amazing night, the most popular event near Virginia Tech',
-          start_date: '2025-10-25T20:00:00Z',
-          location: '201 N Main St SUITE A, Blacksburg, VA',
-          poster_url: null,
-          starting_price: 5000, // $50
-          status: 'active'
-        }
-      ])
+      // 从本地存储加载商家创建的事件
+      const merchantEvents = JSON.parse(localStorage.getItem('merchantEvents') || '[]')
+      
+      // 转换商家事件格式为公共事件格式
+      const publicEvents = merchantEvents.map(event => ({
+        id: event.id,
+        name: event.title,
+        description: event.description,
+        start_date: event.startTime,
+        location: event.location,
+        poster_url: event.poster,
+        starting_price: event.prices && event.prices.length > 0 ? 
+          Math.min(...event.prices.map(p => p.amount_cents)) : 0, // 已经是分为单位
+        status: 'active',
+        ticketsSold: event.ticketsSold || 0,
+        totalTickets: event.totalTickets || 0,
+        revenue: event.revenue || 0
+      }))
+      
+      // 如果没有商家事件，显示默认事件
+      if (publicEvents.length === 0) {
+        setEvents([
+          {
+            id: 'default-1',
+            name: 'Ridiculous Chicken Night Event',
+            description: 'Enjoy delicious chicken and an amazing night, the most popular event near Virginia Tech',
+            start_date: '2025-10-25T20:00:00Z',
+            location: '201 N Main St SUITE A, Blacksburg, VA',
+            poster_url: null,
+            starting_price: 5000, // $50
+            status: 'active'
+          }
+        ])
+      } else {
+        setEvents(publicEvents)
+      }
     } catch (err) {
       console.error('加载活动数据错误:', err)
       setEvents([])

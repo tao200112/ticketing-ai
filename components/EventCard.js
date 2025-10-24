@@ -1,9 +1,16 @@
 import Link from 'next/link'
 
 export default function EventCard({ event }) {
+  // 生成事件页面的URL
+  // 注意：这里event.name是公共事件格式，对应商家事件的title字段
+  const eventSlug = event.name
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '') // 移除特殊字符
+    .replace(/\s+/g, '-') // 空格替换为连字符
+    .trim()
 
   return (
-    <Link href={`/events/ridiculous-chicken`} style={{ display: 'block' }}>
+    <Link href={`/events/dynamic/${eventSlug}`} style={{ display: 'block' }}>
       <div style={{
         background: 'rgba(15, 23, 42, 0.6)',
         border: '1px solid rgba(255, 255, 255, 0.1)',
@@ -73,6 +80,31 @@ export default function EventCard({ event }) {
           }}>
             {event.description || 'No description available'}
           </p>
+          
+          {/* 事件统计信息 */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            marginBottom: '12px',
+            fontSize: '0.75rem',
+            color: '#6b7280'
+          }}>
+            <span>📍 {event.location || 'Location TBD'}</span>
+          </div>
+          
+          {/* 售票统计 */}
+          {event.ticketsSold !== undefined && (
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              fontSize: '0.75rem',
+              color: '#6b7280'
+            }}>
+              <span>🎫 {event.ticketsSold || 0} sold</span>
+              <span>📅 {new Date(event.start_date).toLocaleDateString()}</span>
+            </div>
+          )}
         </div>
       </div>
     </Link>

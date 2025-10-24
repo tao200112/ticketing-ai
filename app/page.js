@@ -13,49 +13,50 @@ export default function Home() {
 
   useEffect(() => {
     loadEvents()
+    
+    // 监听localStorage变化，实现实时更新
+    const handleStorageChange = () => {
+      loadEvents()
+    }
+    
+    // 监听storage事件
+    window.addEventListener('storage', handleStorageChange)
+    
+    // 定期检查localStorage变化（作为备用方案）
+    const interval = setInterval(() => {
+      loadEvents()
+    }, 5000) // 每5秒检查一次
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange)
+      clearInterval(interval)
+    }
   }, [])
 
   const loadEvents = async () => {
     try {
       setLoading(true)
       
-      if (hasSupabase()) {
-        // 尝试从 Supabase 获取真实数据
-        try {
-          // 这里可以添加真实的 Supabase 查询
-          // 暂时使用模拟数据
-          await new Promise(resolve => setTimeout(resolve, 1000))
-                  setEvents([
-                    {
-                      id: 1,
-                      name: 'Ridiculous Chicken Night Event',
-                      description: 'Enjoy delicious chicken and an amazing night',
-                      start_date: '2025-10-25T20:00:00Z',
-                      location: '201 N Main St SUITE A, Blacksburg, VA',
-                      poster_url: null,
-                      starting_price: 5000, // $50
-                      status: 'active'
-                    }
-                  ])
-        } catch (dbError) {
-          console.log('Supabase 查询失败，使用模拟数据:', dbError)
-          setEvents([])
-        }
-      } else {
-        // Use mock data
-        setEvents([
-          {
-            id: 1,
-            name: 'Ridiculous Chicken Night Event',
-            description: 'Enjoy delicious chicken and an amazing night',
-            start_date: '2025-10-25T20:00:00Z',
-            location: '201 N Main St SUITE A, Blacksburg, VA',
-            poster_url: null,
-            starting_price: 5000,
-            status: 'active'
-          }
-        ])
-      }
+      // 从本地存储加载商家创建的事件
+      const merchantEvents = JSON.parse(localStorage.getItem('merchantEvents') || '[]')
+      
+      // 转换商家事件格式为公共事件格式
+      const publicEvents = merchantEvents.map(event => ({
+        id: event.id,
+        name: event.title,
+        description: event.description,
+        start_date: event.startTime,
+        location: event.location,
+        poster_url: event.poster,
+        starting_price: event.prices && event.prices.length > 0 ? 
+          Math.min(...event.prices.map(p => p.amount_cents * 100)) : 0, // 转换为分
+        status: 'active',
+        ticketsSold: event.ticketsSold || 0,
+        totalTickets: event.totalTickets || 0,
+        revenue: event.revenue || 0
+      }))
+      
+      setEvents(publicEvents)
     } catch (err) {
       console.error('加载活动数据错误:', err)
       setEvents([])

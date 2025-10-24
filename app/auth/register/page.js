@@ -59,13 +59,11 @@ export default function RegisterPage() {
       newErrors.age = '年龄必须大于等于16岁'
     }
     
-    // 密码验证
+    // 密码验证 - 只需要大于8位
     if (!formData.password) {
       newErrors.password = '请输入密码'
     } else if (formData.password.length < 8) {
       newErrors.password = '密码至少需要8个字符'
-    } else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(formData.password)) {
-      newErrors.password = '密码必须包含大小写字母和数字'
     }
     
     // 确认密码验证
@@ -304,7 +302,7 @@ export default function RegisterPage() {
                 outline: 'none',
                 transition: 'border-color 0.3s ease'
               }}
-              placeholder="Enter your password (8+ characters, mixed case & numbers)"
+              placeholder="Enter your password (8+ characters)"
               onFocus={(e) => e.target.style.borderColor = '#7c3aed'}
               onBlur={(e) => e.target.style.borderColor = 'rgba(255, 255, 255, 0.1)'}
             />

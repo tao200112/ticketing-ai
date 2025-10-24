@@ -35,18 +35,26 @@ export async function POST(request) {
         if (userError) {
           if (userError.code === 'PGRST116') {
             return NextResponse.json(
-              { message: '用户不存在' },
+              { message: '用户不存在，请检查邮箱地址或先注册账户' },
               { status: 404 }
             )
           }
+          console.error('Supabase 查询用户失败:', userError)
           throw new Error('数据库查询失败')
+        }
+
+        if (!user) {
+          return NextResponse.json(
+            { message: '用户不存在，请检查邮箱地址或先注册账户' },
+            { status: 404 }
+          )
         }
 
         // 验证密码
         const isValidPassword = await bcrypt.compare(password, user.password_hash)
         if (!isValidPassword) {
           return NextResponse.json(
-            { message: '密码错误' },
+            { message: '密码错误，请检查密码是否正确' },
             { status: 401 }
           )
         }
@@ -81,9 +89,19 @@ export async function POST(request) {
             fallback_reason: dbError.message
           })
         } catch (localError) {
-          console.error('本地存储登录也失败:', localError)
+          console.error('本地存储登录失败:', localError)
+          // 根据错误类型返回更具体的错误信息
+          let errorMessage = '登录失败'
+          if (localError.message === '用户不存在') {
+            errorMessage = '用户不存在，请检查邮箱地址或先注册账户'
+          } else if (localError.message === '密码错误') {
+            errorMessage = '密码错误，请检查密码是否正确'
+          } else if (localError.message === '用户密码数据异常') {
+            errorMessage = '用户数据异常，请联系管理员'
+          }
+          
           return NextResponse.json({
-            message: localError.message || '登录失败',
+            message: errorMessage,
             source: 'error'
           }, { status: 401 })
         }
@@ -103,8 +121,18 @@ export async function POST(request) {
         })
       } catch (error) {
         console.error('本地存储登录失败:', error)
+        // 根据错误类型返回更具体的错误信息
+        let errorMessage = '登录失败'
+        if (error.message === '用户不存在') {
+          errorMessage = '用户不存在，请检查邮箱地址或先注册账户'
+        } else if (error.message === '密码错误') {
+          errorMessage = '密码错误，请检查密码是否正确'
+        } else if (error.message === '用户密码数据异常') {
+          errorMessage = '用户数据异常，请联系管理员'
+        }
+        
         return NextResponse.json({
-          message: error.message || '登录失败',
+          message: errorMessage,
           source: 'error'
         }, { status: 401 })
       }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 
 export default function NewEventWizardPage() {
@@ -8,6 +8,7 @@ export default function NewEventWizardPage() {
   const [currentStep, setCurrentStep] = useState(1)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [merchantUser, setMerchantUser] = useState(null)
 
   const [eventData, setEventData] = useState({
     title: '',
@@ -21,6 +22,23 @@ export default function NewEventWizardPage() {
       { name: '', amount_cents: '', inventory: '', limit_per_user: '' }
     ]
   })
+
+  useEffect(() => {
+    // 检查商家登录状态
+    const checkMerchantAuth = () => {
+      const token = localStorage.getItem('merchantToken')
+      const user = localStorage.getItem('merchantUser')
+      
+      if (!token || !user) {
+        router.push('/merchant/auth/login')
+        return
+      }
+      
+      setMerchantUser(JSON.parse(user))
+    }
+    
+    checkMerchantAuth()
+  }, [router])
 
   const updateEventData = (field, value) => {
     setEventData(prev => ({
@@ -83,10 +101,63 @@ export default function NewEventWizardPage() {
     setError('')
     
     try {
-      await new Promise(resolve => setTimeout(resolve, 2000))
+      // 验证必填字段
+      if (!eventData.title || !eventData.description || !eventData.startTime || !eventData.endTime || !eventData.location) {
+        setError('请填写所有必填字段')
+        return
+      }
+
+      // 验证价格设置
+      const validPrices = eventData.prices.filter(price => price.name && price.amount_cents && price.inventory)
+      if (validPrices.length === 0) {
+        setError('请至少设置一个有效的票种')
+        return
+      }
+
+      // 验证价格是否符合 Stripe 最小金额要求
+      const invalidPrices = validPrices.filter(price => parseFloat(price.amount_cents) < 0.50)
+      if (invalidPrices.length > 0) {
+        setError('所有票种价格必须至少为 $0.50（Stripe 最小金额要求）')
+        return
+      }
+
+      // 创建事件对象
+      const newEvent = {
+        id: Date.now().toString(),
+        merchantId: merchantUser.id, // 添加商家ID
+        title: eventData.title,
+        description: eventData.description,
+        startTime: eventData.startTime,
+        endTime: eventData.endTime,
+        location: eventData.location,
+        poster: eventData.posterPreview,
+        prices: validPrices.map(price => ({
+          name: price.name,
+          amount_cents: Math.round(parseFloat(price.amount_cents) * 100), // 将美元转换为分
+          inventory: parseInt(price.inventory),
+          limit_per_user: price.limit_per_user ? parseInt(price.limit_per_user) : null
+        })),
+        ticketsSold: 0,
+        totalTickets: validPrices.reduce((sum, price) => sum + parseInt(price.inventory), 0),
+        revenue: 0,
+        createdAt: new Date().toISOString()
+      }
+
+      // 保存到本地存储
+      const existingEvents = JSON.parse(localStorage.getItem('merchantEvents') || '[]')
+      existingEvents.push(newEvent)
+      localStorage.setItem('merchantEvents', JSON.stringify(existingEvents))
+      
+      // 触发localStorage事件，通知其他页面更新
+      window.dispatchEvent(new Event('storage'))
+
+      // 模拟网络延迟
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      
       router.push('/merchant/events')
     } catch (err) {
-      setError('Failed to create event, please try again')
+      setError('创建事件失败，请重试')
+      console.error('创建事件错误:', err)
     } finally {
       setIsSubmitting(false)
     }
@@ -524,14 +595,14 @@ export default function NewEventWizardPage() {
                         
                         <div>
                           <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
-                            Price ($) *
+                            Price ($) * (Minimum: $0.50)
                           </label>
                           <input
                             type="number"
                             value={price.amount_cents}
                             onChange={(e) => updatePriceData(index, 'amount_cents', e.target.value)}
-                            placeholder="0"
-                            min="0"
+                            placeholder="0.50"
+                            min="0.50"
                             step="0.01"
                             style={{
                               width: '100%',

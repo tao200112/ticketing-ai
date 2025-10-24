@@ -1,11 +1,35 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import AuthGuard from '../../../../components/AuthGuard'
 
 export default function RidiculousChickenEvent() {
   const [quantity, setQuantity] = useState(1)
   const [selectedPrice, setSelectedPrice] = useState('regular')
+  const [customerEmail, setCustomerEmail] = useState('')
+  const [customerName, setCustomerName] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    loadUserData()
+  }, [])
+
+  const loadUserData = () => {
+    try {
+      const userData = localStorage.getItem('userData')
+      if (userData) {
+        const user = JSON.parse(userData)
+        if (user.isLoggedIn) {
+          setCustomerEmail(user.email || '')
+          setCustomerName(user.name || '')
+        }
+      }
+    } catch (error) {
+      console.error('加载用户数据失败:', error)
+    }
+  }
 
   const event = {
     name: "Ridiculous Chicken Night Event",
@@ -21,16 +45,18 @@ export default function RidiculousChickenEvent() {
       id: 'regular',
       name: 'Regular Ticket (21+)',
       price: 15,
+      amount_cents: 1500,
       description: 'For ages 21 and above',
-      stripeUrl: 'https://buy.stripe.com/test_28E4gz5Osd7qgCq0nh4Rq01',
+      inventory: 100,
       available: true
     },
     {
       id: 'special',
       name: 'Special Ticket (18-20)',
       price: 30,
+      amount_cents: 3000,
       description: 'For ages 18-20 only',
-      stripeUrl: 'https://buy.stripe.com/test_aFa7sL6Sw0kE71Q3zt4Rq00',
+      inventory: 50,
       available: true
     }
   ]
@@ -38,19 +64,56 @@ export default function RidiculousChickenEvent() {
   const selectedPriceData = prices.find(p => p.id === selectedPrice)
   const totalPrice = selectedPriceData ? selectedPriceData.price * quantity : 0
 
-  const handleBuyTickets = () => {
-    // Redirect to Stripe payment page
-    if (selectedPriceData && selectedPriceData.stripeUrl) {
-      window.open(selectedPriceData.stripeUrl, '_blank')
+  const handleBuyTickets = async () => {
+    if (!customerEmail || !customerName) {
+      setError('请填写邮箱和姓名')
+      return
+    }
+
+    setLoading(true)
+    setError('')
+
+    try {
+      const response = await fetch('/api/checkout_sessions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          eventId: 'ridiculous-chicken',
+          ticketType: selectedPriceData.name,
+          quantity: quantity,
+          customerEmail: customerEmail,
+          customerName: customerName,
+          eventData: {
+            title: event.name,
+            description: event.description,
+            prices: prices
+          }
+        }),
+      })
+
+      const data = await response.json()
+
+      if (response.ok && data.url) {
+        window.location.href = data.url
+      } else {
+        setError(data.error || '创建支付会话失败')
+      }
+    } catch (err) {
+      setError('网络错误，请重试')
+    } finally {
+      setLoading(false)
     }
   }
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(135deg, #0f172a 0%, #7c3aed 50%, #0f172a 100%)',
-      padding: '32px'
-    }}>
+    <AuthGuard>
+      <div style={{
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #0f172a 0%, #7c3aed 50%, #0f172a 100%)',
+        padding: '32px'
+      }}>
       <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
         {/* 返回按钮 */}
         <div style={{ marginBottom: '24px' }}>
@@ -259,6 +322,76 @@ export default function RidiculousChickenEvent() {
             ))}
           </div>
 
+          {/* 客户信息 */}
+          <div style={{ marginBottom: '24px' }}>
+            <h3 style={{
+              color: 'white',
+              fontSize: '1.125rem',
+              fontWeight: '600',
+              marginBottom: '16px'
+            }}>
+              客户信息
+            </h3>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+              <div>
+                <label style={{
+                  display: 'block',
+                  color: 'white',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  marginBottom: '8px'
+                }}>
+                  姓名 *
+                </label>
+                <input
+                  type="text"
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  placeholder="请输入您的姓名"
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    backgroundColor: 'rgba(55, 65, 81, 0.5)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: '8px',
+                    color: 'white',
+                    fontSize: '1rem',
+                    outline: 'none'
+                  }}
+                />
+              </div>
+              
+              <div>
+                <label style={{
+                  display: 'block',
+                  color: 'white',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  marginBottom: '8px'
+                }}>
+                  邮箱 *
+                </label>
+                <input
+                  type="email"
+                  value={customerEmail}
+                  onChange={(e) => setCustomerEmail(e.target.value)}
+                  placeholder="请输入您的邮箱"
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    backgroundColor: 'rgba(55, 65, 81, 0.5)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: '8px',
+                    color: 'white',
+                    fontSize: '1rem',
+                    outline: 'none'
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+
           {/* 数量选择 */}
           <div style={{ marginBottom: '24px' }}>
             <label style={{
@@ -268,7 +401,7 @@ export default function RidiculousChickenEvent() {
               fontWeight: '500',
               marginBottom: '8px'
             }}>
-                          Quantity
+              数量
             </label>
             <select
               value={quantity}
@@ -313,34 +446,55 @@ export default function RidiculousChickenEvent() {
             </div>
           </div>
 
+          {/* 错误信息 */}
+          {error && (
+            <div style={{
+              backgroundColor: 'rgba(239, 68, 68, 0.1)',
+              border: '1px solid #ef4444',
+              borderRadius: '8px',
+              padding: '12px',
+              marginBottom: '16px',
+              color: '#ef4444',
+              fontSize: '0.875rem'
+            }}>
+              {error}
+            </div>
+          )}
+
           {/* 购票按钮 */}
           <button
             onClick={handleBuyTickets}
+            disabled={loading}
             style={{
               width: '100%',
               padding: '16px',
-              background: 'linear-gradient(135deg, #7C3AED 0%, #22D3EE 100%)',
+              background: loading ? '#6b7280' : 'linear-gradient(135deg, #7C3AED 0%, #22D3EE 100%)',
               color: 'white',
               border: 'none',
               borderRadius: '12px',
               fontSize: '1.125rem',
               fontWeight: 'bold',
-              cursor: 'pointer',
+              cursor: loading ? 'not-allowed' : 'pointer',
               transition: 'all 0.3s ease'
             }}
             onMouseEnter={(e) => {
-              e.target.style.transform = 'scale(1.02)'
-              e.target.style.boxShadow = '0 10px 25px rgba(124, 58, 237, 0.3)'
+              if (!loading) {
+                e.target.style.transform = 'scale(1.02)'
+                e.target.style.boxShadow = '0 10px 25px rgba(124, 58, 237, 0.3)'
+              }
             }}
             onMouseLeave={(e) => {
-              e.target.style.transform = 'scale(1)'
-              e.target.style.boxShadow = 'none'
+              if (!loading) {
+                e.target.style.transform = 'scale(1)'
+                e.target.style.boxShadow = 'none'
+              }
             }}
           >
-            Buy Tickets Now
+            {loading ? '处理中...' : '立即购票'}
           </button>
         </div>
       </div>
     </div>
+    </AuthGuard>
   )
 }

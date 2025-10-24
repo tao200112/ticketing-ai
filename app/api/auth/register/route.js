@@ -16,17 +16,10 @@ export async function POST(request) {
       )
     }
 
-    // 密码强度验证
+    // 密码强度验证 - 只需要大于8位
     if (password.length < 8) {
       return NextResponse.json(
         { message: '密码至少需要8个字符' },
-        { status: 400 }
-      )
-    }
-
-    if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(password)) {
-      return NextResponse.json(
-        { message: '密码必须包含大小写字母和数字' },
         { status: 400 }
       )
     }

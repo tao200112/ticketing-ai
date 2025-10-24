@@ -1,17 +1,40 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { hasSupabase } from '../../lib/safeEnv'
 import Link from 'next/link'
 
 export default function MerchantOverviewPage() {
+  const router = useRouter()
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [merchantUser, setMerchantUser] = useState(null)
 
   useEffect(() => {
-    loadStats()
-  }, [])
+    // 检查商家登录状态
+    const checkMerchantAuth = () => {
+      const token = localStorage.getItem('merchantToken')
+      const user = localStorage.getItem('merchantUser')
+      
+      if (!token || !user) {
+        router.push('/merchant/auth/login')
+        return
+      }
+      
+      setMerchantUser(JSON.parse(user))
+      loadStats()
+    }
+    
+    checkMerchantAuth()
+  }, [router])
+
+  const handleLogout = () => {
+    localStorage.removeItem('merchantToken')
+    localStorage.removeItem('merchantUser')
+    router.push('/merchant/auth/login')
+  }
 
   const loadStats = async () => {
     try {
@@ -206,20 +229,62 @@ export default function MerchantOverviewPage() {
       <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
         {/* 页面标题 */}
         <div style={{ marginBottom: '32px' }}>
-          <h1 style={{
-            fontSize: '1.875rem',
-            fontWeight: 'bold',
-            color: 'white',
-            marginBottom: '8px'
-          }}>
-            Merchant Console
-          </h1>
-          <p style={{ color: '#94a3b8' }}>Manage your events and ticket data</p>
-          {stats?.source && (
-            <p style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '4px' }}>
-              Data Source: {stats.source}
-            </p>
-          )}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+            <div>
+              <h1 style={{
+                fontSize: '1.875rem',
+                fontWeight: 'bold',
+                color: 'white',
+                marginBottom: '8px'
+              }}>
+                Merchant Console
+              </h1>
+              <p style={{ color: '#94a3b8' }}>Manage your events and ticket data</p>
+              {stats?.source && (
+                <p style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '4px' }}>
+                  Data Source: {stats.source}
+                </p>
+              )}
+            </div>
+            
+            {/* 用户信息和登出按钮 */}
+            {merchantUser && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ color: 'white', fontWeight: '500', fontSize: '0.875rem' }}>
+                    {merchantUser.name}
+                  </div>
+                  <div style={{ color: '#94a3b8', fontSize: '0.75rem' }}>
+                    {merchantUser.email}
+                  </div>
+                </div>
+                <button
+                  onClick={handleLogout}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                    border: '1px solid #ef4444',
+                    borderRadius: '0.5rem',
+                    color: '#ef4444',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = 'rgba(239, 68, 68, 0.2)'
+                    e.target.style.transform = 'scale(1.02)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = 'rgba(239, 68, 68, 0.1)'
+                    e.target.style.transform = 'scale(1)'
+                  }}
+                >
+                  登出
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* 统计卡片 */}
@@ -455,13 +520,13 @@ export default function MerchantOverviewPage() {
               </div>
             </Link>
             
-            {/* Scan Tickets Card */}
+            {/* Purchase Records Card */}
             <Link 
-              href="/merchant/scan"
+              href="/merchant/purchases"
               style={{
                 display: 'block',
-                background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(251, 191, 36, 0.1) 100%)',
-                border: '1px solid rgba(245, 158, 11, 0.2)',
+                background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%)',
+                border: '1px solid rgba(168, 85, 247, 0.2)',
                 borderRadius: '16px',
                 padding: '24px',
                 textDecoration: 'none',
@@ -471,13 +536,13 @@ export default function MerchantOverviewPage() {
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.transform = 'translateY(-4px)'
-                e.currentTarget.style.boxShadow = '0 20px 40px rgba(245, 158, 11, 0.15)'
-                e.currentTarget.style.borderColor = 'rgba(245, 158, 11, 0.4)'
+                e.currentTarget.style.boxShadow = '0 20px 40px rgba(168, 85, 247, 0.15)'
+                e.currentTarget.style.borderColor = 'rgba(168, 85, 247, 0.4)'
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.transform = 'translateY(0)'
                 e.currentTarget.style.boxShadow = 'none'
-                e.currentTarget.style.borderColor = 'rgba(245, 158, 11, 0.2)'
+                e.currentTarget.style.borderColor = 'rgba(168, 85, 247, 0.2)'
               }}
             >
               <div style={{
@@ -486,7 +551,7 @@ export default function MerchantOverviewPage() {
                 right: '-20px',
                 width: '80px',
                 height: '80px',
-                background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(251, 191, 36, 0.1) 100%)',
+                background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%)',
                 borderRadius: '50%',
                 opacity: '0.3'
               }}></div>
@@ -498,16 +563,16 @@ export default function MerchantOverviewPage() {
                 <div style={{
                   width: '48px',
                   height: '48px',
-                  background: 'linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)',
+                  background: 'linear-gradient(135deg, #a855f7 0%, #8b5cf6 100%)',
                   borderRadius: '12px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   fontSize: '1.5rem',
                   marginRight: '16px',
-                  boxShadow: '0 8px 16px rgba(245, 158, 11, 0.3)'
+                  boxShadow: '0 8px 16px rgba(168, 85, 247, 0.3)'
                 }}>
-                  📱
+                  📊
                 </div>
                 <div>
                   <h3 style={{
@@ -516,25 +581,25 @@ export default function MerchantOverviewPage() {
                     color: 'white',
                     marginBottom: '4px'
                   }}>
-                    Scan Tickets
+                    Purchase Records
                   </h3>
                   <p style={{
                     fontSize: '0.875rem',
                     color: '#94a3b8',
                     margin: '0'
                   }}>
-                    Verify QR codes
+                    View all ticket purchases
                   </p>
                 </div>
               </div>
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
-                color: '#f59e0b',
+                color: '#a855f7',
                 fontSize: '0.875rem',
                 fontWeight: '500'
               }}>
-                <span>Start Scanning →</span>
+                <span>View Records →</span>
               </div>
             </Link>
           </div>

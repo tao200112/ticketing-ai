@@ -1,0 +1,47 @@
+[
+  {
+    "id": "1761264694328",
+    "email": "test@example.com",
+    "name": "Test User",
+    "age": 25,
+    "password_hash": "$2b$12$JqQRav4C6mgKWH9kqmWaGeleZ6it5cruMNuL8Ln.sSqoSnfo6tzpS",
+    "createdAt": "2025-10-24T00:11:34.328Z",
+    "tickets": []
+  },
+  {
+    "id": "1761264732205",
+    "email": "taoliu0711@gmail.com",
+    "name": "TAO LIU",
+    "age": 22,
+    "password_hash": "$2b$12$ETLpWgSeUt/qKMsvP1N6VO9RxcCyY/zaEYr.9B52mQAEjgFE4EXli",
+    "createdAt": "2025-10-24T00:12:12.205Z",
+    "tickets": []
+  },
+  {
+    "id": "1761266292010",
+    "email": "ltao19@vt.edu",
+    "name": "TAO LIU",
+    "age": 25,
+    "password_hash": "$2b$12$4uQS.qED4bwtEbT0B7RNwus4F4IPiPJc3dxWcF7DjDtP1FrZs49Cm",
+    "createdAt": "2025-10-24T00:38:12.010Z",
+    "tickets": []
+  },
+  {
+    "id": "1761266863021",
+    "email": "1234@gmail.com",
+    "name": "TAO LIU",
+    "age": 25,
+    "password_hash": "$2b$12$pNgJgu3sjh0SzNbhpABO7OMZTuOd8KeclghxwpgqNfuL7.aTWPIU2",
+    "createdAt": "2025-10-24T00:47:43.021Z",
+    "tickets": []
+  },
+  {
+    "id": "1761269245617",
+    "email": "ltao@vt.edu",
+    "name": "TAO LIU",
+    "age": 22,
+    "password_hash": "$2b$12$gLUc7XhAMH17Bw3vNkE51eR5reG3uOybHoxAnJZI10RHS2XR.eoYi",
+    "createdAt": "2025-10-24T01:27:25.617Z",
+    "tickets": []
+  }
+]

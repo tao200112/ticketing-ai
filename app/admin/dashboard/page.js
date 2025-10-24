@@ -564,14 +564,11 @@ export default function AdminDashboard() {
           </div>
               <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
                 {inviteCodes.length} invite codes available
-                  </div>
-                    </div>
-                  )}
-                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
+      </div>
 
         {/* Event Modal */}
       {showEventModal && (

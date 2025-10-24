@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@lib/db';
+import { supabaseAdmin } from '../../../../lib/supabase-admin';
 
 /**
  * 根据 session_id 获取订单和票据信息
@@ -18,16 +18,16 @@ export async function GET(request) {
     }
 
     // 查询订单和关联的票据
-    const order = await prisma.order.findUnique({
-      where: { sessionId },
-      include: { 
-        tickets: {
-          orderBy: { issuedAt: 'asc' }
-        }
-      }
-    });
+    const { data: order, error } = await supabaseAdmin
+      .from('orders')
+      .select(`
+        *,
+        tickets (*)
+      `)
+      .eq('stripe_session_id', sessionId)
+      .single();
 
-    if (!order) {
+    if (error || !order) {
       return NextResponse.json({
         success: false,
         error: 'Order not found',

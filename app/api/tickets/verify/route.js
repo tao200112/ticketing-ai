@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@lib/db';
-import { verifyTicketQRPayload, extractTicketIdFromQR } from '@lib/qr-crypto';
+import { supabaseAdmin } from '../../../../lib/supabase-admin';
+import { verifyTicketQRPayload, extractTicketIdFromQR } from '../../../../lib/qr-crypto';
 
 /**
  * 票据核销验证接口
@@ -63,12 +63,16 @@ export async function POST(request) {
     }
 
     // 查询票据信息
-    const ticket = await prisma.ticket.findUnique({
-      where: { shortId: ticketId },
-      include: { order: true }
-    });
+    const { data: ticket, error: ticketError } = await supabaseAdmin
+      .from('tickets')
+      .select(`
+        *,
+        orders (*)
+      `)
+      .eq('short_id', ticketId)
+      .single();
 
-    if (!ticket) {
+    if (ticketError || !ticket) {
       return NextResponse.json({
         success: false,
         error: 'Ticket not found',
@@ -121,14 +125,27 @@ export async function POST(request) {
     }
 
     // 核销票据
-    const updatedTicket = await prisma.ticket.update({
-      where: { shortId: ticketId },
-      data: {
+    const { data: updatedTicket, error: updateError } = await supabaseAdmin
+      .from('tickets')
+      .update({
         status: 'used',
-        usedAt: new Date()
-      },
-      include: { order: true }
-    });
+        used_at: new Date().toISOString()
+      })
+      .eq('short_id', ticketId)
+      .select(`
+        *,
+        orders (*)
+      `)
+      .single();
+
+    if (updateError) {
+      console.error('Ticket update error:', updateError);
+      return NextResponse.json({
+        success: false,
+        error: 'Failed to verify ticket',
+        code: 'UPDATE_FAILED'
+      }, { status: 500 });
+    }
 
     console.log(`[TicketVerify] Ticket ${ticketId} successfully verified and marked as used`);
 
@@ -173,12 +190,16 @@ export async function GET(request) {
       }, { status: 400 });
     }
 
-    const ticket = await prisma.ticket.findUnique({
-      where: { shortId: ticketId },
-      include: { order: true }
-    });
+    const { data: ticket, error: ticketError } = await supabaseAdmin
+      .from('tickets')
+      .select(`
+        *,
+        orders (*)
+      `)
+      .eq('short_id', ticketId)
+      .single();
 
-    if (!ticket) {
+    if (ticketError || !ticket) {
       return NextResponse.json({
         success: false,
         error: 'Ticket not found'

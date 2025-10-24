@@ -27,7 +27,7 @@ export default function AdminLoginPage() {
       const data = await response.json()
 
       if (response.ok) {
-        // 保存管理员会话
+        // Save admin session
         localStorage.setItem('adminToken', data.token)
         localStorage.setItem('adminUser', JSON.stringify(data.admin))
         router.push('/admin/dashboard')

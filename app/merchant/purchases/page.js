@@ -37,11 +37,27 @@ export default function MerchantPurchasesPage() {
       // 从本地存储加载购买记录
       const allPurchases = JSON.parse(localStorage.getItem('purchaseRecords') || '[]')
       
-      // 只显示当前商家的购买记录
-      const merchantPurchases = allPurchases.filter(purchase => 
-        purchase.merchantId === merchantUser?.id
-      )
+      console.log('📊 所有购买记录:', allPurchases.length);
+      console.log('📊 当前商家用户:', merchantUser);
       
+      // 只显示当前商家的购买记录
+      // 支持多种商家ID匹配方式
+      const merchantPurchases = allPurchases.filter(purchase => {
+        const matches = (
+          purchase.merchantId === merchantUser?.id ||
+          purchase.merchantId === merchantUser?.businessName ||
+          purchase.merchantId === 'merchant_123' || // 默认商家ID
+          purchase.merchantId === localStorage.getItem('currentMerchantId')
+        );
+        
+        if (matches) {
+          console.log('✅ 匹配的购买记录:', purchase);
+        }
+        
+        return matches;
+      })
+      
+      console.log('📊 匹配的购买记录数量:', merchantPurchases.length);
       setPurchases(merchantPurchases)
     } catch (err) {
       console.error('加载购买记录错误:', err)
@@ -92,7 +108,7 @@ export default function MerchantPurchasesPage() {
   }
 
   const getTotalRevenue = (purchases) => {
-    return purchases.reduce((total, purchase) => total + purchase.totalAmount, 0)
+    return purchases.reduce((total, purchase) => total + (purchase.amount || purchase.totalAmount || 0), 0)
   }
 
   const getTotalTickets = (purchases) => {
@@ -371,7 +387,7 @@ export default function MerchantPurchasesPage() {
                         fontWeight: 'bold',
                         color: '#22c55e'
                       }}>
-                        ${(purchase.totalAmount / 100).toFixed(2)}
+                        ${((purchase.amount || purchase.totalAmount || 0) / 100).toFixed(2)}
                       </div>
                       <div style={{ color: '#94a3b8', fontSize: '0.75rem' }}>
                         {new Date(purchase.purchaseDate).toLocaleDateString()}

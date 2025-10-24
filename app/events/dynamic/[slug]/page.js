@@ -73,6 +73,19 @@ export default function DynamicEventPage() {
   }
 
   const handleBuyTickets = async () => {
+    // 检查用户是否已登录
+    const userData = localStorage.getItem('userData')
+    if (!userData) {
+      setPaymentError('请先登录后再购买票据')
+      return
+    }
+
+    const user = JSON.parse(userData)
+    if (!user.isLoggedIn || !user.id) {
+      setPaymentError('请先登录后再购买票据')
+      return
+    }
+
     if (!event || !event.prices || event.prices.length === 0) {
       setPaymentError('No tickets available for this event')
       return
@@ -119,6 +132,8 @@ export default function DynamicEventPage() {
           quantity: quantity,
           customerEmail: customerEmail,
           customerName: customerName,
+          userId: user.id,
+          userToken: user.token || 'local-token',
           ticketValidityDate: ticketValidityDate,
           ticketValidityStart: validityStartTime.toISOString(),
           ticketValidityEnd: validityEndTime.toISOString(),
@@ -359,22 +374,6 @@ export default function DynamicEventPage() {
               </div>
             </div>
 
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-              padding: '12px',
-              backgroundColor: 'rgba(55, 65, 81, 0.3)',
-              borderRadius: '8px'
-            }}>
-              <div style={{ fontSize: '1.5rem' }}>💰</div>
-              <div>
-                <div style={{ color: '#94a3b8', fontSize: '0.875rem' }}>Revenue</div>
-                <div style={{ color: 'white', fontWeight: '500' }}>
-                  ${event.revenue || 0}
-                </div>
-              </div>
-            </div>
           </div>
         </div>
 

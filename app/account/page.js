@@ -20,15 +20,32 @@ export default function AccountPage() {
     const user = JSON.parse(storedUserData)
     setUserData(user)
 
-    // 从用户存储中获取购票记录
-    const storedUsers = JSON.parse(localStorage.getItem('localUsers') || '[]')
-    const userRecord = storedUsers.find(u => u.email === user.email)
-    if (userRecord && userRecord.tickets) {
-      setTickets(userRecord.tickets)
-    }
-
-    setLoading(false)
+    // 从API获取用户的票据历史
+    loadUserTickets(user)
   }, [router])
+
+  const loadUserTickets = async (user) => {
+    try {
+      setLoading(true)
+      
+      // 直接从本地存储获取票据历史
+      const storedUsers = JSON.parse(localStorage.getItem('localUsers') || '[]')
+      const userRecord = storedUsers.find(u => u.email === user.email)
+      
+      if (userRecord && userRecord.tickets) {
+        setTickets(userRecord.tickets)
+        console.log('✅ 从localStorage加载票据:', userRecord.tickets.length, '张')
+      } else {
+        console.log('⚠️ 未找到用户票据记录')
+        setTickets([])
+      }
+    } catch (error) {
+      console.error('获取票据历史失败:', error)
+      setTickets([])
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const handleLogout = () => {
     localStorage.removeItem('userData')
@@ -260,13 +277,41 @@ export default function AccountPage() {
                       padding: '16px',
                       textAlign: 'center'
                     }}>
+                      <img
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(ticket.qrCode || JSON.stringify({
+                          ticketId: ticket.id,
+                          eventName: ticket.eventName,
+                          ticketType: ticket.ticketType,
+                          purchaseDate: ticket.purchaseDate,
+                          price: ticket.price,
+                          customerEmail: ticket.customerEmail,
+                          customerName: ticket.customerName || ticket.customerEmail.split('@')[0],
+                          verificationCode: ticket.verificationCode || 'N/A',
+                          ticketValidityDate: ticket.ticketValidityDate || null,
+                          ticketValidityStart: ticket.ticketValidityStart || null,
+                          ticketValidityEnd: ticket.ticketValidityEnd || null
+                        }))}`}
+                        alt="QR Code"
+                        style={{
+                          width: '8rem',
+                          height: '8rem',
+                          borderRadius: '8px',
+                          margin: '0 auto 12px auto',
+                          display: 'block'
+                        }}
+                        onError={(e) => {
+                          // 如果二维码加载失败，显示备用图标
+                          e.target.style.display = 'none';
+                          e.target.nextSibling.style.display = 'flex';
+                        }}
+                      />
                       <div style={{
                         width: '8rem',
                         height: '8rem',
                         backgroundColor: 'white',
                         borderRadius: '8px',
                         margin: '0 auto 12px auto',
-                        display: 'flex',
+                        display: 'none',
                         alignItems: 'center',
                         justifyContent: 'center'
                       }}>

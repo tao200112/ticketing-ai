@@ -20,7 +20,7 @@ export default function MerchantLoginPage() {
       [name]: value
     }))
     
-    // 清除对应字段的错误
+    // Clear error for corresponding field
     if (errors[name]) {
       setErrors(prev => ({
         ...prev,
@@ -33,13 +33,13 @@ export default function MerchantLoginPage() {
     const newErrors = {}
 
     if (!formData.email) {
-      newErrors.email = '请输入邮箱地址'
+      newErrors.email = 'Please enter email address'
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = '请输入有效的邮箱地址'
+      newErrors.email = 'Please enter a valid email address'
     }
 
     if (!formData.password) {
-      newErrors.password = '请输入密码'
+      newErrors.password = 'Please enter password'
     }
 
     setErrors(newErrors)
@@ -67,18 +67,18 @@ export default function MerchantLoginPage() {
       const data = await response.json()
 
       if (response.ok) {
-        // 登录成功，保存用户信息到localStorage
+        // Login successful, save user info to localStorage
         localStorage.setItem('merchantUser', JSON.stringify(data.user))
         localStorage.setItem('merchantToken', 'merchant-logged-in')
         
-        // 跳转到商家仪表板
+        // Navigate to merchant dashboard
         router.push('/merchant')
       } else {
-        setErrors({ general: data.message || '登录失败' })
+        setErrors({ general: data.message || 'Login failed' })
       }
     } catch (error) {
-      console.error('登录错误:', error)
-      setErrors({ general: '网络错误，请重试' })
+      console.error('Login error:', error)
+      setErrors({ general: 'Network error, please try again' })
     } finally {
       setIsLoading(false)
     }
@@ -102,7 +102,7 @@ export default function MerchantLoginPage() {
         maxWidth: '400px',
         boxShadow: '0 20px 40px rgba(0, 0, 0, 0.3)'
       }}>
-        {/* 头部 */}
+        {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
           <div style={{
             width: '4rem',
@@ -124,16 +124,16 @@ export default function MerchantLoginPage() {
             color: 'white',
             marginBottom: '0.5rem'
           }}>
-            商家登录
+            Merchant Login
           </h1>
           <p style={{ color: '#94a3b8', fontSize: '0.875rem' }}>
-            管理您的活动和票务
+            Manage your events and tickets
           </p>
         </div>
 
-        {/* 表单 */}
+        {/* Form */}
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-          {/* 邮箱 */}
+          {/* Email */}
           <div>
             <label style={{
               display: 'block',
@@ -142,14 +142,14 @@ export default function MerchantLoginPage() {
               color: 'white',
               marginBottom: '0.5rem'
             }}>
-              邮箱地址
+              Email Address
             </label>
             <input
               type="email"
               name="email"
               value={formData.email}
               onChange={handleChange}
-              placeholder="输入您的邮箱地址"
+              placeholder="Enter your email address"
               style={{
                 width: '100%',
                 padding: '0.75rem 1rem',
@@ -177,7 +177,7 @@ export default function MerchantLoginPage() {
             )}
           </div>
 
-          {/* 密码 */}
+          {/* Password */}
           <div>
             <label style={{
               display: 'block',
@@ -186,14 +186,14 @@ export default function MerchantLoginPage() {
               color: 'white',
               marginBottom: '0.5rem'
             }}>
-              密码
+              Password
             </label>
             <input
               type="password"
               name="password"
               value={formData.password}
               onChange={handleChange}
-              placeholder="输入您的密码"
+              placeholder="Enter your password"
               style={{
                 width: '100%',
                 padding: '0.75rem 1rem',
@@ -221,7 +221,7 @@ export default function MerchantLoginPage() {
             )}
           </div>
 
-          {/* 错误信息 */}
+          {/* Error Message */}
           {errors.general && (
             <div style={{
               backgroundColor: 'rgba(239, 68, 68, 0.1)',
@@ -235,7 +235,7 @@ export default function MerchantLoginPage() {
             </div>
           )}
 
-          {/* 登录按钮 */}
+          {/* Login Button */}
           <button
             type="submit"
             disabled={isLoading}
@@ -280,18 +280,18 @@ export default function MerchantLoginPage() {
                   borderRadius: '50%',
                   animation: 'spin 1s linear infinite'
                 }}></div>
-                登录中...
+                Logging in...
               </>
             ) : (
-              '登录'
+              'Login'
             )}
           </button>
         </form>
 
-        {/* 底部链接 */}
+        {/* Footer Links */}
         <div style={{ textAlign: 'center', marginTop: '1.5rem' }}>
           <p style={{ color: '#94a3b8', fontSize: '0.875rem', marginBottom: '0.5rem' }}>
-            还没有商家账户？
+            Don't have a merchant account?
           </p>
           <Link 
             href="/merchant/auth/register"
@@ -305,11 +305,11 @@ export default function MerchantLoginPage() {
             onMouseEnter={(e) => e.target.style.color = '#06b6d4'}
             onMouseLeave={(e) => e.target.style.color = '#22D3EE'}
           >
-            立即注册商家账户
+            Register Merchant Account Now
           </Link>
         </div>
 
-        {/* 返回首页 */}
+        {/* Back to Home */}
         <div style={{ textAlign: 'center', marginTop: '1rem' }}>
           <Link 
             href="/"
@@ -322,7 +322,7 @@ export default function MerchantLoginPage() {
             onMouseEnter={(e) => e.target.style.color = '#9ca3af'}
             onMouseLeave={(e) => e.target.style.color = '#6b7280'}
           >
-            ← 返回首页
+            ← Back to Home
           </Link>
         </div>
       </div>

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getSupabaseClient } from '../../../../lib/supabase'
+import { supabase } from '../../../../lib/supabaseClient'
 import { hasSupabase } from '../../../../lib/safeEnv'
 import bcrypt from 'bcryptjs'
 import localUserStorage from '../../../../lib/user-storage'
@@ -11,7 +11,7 @@ export async function POST(request) {
     // 基本验证
     if (!email || !password) {
       return NextResponse.json(
-        { message: '请输入邮箱和密码' },
+        { message: 'Please enter email and password' },
         { status: 400 }
       )
     }
@@ -19,13 +19,13 @@ export async function POST(request) {
     // 检查 Supabase 是否可用
     if (hasSupabase()) {
       try {
-        const supabase = getSupabaseClient()
+        // Supabase client imported
         
         if (!supabase) {
-          throw new Error('Supabase 客户端初始化失败')
+          throw new Error('Supabase client initialization failed')
         }
 
-        // 查找用户
+        // Find user
         const { data: user, error: userError } = await supabase
           .from('users')
           .select('*')
@@ -35,35 +35,35 @@ export async function POST(request) {
         if (userError) {
           if (userError.code === 'PGRST116') {
             return NextResponse.json(
-              { message: '用户不存在，请检查邮箱地址或先注册账户' },
+              { message: 'User not found, please check email or register first' },
               { status: 404 }
             )
           }
-          console.error('Supabase 查询用户失败:', userError)
-          throw new Error('数据库查询失败')
+          console.error('Supabase user query failed:', userError)
+          throw new Error('Database query failed')
         }
 
         if (!user) {
           return NextResponse.json(
-            { message: '用户不存在，请检查邮箱地址或先注册账户' },
+            { message: 'User not found, please check email or register first' },
             { status: 404 }
           )
         }
 
-        // 验证密码
+        // Verify password
         const isValidPassword = await bcrypt.compare(password, user.password_hash)
         if (!isValidPassword) {
           return NextResponse.json(
-            { message: '密码错误，请检查密码是否正确' },
+            { message: 'Incorrect password, please check password' },
             { status: 401 }
           )
         }
 
-        // 返回用户数据（不包含密码哈希）
+        // Return user data (excluding password hash)
         return NextResponse.json({
           ok: true,
           source: 'supabase',
-          message: '登录成功',
+          message: 'Login successful',
           user: {
             id: user.id,
             email: user.email,
@@ -74,28 +74,28 @@ export async function POST(request) {
         })
 
       } catch (dbError) {
-        console.error('Supabase 登录失败，降级到本地存储:', dbError)
+        console.error('Supabase login failed, fallback to local storage:', dbError)
         
         try {
-          // 使用本地存储
-          console.log('🔍 尝试本地存储登录，邮箱:', email)
+          // Use local storage
+          console.log('🔍 Attempting local storage login, email:', email)
           const user = await localUserStorage.authenticateUser(email, password)
-          console.log('✅ 本地存储登录成功:', user)
+          console.log('✅ Local storage login successful:', user)
           return NextResponse.json({
             ok: true,
             source: 'local',
-            message: '登录成功（本地存储）',
+            message: 'Login successful (local storage)',
             user,
             fallback_reason: dbError.message
           })
         } catch (localError) {
-          console.error('本地存储登录失败:', localError)
+          console.error('Local storage login failed:', localError)
           // 根据错误类型返回更具体的错误信息
-          let errorMessage = '登录失败'
+          let errorMessage = 'Login failed'
           if (localError.message === '用户不存在') {
-            errorMessage = '用户不存在，请检查邮箱地址或先注册账户'
+            errorMessage = 'User not found, please check email or register first'
           } else if (localError.message === '密码错误') {
-            errorMessage = '密码错误，请检查密码是否正确'
+            errorMessage = 'Incorrect password, please check password'
           } else if (localError.message === '用户密码数据异常') {
             errorMessage = '用户数据异常，请联系管理员'
           }
@@ -108,19 +108,19 @@ export async function POST(request) {
       }
     } else {
       // Supabase 不可用，使用本地存储
-      console.log('🔄 Supabase 不可用，使用本地存储模式')
+      console.log('🔄 Supabase unavailable, using local storage mode')
       try {
-        console.log('🔍 尝试本地存储登录，邮箱:', email)
+        console.log('🔍 Attempting local storage login, email:', email)
         const user = await localUserStorage.authenticateUser(email, password)
-        console.log('✅ 本地存储登录成功:', user)
+        console.log('✅ Local storage login successful:', user)
         return NextResponse.json({
           ok: true,
           source: 'local',
-          message: '登录成功（本地存储）',
+          message: 'Login successful (local storage)',
           user
         })
       } catch (error) {
-        console.error('本地存储登录失败:', error)
+        console.error('Local storage login failed:', error)
         // 根据错误类型返回更具体的错误信息
         let errorMessage = '登录失败'
         if (error.message === '用户不存在') {
@@ -139,9 +139,9 @@ export async function POST(request) {
     }
 
   } catch (error) {
-    console.error('登录 API 错误:', error)
+    console.error('Login API error:', error)
     return NextResponse.json(
-      { message: '服务器错误，请稍后重试' },
+      { message: 'Server error, please try again later' },
       { status: 500 }
     )
   }

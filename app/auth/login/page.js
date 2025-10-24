@@ -26,7 +26,7 @@ export default function LoginPage() {
       [name]: value
     }))
     
-    // 清除对应字段的错误
+    // Clear error for corresponding field
     if (errors[name]) {
       setErrors(prev => ({
         ...prev,
@@ -39,13 +39,13 @@ export default function LoginPage() {
     const newErrors = {}
     
     if (!formData.email) {
-      newErrors.email = '请输入邮箱地址'
+      newErrors.email = 'Please enter email address'
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = '请输入有效的邮箱地址'
+      newErrors.email = 'Please enter a valid email address'
     }
     
     if (!formData.password) {
-      newErrors.password = '请输入密码'
+      newErrors.password = 'Please enter password'
     }
     
     setErrors(newErrors)
@@ -77,9 +77,9 @@ export default function LoginPage() {
       const result = await response.json()
       
       if (response.ok && result.ok) {
-        setMessage(`登录成功! ${result.source === 'supabase' ? '从数据库获取用户信息' : '从本地存储获取用户信息'}`)
+        setMessage(`Login successful! ${result.source === 'supabase' ? 'User info from database' : 'User info from local storage'}`)
         
-        // 保存用户信息到localStorage（不包含密码）
+        // Save user info to localStorage (excluding password)
         const userData = {
           email: result.user.email,
           name: result.user.name,
@@ -91,16 +91,16 @@ export default function LoginPage() {
         }
         localStorage.setItem('userData', JSON.stringify(userData))
         
-        // 延迟跳转到账户页面
+        // Navigate to account page after delay
         setTimeout(() => {
           router.push('/account')
         }, 1500)
       } else {
-        setMessage(result.message || '登录失败，请检查邮箱和密码')
+        setMessage(result.message || 'Login failed, please check email and password')
       }
     } catch (error) {
-      console.error('登录错误:', error)
-      setMessage('网络错误，请检查连接后重试')
+      console.error('Login error:', error)
+      setMessage('Network error, please check connection and try again')
     } finally {
       setLoading(false)
     }
@@ -230,10 +230,10 @@ export default function LoginPage() {
             <div style={{
               marginTop: '16px',
               padding: '12px',
-              backgroundColor: message.includes('成功') ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-              border: `1px solid ${message.includes('成功') ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
+              backgroundColor: message.includes('successful') ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+              border: `1px solid ${message.includes('successful') ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
               borderRadius: '8px',
-              color: message.includes('成功') ? '#22c55e' : '#ef4444',
+              color: message.includes('successful') ? '#22c55e' : '#ef4444',
               fontSize: '0.875rem',
               textAlign: 'center'
             }}>
@@ -252,7 +252,7 @@ export default function LoginPage() {
               fontSize: '0.75rem',
               textAlign: 'center'
             }}>
-              ⚠️ Supabase 未配置，使用本地存储
+              ⚠️ Supabase not configured, using local storage
             </div>
           )}
 

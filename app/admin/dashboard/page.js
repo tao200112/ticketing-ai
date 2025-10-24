@@ -14,7 +14,7 @@ export default function AdminDashboard() {
   const router = useRouter()
 
   useEffect(() => {
-    // 检查管理员登录状态
+    // Check admin login status
     const adminToken = localStorage.getItem('adminToken')
     const adminUserData = localStorage.getItem('adminUser')
     
@@ -31,21 +31,35 @@ export default function AdminDashboard() {
     try {
       setLoading(true)
       
-      // 加载商家数据
+      // Load merchant data
       const merchantsData = JSON.parse(localStorage.getItem('merchantUsers') || '[]')
       setMerchants(merchantsData)
       
-      // 加载事件数据
+      // Load event data
       const eventsData = JSON.parse(localStorage.getItem('merchantEvents') || '[]')
       setEvents(eventsData)
       
-      // 加载邀请码数据
-      const inviteCodesData = JSON.parse(localStorage.getItem('adminInviteCodes') || '[]')
-      setInviteCodes(inviteCodesData)
+      // Load invite codes - from API
+      try {
+        const response = await fetch('/api/admin/invite-codes')
+        const data = await response.json()
+        if (data.success) {
+          setInviteCodes(data.inviteCodes || [])
+        } else {
+          // Fallback to local storage
+          const inviteCodesData = JSON.parse(localStorage.getItem('adminInviteCodes') || '[]')
+          setInviteCodes(inviteCodesData)
+        }
+      } catch (error) {
+        console.error('Failed to load invite codes:', error)
+        // Fallback to local storage
+        const inviteCodesData = JSON.parse(localStorage.getItem('adminInviteCodes') || '[]')
+        setInviteCodes(inviteCodesData)
+      }
       
-      // 加载客户数据
-      const customersData = JSON.parse(localStorage.getItem('customers') || '[]')
-      setCustomers(customersData)
+      // Load customer data - from localUsers
+      const localUsers = JSON.parse(localStorage.getItem('localUsers') || '[]')
+      setCustomers(localUsers)
       
     } catch (error) {
       console.error('Error loading admin data:', error)
@@ -60,23 +74,50 @@ export default function AdminDashboard() {
     router.push('/admin/login')
   }
 
-  const generateInviteCode = () => {
-    const code = `INV_${Date.now().toString(36).toUpperCase()}_${Math.random().toString(36).substr(2, 6).toUpperCase()}`
-    const newInviteCode = {
-      id: `invite_${Date.now()}`,
-      code: code,
-      createdBy: adminUser.id,
-      createdAt: new Date().toISOString(),
-      usedBy: null,
-      usedAt: null,
-      isActive: true,
-      maxEvents: 10, // 默认最大事件数
-      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30天后过期
+  const generateInviteCode = async () => {
+    try {
+      const response = await fetch('/api/admin/invite-codes', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          maxEvents: 10,
+          expiresInDays: 30
+        })
+      })
+
+      const data = await response.json()
+      
+      if (data.success) {
+        setInviteCodes([...inviteCodes, data.inviteCode])
+        // Also update local storage as backup
+        const updatedCodes = [...inviteCodes, data.inviteCode]
+        localStorage.setItem('adminInviteCodes', JSON.stringify(updatedCodes))
+      } else {
+        console.error('Failed to generate invite code:', data.error)
+        alert('Failed to generate invite code, please try again')
+      }
+    } catch (error) {
+      console.error('Generate invite code error:', error)
+      // Fallback to local generation
+      const code = `INV_${Date.now().toString(36).toUpperCase()}_${Math.random().toString(36).substr(2, 6).toUpperCase()}`
+      const newInviteCode = {
+        id: `invite_${Date.now()}`,
+        code: code,
+        createdBy: adminUser.id,
+        createdAt: new Date().toISOString(),
+        usedBy: null,
+        usedAt: null,
+        isActive: true,
+        maxEvents: 10,
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+      }
+      
+      const updatedCodes = [...inviteCodes, newInviteCode]
+      setInviteCodes(updatedCodes)
+      localStorage.setItem('adminInviteCodes', JSON.stringify(updatedCodes))
     }
-    
-    const updatedCodes = [...inviteCodes, newInviteCode]
-    setInviteCodes(updatedCodes)
-    localStorage.setItem('adminInviteCodes', JSON.stringify(updatedCodes))
   }
 
   const updateMerchantEventLimit = (merchantId, newLimit) => {
@@ -126,7 +167,7 @@ export default function AdminDashboard() {
       return customer
     })
     setCustomers(updatedCustomers)
-    localStorage.setItem('customers', JSON.stringify(updatedCustomers))
+    localStorage.setItem('localUsers', JSON.stringify(updatedCustomers))
   }
 
   if (loading) {

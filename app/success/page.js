@@ -42,6 +42,9 @@ export default function SuccessPage() {
         
         setTicket(ticket)
         
+        // 保存票据记录到localStorage
+        saveTicketToLocalStorage(ticket)
+        
         // 生成验证码
         const verificationCode = generateVerificationCode()
         setVerificationCode(verificationCode)
@@ -140,6 +143,102 @@ export default function SuccessPage() {
       result += chars.charAt(Math.floor(Math.random() * chars.length))
     }
     return result
+  }
+
+  const saveTicketToLocalStorage = (ticket) => {
+    try {
+      // 保存购买记录到purchaseRecords
+      const purchaseRecord = {
+        id: `purchase_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        orderId: `order_${Date.now()}`,
+        sessionId: ticket.sessionId,
+        customerEmail: ticket.customerEmail,
+        customerName: ticket.customerName,
+        eventId: ticket.eventName,
+        eventTitle: ticket.eventName,
+        ticketType: ticket.ticketType,
+        quantity: ticket.quantity,
+        amount: parseFloat(ticket.price) * 100, // 转换为分
+        currency: 'usd',
+        status: 'completed',
+        purchaseDate: new Date().toISOString(),
+        merchantId: localStorage.getItem('currentMerchantId') || 'merchant_123', // 使用当前商家ID
+        tickets: [{
+          id: ticket.id,
+          shortId: `TKT${Date.now().toString(36).toUpperCase()}`,
+          tier: ticket.ticketType,
+          status: ticket.status,
+          qrPayload: JSON.stringify(ticket)
+        }]
+      };
+
+      // 获取现有购买记录
+      const existingPurchases = JSON.parse(localStorage.getItem('purchaseRecords') || '[]');
+      existingPurchases.push(purchaseRecord);
+      localStorage.setItem('purchaseRecords', JSON.stringify(existingPurchases));
+
+      // 保存用户票据记录到localUsers
+      const userTicketRecord = {
+        id: ticket.id,
+        eventName: ticket.eventName,
+        ticketType: ticket.ticketType,
+        price: ticket.price,
+        purchaseDate: ticket.purchaseDate,
+        status: ticket.status,
+        customerEmail: ticket.customerEmail,
+        customerName: ticket.customerName,
+        sessionId: ticket.sessionId,
+        verificationCode: verificationCode,
+        ticketValidityDate: ticket.ticketValidityDate,
+        ticketValidityStart: ticket.ticketValidityStart,
+        ticketValidityEnd: ticket.ticketValidityEnd,
+        qrCode: JSON.stringify({
+          ticketId: ticket.id,
+          verificationCode: verificationCode,
+          eventName: ticket.eventName,
+          ticketType: ticket.ticketType,
+          purchaseDate: ticket.purchaseDate,
+          ticketValidityDate: ticket.ticketValidityDate,
+          ticketValidityStart: ticket.ticketValidityStart,
+          ticketValidityEnd: ticket.ticketValidityEnd,
+          price: ticket.price,
+          customerEmail: ticket.customerEmail,
+          customerName: ticket.customerName
+        })
+      };
+
+      // 获取现有用户数据
+      const existingUsers = JSON.parse(localStorage.getItem('localUsers') || '[]');
+      const userIndex = existingUsers.findIndex(u => u.email === ticket.customerEmail);
+      
+      if (userIndex !== -1) {
+        // 用户已存在，添加票据
+        if (!existingUsers[userIndex].tickets) {
+          existingUsers[userIndex].tickets = [];
+        }
+        existingUsers[userIndex].tickets.push(userTicketRecord);
+      } else {
+        // 用户不存在，创建新用户
+        const newUser = {
+          id: `user_${Date.now()}`,
+          email: ticket.customerEmail,
+          name: ticket.customerName,
+          age: 25, // 默认年龄
+          createdAt: new Date().toISOString(),
+          tickets: [userTicketRecord]
+        };
+        existingUsers.push(newUser);
+      }
+      
+      localStorage.setItem('localUsers', JSON.stringify(existingUsers));
+      
+      console.log('✅ 票据记录已保存到localStorage');
+      console.log('📊 购买记录数量:', existingPurchases.length);
+      console.log('📊 用户数量:', existingUsers.length);
+      
+    } catch (error) {
+      console.error('❌ 保存票据记录失败:', error);
+    }
   }
 
          // 生成二维码

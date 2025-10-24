@@ -1,109 +1,122 @@
-# PartyTix MVP Database Migration
+# Supabase 数据库迁移文件
 
-## 概述
+## 📁 文件说明
 
-这个迁移文件创建了 PartyTix MVP 的完整数据库模式，包括用户、商家、活动和价格表。所有 SQL 语句都是幂等的，可以安全地重复执行。
+### 1. `partytix_mvp.sql`
+- **完整版本**：包含所有表、触发器、约束和视图
+- **适用场景**：本地开发或需要完整功能的部署
+- **特点**：包含复杂的约束检查和视图
 
-## 运行方式
+### 2. `supabase_schema.sql` ⭐ **推荐**
+- **简化版本**：专门为 Supabase 优化
+- **适用场景**：Supabase 部署
+- **特点**：移除了可能导致问题的复杂约束，保留核心功能
 
-### 1. 本地 SQL (推荐用于开发)
+### 3. `supabase_schema_fixed.sql` 🔥 **最新推荐**
+- **修复版本**：修复了所有已知问题
+- **适用场景**：Supabase 部署（推荐使用此版本）
+- **特点**：移除了视图和复杂约束，确保稳定运行
 
-```bash
-# 使用 psql 连接到数据库
-psql -d your_database_name -f supabase/migrations/partytix_mvp.sql
+## 🚀 使用方法
 
-# 或者如果使用 Supabase CLI
-supabase db reset
-supabase db push
-```
+### 在 Supabase 中使用（推荐）
 
-### 2. Supabase SQL Editor (推荐用于生产)
-
-1. 登录 Supabase Dashboard
-2. 进入你的项目
-3. 导航到 SQL Editor
-4. 复制 `partytix_mvp.sql` 的内容
+1. 登录 [Supabase Dashboard](https://supabase.com/dashboard)
+2. 选择您的项目
+3. 进入 **SQL Editor**
+4. 复制 `supabase_schema_fixed.sql` 的内容（推荐使用此版本）
 5. 粘贴到 SQL Editor 中
-6. 点击 "Run" 执行
+6. 点击 **Run** 执行
 
-### 3. Supabase CLI (推荐用于版本控制)
+### 在本地 PostgreSQL 中使用
 
 ```bash
-# 将迁移文件放在 supabase/migrations/ 目录下
-supabase migration up
+# 使用完整版本
+psql -d your_database -f supabase/migrations/partytix_mvp.sql
 
-# 或者直接应用
-supabase db push
+# 或使用简化版本
+psql -d your_database -f supabase/migrations/supabase_schema.sql
 ```
 
-## 创建的表
+## 📊 数据库表结构
 
-### 1. `users` - 用户表
-- 存储用户基本信息
-- 包含邮箱、姓名、年龄、角色
-- 支持用户、商家、管理员角色
+### 核心表
+- **users**: 用户表（包含密码哈希）
+- **merchants**: 商家表
+- **admin_invite_codes**: 管理员邀请码表
+- **events**: 活动表
+- **prices**: 价格表
+- **orders**: 订单表
+- **tickets**: 票据表
 
-### 2. `merchants` - 商家表
-- 存储商家信息
-- 关联到用户表
-- 包含验证状态和商家详情
+### 关系
+- 用户 → 商家（一对多）
+- 商家 → 活动（一对多）
+- 活动 → 价格（一对多）
+- 订单 → 票据（一对多）
+- 活动 → 票据（一对多）
 
-### 3. `events` - 活动表
-- 存储活动信息
-- 关联到商家表
-- 包含时间、地点、状态等信息
+## 🔧 功能特性
 
-### 4. `prices` - 价格表
-- 存储票档和价格信息
-- 关联到活动表
-- 支持库存管理和限购设置
+### ✅ 已实现
+- 用户认证和管理
+- 商家注册和管理
+- 邀请码系统
+- 活动创建和管理
+- 价格管理
+- 订单处理
+- 票据生成和验证
+- 自动更新时间戳
+- 完整的索引优化
 
-## 安全特性
+### 🔒 安全特性
+- 数据完整性约束
+- 外键关系
+- 检查约束
+- 唯一性约束
 
-### Row Level Security (RLS)
-- RLS 策略已注释，可根据需要启用
-- 支持公开读取已发布内容
-- 商家只能管理自己的数据
+## 🚨 注意事项
 
-### 数据完整性
-- 外键约束确保数据一致性
-- 检查约束验证数据有效性
-- 触发器自动更新时间戳
+1. **环境变量**：确保在 Vercel 中配置了正确的 Supabase 环境变量
+2. **RLS策略**：当前版本注释了 RLS 策略，如需要请取消注释
+3. **种子数据**：会自动插入 Ridiculous Chicken 商家数据
+4. **索引**：所有表都创建了必要的索引以优化查询性能
 
-## 种子数据
+## 🔍 故障排除
 
-迁移会自动插入 `Ridiculous Chicken` 商家作为种子数据，仅当不存在时插入。
+### 常见问题
 
-## 视图
+1. **表已存在错误**
+   - 解决方案：使用 `IF NOT EXISTS` 语句，可以安全地重新运行
 
-### `events_overview`
-提供活动概览信息，包括商家信息、价格统计等。
+2. **权限错误**
+   - 解决方案：确保数据库用户有创建表和索引的权限
 
-### `merchant_stats`
-提供商家统计数据，包括活动数量、参与人数、收入等。
+3. **外键约束错误**
+   - 解决方案：确保引用的表已经存在
 
-## 注意事项
+### 验证安装
 
-1. **幂等性**: 所有 SQL 语句都可以安全地重复执行
-2. **RLS 策略**: 默认注释，需要手动启用
-3. **外键关系**: 确保删除操作的正确级联
-4. **索引**: 已创建必要的索引以优化查询性能
+运行以下查询来验证表是否创建成功：
 
-## 后续步骤
+```sql
+-- 检查所有表
+SELECT table_name 
+FROM information_schema.tables 
+WHERE table_schema = 'public' 
+ORDER BY table_name;
 
-1. 根据需要启用 RLS 策略
-2. 创建 orders 和 tickets 表（避免影响现有支付流程）
-3. 设置适当的权限和角色
-4. 配置备份和监控
+-- 检查邀请码表
+SELECT * FROM admin_invite_codes LIMIT 5;
 
-## 故障排除
+-- 检查商家表
+SELECT * FROM merchants LIMIT 5;
+```
 
-如果遇到错误：
-1. 检查数据库连接
-2. 确认权限设置
+## 📞 获取帮助
+
+如果遇到问题：
+1. 检查 Supabase 项目的 API 设置
+2. 验证环境变量配置
 3. 查看 Supabase 日志
-4. 验证表是否已存在
-
-## 联系支持
-
-如有问题，请查看 Supabase 文档或联系技术支持。
+4. 确认网络连接正常

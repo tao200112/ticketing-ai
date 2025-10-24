@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getSupabaseClient } from '../../../../lib/supabase'
+import { supabase } from '../../../../lib/supabaseClient'
 import { hasSupabase } from '../../../../lib/safeEnv'
 import bcrypt from 'bcryptjs'
 import localUserStorage from '../../../../lib/user-storage'
@@ -11,7 +11,7 @@ export async function POST(request) {
     // 基本验证
     if (!email || !name || !age || !password) {
       return NextResponse.json(
-        { message: '缺少必填字段' },
+        { message: 'Missing required fields' },
         { status: 400 }
       )
     }
@@ -19,14 +19,14 @@ export async function POST(request) {
     // 密码强度验证 - 只需要大于8位
     if (password.length < 8) {
       return NextResponse.json(
-        { message: '密码至少需要8个字符' },
+        { message: 'Password must be at least 8 characters' },
         { status: 400 }
       )
     }
 
     if (age < 16) {
       return NextResponse.json(
-        { message: '年龄必须为 16 岁或以上' },
+        { message: 'Age must be 16 or older' },
         { status: 400 }
       )
     }
@@ -34,13 +34,13 @@ export async function POST(request) {
     // 检查 Supabase 是否可用
     if (hasSupabase()) {
       try {
-        const supabase = getSupabaseClient()
+        // Supabase client imported
         
         if (!supabase) {
-          throw new Error('Supabase 客户端初始化失败')
+          throw new Error('Supabase client initialization failed')
         }
 
-        // 检查邮箱是否已存在
+        // Check if email already exists
         const { data: existingUser, error: checkError } = await supabase
           .from('users')
           .select('id')
@@ -48,22 +48,22 @@ export async function POST(request) {
           .single()
 
         if (checkError && checkError.code !== 'PGRST116') {
-          console.error('检查用户存在性时出错:', checkError)
-          throw new Error('数据库查询失败')
+          console.error('Error checking user existence:', checkError)
+          throw new Error('Database query failed')
         }
 
         if (existingUser) {
           return NextResponse.json(
-            { message: '该邮箱已被注册' },
+            { message: 'Email already registered' },
             { status: 409 }
           )
         }
 
-        // 哈希密码
+        // Hash password
         const saltRounds = 12
         const hashedPassword = await bcrypt.hash(password, saltRounds)
 
-        // 创建新用户
+        // Create new user
         const { data: newUser, error: insertError } = await supabase
           .from('users')
           .insert([
@@ -79,26 +79,26 @@ export async function POST(request) {
           .single()
 
         if (insertError) {
-          console.error('创建用户时出错:', insertError)
+          console.error('Error creating user:', insertError)
           
-          // 如果是表不存在的错误，降级到本地模拟
+          // If table does not exist, fallback to local simulation
           if (insertError.code === '42P01' || insertError.message?.includes('relation "users" does not exist')) {
-            console.log('🔄 users 表不存在，降级到本地模拟模式')
+            console.log('🔄 users table does not exist, fallback to local simulation mode')
             return NextResponse.json({
               ok: true,
               source: 'local',
-              message: '注册成功（本地模拟）'
+              message: 'Registration successful (local simulation)'
             })
           }
           
-          throw new Error('数据库插入失败')
+          throw new Error('Database insert failed')
         }
 
-        // 返回 Supabase 成功响应（不包含密码哈希）
+        // Return Supabase success response (excluding password hash)
         return NextResponse.json({
           ok: true,
           source: 'supabase',
-          message: '注册成功',
+          message: 'Registration successful',
           user: {
             id: newUser.id,
             email: newUser.email,
@@ -109,52 +109,52 @@ export async function POST(request) {
         })
 
       } catch (dbError) {
-        console.error('Supabase 操作失败，降级到本地存储:', dbError)
+        console.error('Supabase operation failed, fallback to local storage:', dbError)
         
       try {
-        // 使用本地存储
+        // Use local storage
         const user = await localUserStorage.createUser({ email, name, age, password })
-        console.log('✅ 本地存储注册成功:', user)
+        console.log('✅ Local storage registration successful:', user)
         return NextResponse.json({
           ok: true,
           source: 'local',
-          message: '注册成功（本地存储）',
+          message: 'Registration successful (local storage)',
           user,
           fallback_reason: dbError.message
         })
       } catch (localError) {
-          console.error('本地存储也失败:', localError)
+          console.error('Local storage also failed:', localError)
           return NextResponse.json({
-            message: localError.message || '注册失败',
+            message: localError.message || 'Registration failed',
             source: 'error'
           }, { status: 500 })
         }
       }
     } else {
       // Supabase 不可用，使用本地存储
-      console.log('🔄 Supabase 不可用，使用本地存储模式')
+      console.log('🔄 Supabase unavailable, using local storage mode')
       try {
         const user = await localUserStorage.createUser({ email, name, age, password })
-        console.log('✅ 本地存储注册成功:', user)
+        console.log('✅ Local storage registration successful:', user)
         return NextResponse.json({
           ok: true,
           source: 'local',
-          message: '注册成功（本地存储）',
+          message: 'Registration successful (local storage)',
           user
         })
       } catch (error) {
-        console.error('本地存储失败:', error)
+        console.error('Local storage failed:', error)
         return NextResponse.json({
-          message: error.message || '注册失败',
+          message: error.message || 'Registration failed',
           source: 'error'
         }, { status: 500 })
       }
     }
 
   } catch (error) {
-    console.error('注册 API 错误:', error)
+    console.error('Registration API error:', error)
     return NextResponse.json(
-      { message: '服务器错误，请稍后重试' },
+      { message: 'Server error, please try again later' },
       { status: 500 }
     )
   }

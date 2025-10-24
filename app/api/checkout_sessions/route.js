@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 
-// 初始化 Stripe
+// Initialize Stripe
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
   apiVersion: '2024-12-18.acacia',
 });
 
-// 验证 Stripe 配置
+// Verify Stripe configuration
 if (!process.env.STRIPE_SECRET_KEY) {
   console.error('[CheckoutSessions] STRIPE_SECRET_KEY is not defined');
 }
@@ -15,7 +15,7 @@ export async function POST(request) {
   try {
     console.log('[CheckoutSessions] API Request: POST /api/checkout_sessions');
     
-    // 检查 Stripe 配置
+    // Check Stripe configuration
     if (!process.env.STRIPE_SECRET_KEY) {
       console.error('[CheckoutSessions] STRIPE_SECRET_KEY is not defined');
       return NextResponse.json(
@@ -24,7 +24,7 @@ export async function POST(request) {
       );
     }
     
-    // 解析请求体
+    // Parse request body
     const body = await request.json();
     const { 
       eventId, 
@@ -32,10 +32,30 @@ export async function POST(request) {
       quantity = 1, 
       customerEmail,
       customerName,
+      userId,
+      userToken,
       metadata = {} 
     } = body;
+
+    // Verify user is logged in
+    if (!userToken || !userId) {
+      console.warn('[CheckoutSessions] User not authenticated');
+      return NextResponse.json(
+        { error: 'Please login before purchasing tickets' },
+        { status: 401 }
+      );
+    }
+
+    // Verify user email
+    if (!customerEmail) {
+      console.warn('[CheckoutSessions] Missing customer email');
+      return NextResponse.json(
+        { error: 'Please provide your email address' },
+        { status: 400 }
+      );
+    }
     
-    // 验证必需参数
+    // Verify required parameters
     if (!eventId || !ticketType) {
       console.warn('[CheckoutSessions] Missing required parameters');
       return NextResponse.json(
@@ -44,7 +64,7 @@ export async function POST(request) {
       );
     }
     
-    // 验证 quantity
+    // Verify quantity
     if (quantity < 1 || quantity > 10) {
       console.warn('[CheckoutSessions] Invalid quantity:', quantity);
       return NextResponse.json(
@@ -53,7 +73,7 @@ export async function POST(request) {
       );
     }
     
-    // 从请求体中获取事件信息
+    // Get event information from request body
     const { eventData } = body;
     
     if (!eventData) {
@@ -66,7 +86,7 @@ export async function POST(request) {
     
     const event = eventData;
     
-    // 查找票种信息
+    // Find ticket type information
     const ticketInfo = event.prices.find(p => p.name === ticketType);
     if (!ticketInfo) {
       console.warn('[CheckoutSessions] Ticket type not found:', ticketType);
@@ -76,7 +96,7 @@ export async function POST(request) {
       );
     }
     
-    // 检查库存
+    // Check inventory
     if (ticketInfo.inventory < quantity) {
       console.warn('[CheckoutSessions] Insufficient inventory');
       return NextResponse.json(
@@ -93,7 +113,7 @@ export async function POST(request) {
       customerName 
     });
     
-    // 构建 metadata
+    // Build metadata
     const sessionMetadata = {
       eventId: eventId,
       eventTitle: event.title,
@@ -101,10 +121,13 @@ export async function POST(request) {
       quantity: quantity.toString(),
       customerEmail: customerEmail || '',
       customerName: customerName || '',
+      user_id: userId || '',
+      tier: ticketType,
+      merchantId: event.merchantId || 'unknown',
       ...metadata
     };
     
-    // 验证价格数据
+    // Verify price data
     if (!ticketInfo.amount_cents || ticketInfo.amount_cents <= 0) {
       console.warn('[CheckoutSessions] Invalid amount_cents:', ticketInfo.amount_cents);
       return NextResponse.json(
@@ -113,7 +136,7 @@ export async function POST(request) {
       );
     }
 
-    // 验证 Stripe 最小金额要求（50 分 = $0.50）
+    // Verify Stripe minimum amount requirement (50 cents = $0.50)
     if (ticketInfo.amount_cents < 50) {
       console.warn('[CheckoutSessions] Amount too small for Stripe:', ticketInfo.amount_cents);
       return NextResponse.json(
@@ -130,7 +153,7 @@ export async function POST(request) {
       customerEmail: customerEmail
     });
 
-    // 创建 Stripe Checkout Session
+    // Create Stripe Checkout Session
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
       line_items: [
@@ -145,7 +168,7 @@ export async function POST(request) {
                 ticketType: ticketType
               }
             },
-            unit_amount: ticketInfo.amount_cents, // 价格以分为单位
+            unit_amount: ticketInfo.amount_cents, // Price in cents
           },
           quantity: quantity,
         },
@@ -154,7 +177,7 @@ export async function POST(request) {
       cancel_url: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/events/dynamic/${event.title.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').trim()}`,
       metadata: sessionMetadata,
       customer_email: customerEmail,
-      // 允许客户输入邮箱
+      // Allow customer to enter email
       customer_creation: 'always',
     });
     
@@ -171,7 +194,7 @@ export async function POST(request) {
   } catch (error) {
     console.error('[CheckoutSessions] Error creating checkout session:', error);
     
-    // 处理 Stripe 特定错误
+    // Handle Stripe specific errors
     if (error.type === 'StripeInvalidRequestError') {
       return NextResponse.json(
         { 
@@ -192,7 +215,7 @@ export async function POST(request) {
   }
 }
 
-// 处理其他 HTTP 方法
+// Handle other HTTP methods
 export async function GET() {
   console.warn('[CheckoutSessions] GET method not allowed on /api/checkout_sessions');
   

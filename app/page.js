@@ -14,18 +14,18 @@ export default function Home() {
   useEffect(() => {
     loadEvents()
     
-    // 监听localStorage变化，实现实时更新
+    // Listen to localStorage changes for real-time updates
     const handleStorageChange = () => {
       loadEvents()
     }
     
-    // 监听storage事件
+    // Listen to storage events
     window.addEventListener('storage', handleStorageChange)
     
-    // 定期检查localStorage变化（作为备用方案）
+    // Periodically check localStorage changes (as backup)
     const interval = setInterval(() => {
       loadEvents()
-    }, 5000) // 每5秒检查一次
+    }, 5000) // Check every 5 seconds
     
     return () => {
       window.removeEventListener('storage', handleStorageChange)
@@ -37,10 +37,10 @@ export default function Home() {
     try {
       setLoading(true)
       
-      // 从本地存储加载商家创建的事件
+      // Load events created by merchants from local storage
       const merchantEvents = JSON.parse(localStorage.getItem('merchantEvents') || '[]')
       
-      // 转换商家事件格式为公共事件格式
+      // Convert merchant event format to public event format
       const publicEvents = merchantEvents.map(event => ({
         id: event.id,
         name: event.title,
@@ -49,7 +49,7 @@ export default function Home() {
         location: event.location,
         poster_url: event.poster,
         starting_price: event.prices && event.prices.length > 0 ? 
-          Math.min(...event.prices.map(p => p.amount_cents * 100)) : 0, // 转换为分
+          Math.min(...event.prices.map(p => p.amount_cents * 100)) : 0, // Convert to cents
         status: 'active',
         ticketsSold: event.ticketsSold || 0,
         totalTickets: event.totalTickets || 0,
@@ -58,7 +58,7 @@ export default function Home() {
       
       setEvents(publicEvents)
     } catch (err) {
-      console.error('加载活动数据错误:', err)
+      console.error('Error loading event data:', err)
       setEvents([])
     } finally {
       setLoading(false)

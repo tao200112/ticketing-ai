@@ -29,7 +29,7 @@ export default function RegisterPage() {
       [name]: value
     }))
     
-    // 清除对应字段的错误
+    // Clear error for corresponding field
     if (errors[name]) {
       setErrors(prev => ({
         ...prev,
@@ -42,35 +42,35 @@ export default function RegisterPage() {
     const newErrors = {}
     
     if (!formData.email) {
-      newErrors.email = '请输入邮箱地址'
+      newErrors.email = 'Please enter email address'
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = '请输入有效的邮箱地址'
+      newErrors.email = 'Please enter a valid email address'
     }
     
     if (!formData.name) {
-      newErrors.name = '请输入姓名'
+      newErrors.name = 'Please enter name'
     } else if (formData.name.length < 2) {
-      newErrors.name = '姓名至少需要2个字符'
+      newErrors.name = 'Name must be at least 2 characters'
     }
     
     if (!formData.age) {
-      newErrors.age = '请输入年龄'
+      newErrors.age = 'Please enter age'
     } else if (isNaN(formData.age) || parseInt(formData.age) < 16) {
-      newErrors.age = '年龄必须大于等于16岁'
+      newErrors.age = 'Age must be 16 or older'
     }
     
-    // 密码验证 - 只需要大于8位
+    // Password validation - at least 8 characters
     if (!formData.password) {
-      newErrors.password = '请输入密码'
+      newErrors.password = 'Please enter password'
     } else if (formData.password.length < 8) {
-      newErrors.password = '密码至少需要8个字符'
+      newErrors.password = 'Password must be at least 8 characters'
     }
     
-    // 确认密码验证
+    // Confirm password validation
     if (!formData.confirmPassword) {
-      newErrors.confirmPassword = '请确认密码'
+      newErrors.confirmPassword = 'Please confirm password'
     } else if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = '两次输入的密码不一致'
+      newErrors.confirmPassword = 'Passwords do not match'
     }
     
     setErrors(newErrors)
@@ -106,7 +106,7 @@ export default function RegisterPage() {
         if (response.ok && result.ok) {
           setMessage(`Registration successful! ${result.source === 'supabase' ? 'Data saved to database' : 'Data saved locally'}`)
           
-          // 保存用户信息到localStorage（不包含密码）
+          // Save user info to localStorage (excluding password)
           const userData = {
             email: formData.email,
             name: formData.name,
@@ -117,7 +117,7 @@ export default function RegisterPage() {
           }
           localStorage.setItem('userData', JSON.stringify(userData))
           
-          // 延迟跳转到账户页面
+          // Navigate to account page after delay
           setTimeout(() => {
             router.push('/account')
           }, 1500)
@@ -125,8 +125,8 @@ export default function RegisterPage() {
           setMessage(result.message || 'Registration failed, please try again')
         }
     } catch (error) {
-      console.error('注册错误:', error)
-      setMessage('网络错误，请检查连接后重试')
+      console.error('Registration error:', error)
+      setMessage('Network error, please check connection and try again')
     } finally {
       setLoading(false)
     }
@@ -369,10 +369,10 @@ export default function RegisterPage() {
             <div style={{
               marginTop: '16px',
               padding: '12px',
-              backgroundColor: message.includes('成功') ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-              border: `1px solid ${message.includes('成功') ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
+              backgroundColor: message.includes('successful') ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+              border: `1px solid ${message.includes('successful') ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
               borderRadius: '8px',
-              color: message.includes('成功') ? '#22c55e' : '#ef4444',
+              color: message.includes('successful') ? '#22c55e' : '#ef4444',
               fontSize: '0.875rem',
               textAlign: 'center'
             }}>
@@ -391,7 +391,7 @@ export default function RegisterPage() {
               fontSize: '0.75rem',
               textAlign: 'center'
             }}>
-              ⚠️ Supabase 未配置，数据将保存在本地
+              ⚠️ Supabase not configured, data will be saved locally
             </div>
           )}
         </form>

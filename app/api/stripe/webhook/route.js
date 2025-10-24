@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
-import { processPaidOrder } from '@lib/ticket-service';
+import { processPaidOrder } from '../../../../lib/ticket-service';
 
 // 强制使用 Node.js runtime
 export const runtime = 'nodejs';
@@ -154,8 +154,22 @@ async function handleCheckoutSessionCompleted(session) {
     console.log('[StripeWebhook] Order processed successfully:', {
       orderId: result.order.id,
       ticketCount: result.tickets.length,
-      ticketIds: result.tickets.map(t => t.shortId)
+      ticketIds: result.tickets.map(t => t.short_id || t.shortId)
     });
+    
+    // 准备票据记录数据，供前端保存到localStorage
+    const ticketData = {
+      order: result.order,
+      tickets: result.tickets,
+      userId: session.metadata?.user_id,
+      customerEmail: session.customer_email,
+      eventTitle: session.metadata?.eventTitle,
+      tier: session.metadata?.tier,
+      amount: session.amount_total,
+      quantity: parseInt(session.metadata?.quantity) || 1
+    };
+    
+    console.log('[StripeWebhook] Ticket data prepared for localStorage:', ticketData);
     
     // 暂不发邮件，只记录日志
     console.log('[StripeWebhook] Tickets generated for customer:', session.customer_email);

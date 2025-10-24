@@ -40,42 +40,66 @@ export default function MerchantOverviewPage() {
     try {
       setLoading(true)
       
-      if (hasSupabase()) {
-        // 尝试从 Supabase 获取真实数据
-        try {
-          // 这里可以添加真实的 Supabase 查询
-          // 暂时使用模拟数据
-          await new Promise(resolve => setTimeout(resolve, 1000)) // 模拟网络延迟
-          setStats({
-            todaySold: 45,
-            todayVerified: 38,
-            totalRevenue: 2340,
-            lowStockAlerts: 2,
-            source: 'supabase'
-          })
-        } catch (dbError) {
-          console.log('Supabase 查询失败，使用模拟数据:', dbError)
-          setStats({
-            todaySold: 45,
-            todayVerified: 38,
-            totalRevenue: 2340,
-            lowStockAlerts: 2,
-            source: 'local'
-          })
-        }
-      } else {
-        // 使用本地模拟数据
-        setStats({
-          todaySold: 45,
-          todayVerified: 38,
-          totalRevenue: 2340,
-          lowStockAlerts: 2,
-          source: 'local'
-        })
-      }
+      // 从本地存储获取真实数据
+      const merchantEvents = JSON.parse(localStorage.getItem('merchantEvents') || '[]')
+      const orders = JSON.parse(localStorage.getItem('orders') || '[]')
+      const tickets = JSON.parse(localStorage.getItem('tickets') || '[]')
+      
+      // 获取当前商户的用户信息
+      const currentMerchant = JSON.parse(localStorage.getItem('merchantUser') || '{}')
+      
+      // 计算今日日期
+      const today = new Date().toISOString().split('T')[0]
+      
+      // 筛选当前商户的订单
+      const merchantOrders = orders.filter(order => 
+        order.merchant_id === currentMerchant.id || 
+        order.merchantEmail === currentMerchant.email
+      )
+      
+      // 筛选今日的订单
+      const todayOrders = merchantOrders.filter(order => 
+        order.created_at && order.created_at.startsWith(today)
+      )
+      
+      // 计算今日售出的票数
+      const todaySold = todayOrders.reduce((total, order) => {
+        return total + (order.quantity || 0)
+      }, 0)
+      
+      // 计算今日收入
+      const totalRevenue = todayOrders.reduce((total, order) => {
+        return total + (order.total_amount || 0)
+      }, 0)
+      
+      // 筛选当前商户的票务
+      const merchantTickets = tickets.filter(ticket => 
+        ticket.merchant_id === currentMerchant.id ||
+        ticket.merchantEmail === currentMerchant.email
+      )
+      
+      // 筛选今日验证的票务
+      const todayVerified = merchantTickets.filter(ticket => 
+        ticket.verified_at && ticket.verified_at.startsWith(today)
+      ).length
+      
+      // 检查低库存警告
+      const lowStockAlerts = merchantEvents.filter(event => {
+        if (!event.prices || event.prices.length === 0) return false
+        return event.prices.some(price => price.inventory < 10)
+      }).length
+      
+      setStats({
+        todaySold,
+        todayVerified,
+        totalRevenue: Math.round(totalRevenue / 100), // 转换为元
+        lowStockAlerts,
+        source: 'local'
+      })
+      
     } catch (err) {
-      setError('加载统计数据失败')
-      console.error('加载统计数据错误:', err)
+      setError('Failed to load statistics')
+      console.error('Error loading statistics:', err)
     } finally {
       setLoading(false)
     }
@@ -175,14 +199,14 @@ export default function MerchantOverviewPage() {
             </svg>
           </div>
           <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: 'white', marginBottom: '8px' }}>
-            加载失败
+            Loading Failed
           </h2>
           <p style={{ color: '#94a3b8', marginBottom: '24px' }}>{error}</p>
           <button 
             onClick={loadStats}
             className="btn-partytix-gradient"
           >
-            重试
+            Retry
           </button>
         </div>
       </div>
@@ -280,7 +304,7 @@ export default function MerchantOverviewPage() {
                     e.target.style.transform = 'scale(1)'
                   }}
                 >
-                  登出
+                  Logout
                 </button>
               </div>
             )}

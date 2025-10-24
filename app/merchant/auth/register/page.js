@@ -25,7 +25,7 @@ export default function MerchantRegisterPage() {
       [name]: value
     }))
     
-    // 清除对应字段的错误
+    // Clear error for corresponding field
     if (errors[name]) {
       setErrors(prev => ({
         ...prev,
@@ -38,37 +38,37 @@ export default function MerchantRegisterPage() {
     const newErrors = {}
 
     if (!formData.email) {
-      newErrors.email = '请输入邮箱地址'
+      newErrors.email = 'Please enter email address'
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = '请输入有效的邮箱地址'
+      newErrors.email = 'Please enter a valid email address'
     }
 
     if (!formData.name) {
-      newErrors.name = '请输入您的姓名'
+      newErrors.name = 'Please enter your name'
     }
 
     if (!formData.businessName) {
-      newErrors.businessName = '请输入商家名称'
+      newErrors.businessName = 'Please enter business name'
     }
 
     if (!formData.phone) {
-      newErrors.phone = '请输入联系电话'
+      newErrors.phone = 'Please enter contact phone'
     }
 
     if (!formData.password) {
-      newErrors.password = '请输入密码'
+      newErrors.password = 'Please enter password'
     } else if (formData.password.length < 8) {
-      newErrors.password = '密码至少需要8个字符'
+      newErrors.password = 'Password must be at least 8 characters'
     }
 
     if (!formData.confirmPassword) {
-      newErrors.confirmPassword = '请确认密码'
+      newErrors.confirmPassword = 'Please confirm password'
     } else if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = '两次输入的密码不一致'
+      newErrors.confirmPassword = 'Passwords do not match'
     }
 
     if (!formData.inviteCode) {
-      newErrors.inviteCode = '请输入邀请码'
+      newErrors.inviteCode = 'Please enter invite code'
     }
 
     setErrors(newErrors)
@@ -103,18 +103,23 @@ export default function MerchantRegisterPage() {
       const data = await response.json()
 
       if (response.ok) {
-        // 注册成功，保存用户信息到localStorage
+        // Registration successful, save user info to localStorage
         localStorage.setItem('merchantUser', JSON.stringify(data.merchant))
         localStorage.setItem('merchantToken', 'merchant_token_' + Date.now())
         
-        // 跳转到商家仪表板
+        // Also save to merchant users list (for admin dashboard)
+        const existingMerchants = JSON.parse(localStorage.getItem('merchantUsers') || '[]')
+        const updatedMerchants = [...existingMerchants, data.merchant]
+        localStorage.setItem('merchantUsers', JSON.stringify(updatedMerchants))
+        
+        // Navigate to merchant dashboard
         router.push('/merchant')
       } else {
-        setErrors({ general: data.error || '注册失败' })
+        setErrors({ general: data.error || 'Registration failed' })
       }
     } catch (error) {
-      console.error('注册错误:', error)
-      setErrors({ general: '网络错误，请重试' })
+      console.error('Registration error:', error)
+      setErrors({ general: 'Network error, please try again' })
     } finally {
       setIsLoading(false)
     }
@@ -138,7 +143,7 @@ export default function MerchantRegisterPage() {
         maxWidth: '500px',
         boxShadow: '0 20px 40px rgba(0, 0, 0, 0.3)'
       }}>
-        {/* 头部 */}
+        {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
           <div style={{
             width: '4rem',
@@ -160,16 +165,16 @@ export default function MerchantRegisterPage() {
             color: 'white',
             marginBottom: '0.5rem'
           }}>
-            商家注册
+            Merchant Registration
           </h1>
           <p style={{ color: '#94a3b8', fontSize: '0.875rem' }}>
-            创建您的商家账户，开始管理活动
+            Create your merchant account and start managing events
           </p>
         </div>
 
-        {/* 表单 */}
+        {/* Form */}
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-          {/* 邮箱 */}
+          {/* Email */}
           <div>
             <label style={{
               display: 'block',
@@ -178,14 +183,14 @@ export default function MerchantRegisterPage() {
               color: 'white',
               marginBottom: '0.5rem'
             }}>
-              邮箱地址 *
+              Email Address *
             </label>
             <input
               type="email"
               name="email"
               value={formData.email}
               onChange={handleChange}
-              placeholder="输入您的邮箱地址"
+              placeholder="Enter your email address"
               style={{
                 width: '100%',
                 padding: '0.75rem 1rem',
@@ -213,7 +218,7 @@ export default function MerchantRegisterPage() {
             )}
           </div>
 
-          {/* 姓名 */}
+          {/* Name */}
           <div>
             <label style={{
               display: 'block',
@@ -222,14 +227,14 @@ export default function MerchantRegisterPage() {
               color: 'white',
               marginBottom: '0.5rem'
             }}>
-              您的姓名 *
+              Your Name *
             </label>
             <input
               type="text"
               name="name"
               value={formData.name}
               onChange={handleChange}
-              placeholder="输入您的姓名"
+              placeholder="Enter your name"
               style={{
                 width: '100%',
                 padding: '0.75rem 1rem',
@@ -257,7 +262,7 @@ export default function MerchantRegisterPage() {
             )}
           </div>
 
-          {/* 商家名称 */}
+          {/* Business Name */}
           <div>
             <label style={{
               display: 'block',
@@ -266,14 +271,14 @@ export default function MerchantRegisterPage() {
               color: 'white',
               marginBottom: '0.5rem'
             }}>
-              商家名称 *
+              Business Name *
             </label>
             <input
               type="text"
               name="businessName"
               value={formData.businessName}
               onChange={handleChange}
-              placeholder="输入您的商家名称"
+              placeholder="Enter your business name"
               style={{
                 width: '100%',
                 padding: '0.75rem 1rem',
@@ -301,7 +306,7 @@ export default function MerchantRegisterPage() {
             )}
           </div>
 
-          {/* 联系电话 */}
+          {/* Contact Phone */}
           <div>
             <label style={{
               display: 'block',
@@ -310,14 +315,14 @@ export default function MerchantRegisterPage() {
               color: 'white',
               marginBottom: '0.5rem'
             }}>
-              联系电话 *
+              Contact Phone *
             </label>
             <input
               type="tel"
               name="phone"
               value={formData.phone}
               onChange={handleChange}
-              placeholder="输入您的联系电话"
+              placeholder="Enter your contact phone"
               style={{
                 width: '100%',
                 padding: '0.75rem 1rem',
@@ -345,7 +350,7 @@ export default function MerchantRegisterPage() {
             )}
           </div>
 
-          {/* 密码 */}
+          {/* Password */}
           <div>
             <label style={{
               display: 'block',
@@ -354,14 +359,14 @@ export default function MerchantRegisterPage() {
               color: 'white',
               marginBottom: '0.5rem'
             }}>
-              密码 *
+              Password *
             </label>
             <input
               type="password"
               name="password"
               value={formData.password}
               onChange={handleChange}
-              placeholder="输入密码 (8+ 字符)"
+              placeholder="Enter password (8+ characters)"
               style={{
                 width: '100%',
                 padding: '0.75rem 1rem',
@@ -389,7 +394,7 @@ export default function MerchantRegisterPage() {
             )}
           </div>
 
-          {/* 确认密码 */}
+          {/* Confirm Password */}
           <div>
             <label style={{
               display: 'block',
@@ -398,14 +403,14 @@ export default function MerchantRegisterPage() {
               color: 'white',
               marginBottom: '0.5rem'
             }}>
-              确认密码 *
+              Confirm Password *
             </label>
             <input
               type="password"
               name="confirmPassword"
               value={formData.confirmPassword}
               onChange={handleChange}
-              placeholder="再次输入密码"
+              placeholder="Enter password again"
               style={{
                 width: '100%',
                 padding: '0.75rem 1rem',
@@ -433,7 +438,7 @@ export default function MerchantRegisterPage() {
             )}
           </div>
 
-          {/* 邀请码 */}
+          {/* Invite Code */}
           <div>
             <label style={{
               display: 'block',
@@ -442,14 +447,14 @@ export default function MerchantRegisterPage() {
               color: 'white',
               marginBottom: '0.5rem'
             }}>
-              邀请码 * <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>(需要管理员提供的邀请码)</span>
+              Invite Code * <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>(Invite code provided by admin)</span>
             </label>
             <input
               type="text"
               name="inviteCode"
               value={formData.inviteCode}
               onChange={handleChange}
-              placeholder="输入邀请码"
+              placeholder="Enter invite code"
               style={{
                 width: '100%',
                 padding: '0.75rem 1rem',
@@ -477,7 +482,7 @@ export default function MerchantRegisterPage() {
             )}
           </div>
 
-          {/* 错误信息 */}
+          {/* Error Message */}
           {errors.general && (
             <div style={{
               backgroundColor: 'rgba(239, 68, 68, 0.1)',
@@ -491,7 +496,7 @@ export default function MerchantRegisterPage() {
             </div>
           )}
 
-          {/* 注册按钮 */}
+          {/* Register Button */}
           <button
             type="submit"
             disabled={isLoading}
@@ -536,18 +541,18 @@ export default function MerchantRegisterPage() {
                   borderRadius: '50%',
                   animation: 'spin 1s linear infinite'
                 }}></div>
-                注册中...
+                Registering...
               </>
             ) : (
-              '注册商家账户'
+              'Register Merchant Account'
             )}
           </button>
         </form>
 
-        {/* 底部链接 */}
+        {/* Footer Links */}
         <div style={{ textAlign: 'center', marginTop: '1.5rem' }}>
           <p style={{ color: '#94a3b8', fontSize: '0.875rem', marginBottom: '0.5rem' }}>
-            已有商家账户？
+            Already have a merchant account?
           </p>
           <Link 
             href="/merchant/auth/login"
@@ -561,11 +566,11 @@ export default function MerchantRegisterPage() {
             onMouseEnter={(e) => e.target.style.color = '#06b6d4'}
             onMouseLeave={(e) => e.target.style.color = '#22D3EE'}
           >
-            立即登录
+            Login Now
           </Link>
         </div>
 
-        {/* 返回首页 */}
+        {/* Back to Home */}
         <div style={{ textAlign: 'center', marginTop: '1rem' }}>
           <Link 
             href="/"
@@ -578,7 +583,7 @@ export default function MerchantRegisterPage() {
             onMouseEnter={(e) => e.target.style.color = '#9ca3af'}
             onMouseLeave={(e) => e.target.style.color = '#6b7280'}
           >
-            ← 返回首页
+            ← Back to Home
           </Link>
         </div>
       </div>

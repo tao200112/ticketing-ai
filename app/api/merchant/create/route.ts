@@ -6,9 +6,7 @@ import { createClient as createBrowser } from '@supabase/supabase-js'
 import { createClient as createAdmin } from '@supabase/supabase-js'
 
 const anon = () =>
-  createBrowser(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
-    cookies: { get: (k) => cookies().get(k)?.value }
-  })
+  createBrowser(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
 
 const admin = () =>
   createAdmin(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)

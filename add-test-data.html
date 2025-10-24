@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add Test Merchant Data</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 30px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+            transition: transform 0.3s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+        }
+        .success {
+            background: rgba(34, 197, 94, 0.2);
+            border: 1px solid #22c55e;
+            color: #22c55e;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+        .info {
+            background: rgba(59, 130, 246, 0.2);
+            border: 1px solid #3b82f6;
+            color: #3b82f6;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+        pre {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏪 添加测试商家数据</h1>
+        
+        <div class="info">
+            <h3>📋 测试账号信息</h3>
+            <p><strong>邮箱:</strong> test@merchant.com</p>
+            <p><strong>密码:</strong> test123</p>
+            <p><strong>商家名称:</strong> Test Business</p>
+            <p><strong>活动:</strong> Test Event</p>
+            <p><strong>价格:</strong> $20.00 General Admission</p>
+        </div>
+
+        <button onclick="addTestData()">🚀 添加测试数据</button>
+        <button onclick="clearAllData()">🗑️ 清除所有数据</button>
+        <button onclick="viewData()">👀 查看当前数据</button>
+
+        <div id="result"></div>
+
+        <h3>📱 使用方法</h3>
+        <ol>
+            <li>点击 "添加测试数据" 按钮</li>
+            <li>访问 <a href="https://ticketing-cph4rc6b9-taoliu0711-7515s-projects.vercel.app/merchant/auth/login" target="_blank" style="color: #60a5fa;">商户登录页面</a></li>
+            <li>使用邮箱: test@merchant.com</li>
+            <li>使用密码: test123</li>
+            <li>登录后查看商户仪表板</li>
+        </ol>
+    </div>
+
+    <script>
+        function addTestData() {
+            try {
+                // 测试商家数据
+                const testMerchant = {
+                    id: 'test-merchant-123',
+                    email: 'test@merchant.com',
+                    name: 'Test Merchant',
+                    businessName: 'Test Business',
+                    phone: '1234567890',
+                    maxEvents: 10,
+                    isActive: true,
+                    createdAt: new Date().toISOString(),
+                    verified: true
+                };
+
+                // 测试用户数据
+                const testUser = {
+                    id: 'test-user-123',
+                    email: 'test@merchant.com',
+                    name: 'Test Merchant',
+                    age: 25,
+                    role: 'merchant',
+                    createdAt: new Date().toISOString()
+                };
+
+                // 测试活动数据
+                const testEvent = {
+                    id: 'test-event-123',
+                    merchant_id: 'test-merchant-123',
+                    title: 'Test Event',
+                    description: 'A test event for development',
+                    start_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+                    end_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000 + 3 * 60 * 60 * 1000).toISOString(),
+                    venue_name: 'Test Venue',
+                    status: 'published',
+                    prices: [
+                        {
+                            name: 'General Admission',
+                            description: 'General admission ticket',
+                            amount_cents: 2000,
+                            currency: 'USD',
+                            inventory: 100,
+                            is_active: true
+                        }
+                    ],
+                    created_at: new Date().toISOString()
+                };
+
+                // 测试订单数据
+                const testOrder = {
+                    id: 'test-order-123',
+                    merchant_id: 'test-merchant-123',
+                    merchant_email: 'test@merchant.com',
+                    customer_email: 'customer@test.com',
+                    customer_name: 'Test Customer',
+                    total_amount_cents: 2000,
+                    currency: 'USD',
+                    status: 'paid',
+                    created_at: new Date().toISOString()
+                };
+
+                // 测试票据数据
+                const testTicket = {
+                    id: 'test-ticket-123',
+                    merchant_id: 'test-merchant-123',
+                    merchant_email: 'test@merchant.com',
+                    order_id: 'test-order-123',
+                    event_id: 'test-event-123',
+                    tier: 'General Admission',
+                    holder_email: 'customer@test.com',
+                    short_id: 'TKT123456',
+                    status: 'unused',
+                    created_at: new Date().toISOString()
+                };
+
+                // 添加到本地存储
+                const existingMerchants = JSON.parse(localStorage.getItem('merchantUsers') || '[]');
+                const updatedMerchants = [...existingMerchants, testMerchant];
+                localStorage.setItem('merchantUsers', JSON.stringify(updatedMerchants));
+
+                const existingUsers = JSON.parse(localStorage.getItem('localUsers') || '[]');
+                const updatedUsers = [...existingUsers, testUser];
+                localStorage.setItem('localUsers', JSON.stringify(updatedUsers));
+
+                const existingEvents = JSON.parse(localStorage.getItem('merchantEvents') || '[]');
+                const updatedEvents = [...existingEvents, testEvent];
+                localStorage.setItem('merchantEvents', JSON.stringify(updatedEvents));
+
+                const existingOrders = JSON.parse(localStorage.getItem('orders') || '[]');
+                const updatedOrders = [...existingOrders, testOrder];
+                localStorage.setItem('orders', JSON.stringify(updatedOrders));
+
+                const existingTickets = JSON.parse(localStorage.getItem('tickets') || '[]');
+                const updatedTickets = [...existingTickets, testTicket];
+                localStorage.setItem('tickets', JSON.stringify(updatedTickets));
+
+                document.getElementById('result').innerHTML = `
+                    <div class="success">
+                        ✅ 测试数据已成功添加到本地存储！<br>
+                        📧 邮箱: test@merchant.com<br>
+                        🔑 密码: test123<br>
+                        🏢 商家: Test Business
+                    </div>
+                `;
+
+            } catch (error) {
+                document.getElementById('result').innerHTML = `
+                    <div style="background: rgba(239, 68, 68, 0.2); border: 1px solid #ef4444; color: #ef4444; padding: 15px; border-radius: 8px;">
+                        ❌ 错误: ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        function clearAllData() {
+            localStorage.clear();
+            document.getElementById('result').innerHTML = `
+                <div class="success">
+                    🗑️ 所有本地数据已清除！
+                </div>
+            `;
+        }
+
+        function viewData() {
+            const merchants = JSON.parse(localStorage.getItem('merchantUsers') || '[]');
+            const users = JSON.parse(localStorage.getItem('localUsers') || '[]');
+            const events = JSON.parse(localStorage.getItem('merchantEvents') || '[]');
+            const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+            const tickets = JSON.parse(localStorage.getItem('tickets') || '[]');
+
+            document.getElementById('result').innerHTML = `
+                <div class="info">
+                    <h3>📊 当前数据统计</h3>
+                    <p>商家数量: ${merchants.length}</p>
+                    <p>用户数量: ${users.length}</p>
+                    <p>活动数量: ${events.length}</p>
+                    <p>订单数量: ${orders.length}</p>
+                    <p>票据数量: ${tickets.length}</p>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>

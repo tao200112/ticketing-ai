@@ -8,14 +8,7 @@ import { createClient as createAdminClient } from '@supabase/supabase-js'
 function supaAuthFromCookies() {
   return createAuthClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, 
-    {
-      cookies: {
-        get: (key) => cookies().get(key)?.value,
-        set: () => {},   // 只读即可
-        remove: () => {}
-      }
-    }
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   )
 }
 

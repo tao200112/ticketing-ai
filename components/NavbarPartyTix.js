@@ -1,8 +1,20 @@
 import Link from 'next/link'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 export default function NavbarPartyTix() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
+
+  useEffect(() => {
+    const checkScreenSize = () => {
+      setIsMobile(window.innerWidth < 768)
+    }
+    
+    checkScreenSize()
+    window.addEventListener('resize', checkScreenSize)
+    
+    return () => window.removeEventListener('resize', checkScreenSize)
+  }, [])
 
   return (
     <nav style={{
@@ -50,16 +62,149 @@ export default function NavbarPartyTix() {
         </Link>
         
         {/* Desktop Navigation */}
-        <div className="hidden md:flex items-center gap-6">
+        {!isMobile && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '24px'
+          }}>
+            <Link 
+              href="/events" 
+              style={{ 
+                color: 'white', 
+                textDecoration: 'none',
+                transition: 'color 0.3s ease'
+              }}
+              onMouseEnter={(e) => e.target.style.color = '#22D3EE'}
+              onMouseLeave={(e) => e.target.style.color = 'white'}
+            >
+              Events
+            </Link>
+            <Link 
+              href="/qr-scanner" 
+              style={{ 
+                color: 'white', 
+                textDecoration: 'none',
+                transition: 'color 0.3s ease',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}
+              onMouseEnter={(e) => e.target.style.color = '#22D3EE'}
+              onMouseLeave={(e) => e.target.style.color = 'white'}
+            >
+              <svg style={{ width: '1rem', height: '1rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0 0v-4m0 0h4m-4 0H6m12 0h-2M7 7h10a2 2 0 012 2v10a2 2 0 01-2 2H7a2 2 0 01-2-2V9a2 2 0 012-2z" />
+              </svg>
+              扫码验票
+            </Link>
+            <Link 
+              href="/merchant" 
+              style={{ 
+                color: 'white', 
+                textDecoration: 'none',
+                transition: 'color 0.3s ease'
+              }}
+              onMouseEnter={(e) => e.target.style.color = '#22D3EE'}
+              onMouseLeave={(e) => e.target.style.color = 'white'}
+            >
+              Merchant Console
+            </Link>
+            <Link 
+              href="/admin/login" 
+              style={{ 
+                color: '#fbbf24', 
+                textDecoration: 'none',
+                transition: 'color 0.3s ease',
+                fontWeight: '500'
+              }}
+              onMouseEnter={(e) => e.target.style.color = '#f59e0b'}
+              onMouseLeave={(e) => e.target.style.color = '#fbbf24'}
+            >
+              Admin
+            </Link>
+            <Link 
+              href="/auth/login" 
+              style={{ 
+                color: 'white', 
+                textDecoration: 'none',
+                transition: 'color 0.3s ease'
+              }}
+              onMouseEnter={(e) => e.target.style.color = '#22D3EE'}
+              onMouseLeave={(e) => e.target.style.color = 'white'}
+            >
+              Login
+            </Link>
+            <Link 
+              href="/auth/register" 
+              style={{ 
+                color: 'white', 
+                textDecoration: 'none',
+                transition: 'color 0.3s ease'
+              }}
+              onMouseEnter={(e) => e.target.style.color = '#22D3EE'}
+              onMouseLeave={(e) => e.target.style.color = 'white'}
+            >
+              Register
+            </Link>
+            <Link 
+              href="/account" 
+              style={{ 
+                color: 'white', 
+                textDecoration: 'none',
+                transition: 'color 0.3s ease'
+              }}
+              onMouseEnter={(e) => e.target.style.color = '#22D3EE'}
+              onMouseLeave={(e) => e.target.style.color = 'white'}
+            >
+              Account
+            </Link>
+          </div>
+        )}
+
+        {/* Mobile Menu Button */}
+        {isMobile && (
+          <button
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'white',
+              fontSize: '24px',
+              cursor: 'pointer',
+              padding: '8px'
+            }}
+          >
+            {isMobileMenuOpen ? '✕' : '☰'}
+          </button>
+        )}
+      </div>
+
+      {/* Mobile Navigation Menu */}
+      {isMobile && isMobileMenuOpen && (
+        <div style={{
+          position: 'absolute',
+          top: '100%',
+          left: 0,
+          right: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.9)',
+          backdropFilter: 'blur(12px)',
+          borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+          padding: '20px 24px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '16px'
+        }}>
           <Link 
             href="/events" 
             style={{ 
               color: 'white', 
               textDecoration: 'none',
+              fontSize: '16px',
+              padding: '8px 0',
               transition: 'color 0.3s ease'
             }}
-            onMouseEnter={(e) => e.target.style.color = '#22D3EE'}
-            onMouseLeave={(e) => e.target.style.color = 'white'}
+            onClick={() => setIsMobileMenuOpen(false)}
           >
             Events
           </Link>
@@ -68,28 +213,30 @@ export default function NavbarPartyTix() {
             style={{ 
               color: 'white', 
               textDecoration: 'none',
-              transition: 'color 0.3s ease',
+              fontSize: '16px',
+              padding: '8px 0',
               display: 'flex',
               alignItems: 'center',
-              gap: '0.5rem'
+              gap: '8px',
+              transition: 'color 0.3s ease'
             }}
-            onMouseEnter={(e) => e.target.style.color = '#22D3EE'}
-            onMouseLeave={(e) => e.target.style.color = 'white'}
+            onClick={() => setIsMobileMenuOpen(false)}
           >
-            <svg style={{ width: '1rem', height: '1rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg style={{ width: '16px', height: '16px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0 0v-4m0 0h4m-4 0H6m12 0h-2M7 7h10a2 2 0 012 2v10a2 2 0 01-2 2H7a2 2 0 01-2-2V9a2 2 0 012-2z" />
             </svg>
-            扫码验票
+            QR Scanner
           </Link>
           <Link 
             href="/merchant" 
             style={{ 
               color: 'white', 
               textDecoration: 'none',
+              fontSize: '16px',
+              padding: '8px 0',
               transition: 'color 0.3s ease'
             }}
-            onMouseEnter={(e) => e.target.style.color = '#22D3EE'}
-            onMouseLeave={(e) => e.target.style.color = 'white'}
+            onClick={() => setIsMobileMenuOpen(false)}
           >
             Merchant Console
           </Link>
@@ -98,11 +245,12 @@ export default function NavbarPartyTix() {
             style={{ 
               color: '#fbbf24', 
               textDecoration: 'none',
-              transition: 'color 0.3s ease',
-              fontWeight: '500'
+              fontSize: '16px',
+              padding: '8px 0',
+              fontWeight: '500',
+              transition: 'color 0.3s ease'
             }}
-            onMouseEnter={(e) => e.target.style.color = '#f59e0b'}
-            onMouseLeave={(e) => e.target.style.color = '#fbbf24'}
+            onClick={() => setIsMobileMenuOpen(false)}
           >
             Admin
           </Link>
@@ -111,10 +259,11 @@ export default function NavbarPartyTix() {
             style={{ 
               color: 'white', 
               textDecoration: 'none',
+              fontSize: '16px',
+              padding: '8px 0',
               transition: 'color 0.3s ease'
             }}
-            onMouseEnter={(e) => e.target.style.color = '#22D3EE'}
-            onMouseLeave={(e) => e.target.style.color = 'white'}
+            onClick={() => setIsMobileMenuOpen(false)}
           >
             Login
           </Link>
@@ -123,10 +272,11 @@ export default function NavbarPartyTix() {
             style={{ 
               color: 'white', 
               textDecoration: 'none',
+              fontSize: '16px',
+              padding: '8px 0',
               transition: 'color 0.3s ease'
             }}
-            onMouseEnter={(e) => e.target.style.color = '#22D3EE'}
-            onMouseLeave={(e) => e.target.style.color = 'white'}
+            onClick={() => setIsMobileMenuOpen(false)}
           >
             Register
           </Link>
@@ -135,79 +285,10 @@ export default function NavbarPartyTix() {
             style={{ 
               color: 'white', 
               textDecoration: 'none',
+              fontSize: '16px',
+              padding: '8px 0',
               transition: 'color 0.3s ease'
             }}
-            onMouseEnter={(e) => e.target.style.color = '#22D3EE'}
-            onMouseLeave={(e) => e.target.style.color = 'white'}
-          >
-            Account
-          </Link>
-        </div>
-
-        {/* Mobile Menu Button */}
-        <button
-          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="md:hidden bg-none border-none text-white text-2xl cursor-pointer p-2"
-          style={{
-            background: 'none',
-            border: 'none'
-          }}
-        >
-          {isMobileMenuOpen ? '✕' : '☰'}
-        </button>
-      </div>
-
-      {/* Mobile Navigation Menu */}
-      {isMobileMenuOpen && (
-        <div className="md:hidden absolute top-full left-0 right-0 bg-black bg-opacity-90 backdrop-blur-lg border-t border-white border-opacity-10 p-5 flex flex-col gap-4">
-          <Link 
-            href="/events" 
-            className="text-white no-underline text-base py-2 transition-colors duration-300 hover:text-cyan-400"
-            onClick={() => setIsMobileMenuOpen(false)}
-          >
-            Events
-          </Link>
-          <Link 
-            href="/qr-scanner" 
-            className="text-white no-underline text-base py-2 flex items-center gap-2 transition-colors duration-300 hover:text-cyan-400"
-            onClick={() => setIsMobileMenuOpen(false)}
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0 0v-4m0 0h4m-4 0H6m12 0h-2M7 7h10a2 2 0 012 2v10a2 2 0 01-2 2H7a2 2 0 01-2-2V9a2 2 0 012-2z" />
-            </svg>
-            QR Scanner
-          </Link>
-          <Link 
-            href="/merchant" 
-            className="text-white no-underline text-base py-2 transition-colors duration-300 hover:text-cyan-400"
-            onClick={() => setIsMobileMenuOpen(false)}
-          >
-            Merchant Console
-          </Link>
-          <Link 
-            href="/admin/login" 
-            className="text-yellow-400 no-underline text-base py-2 font-medium transition-colors duration-300 hover:text-yellow-300"
-            onClick={() => setIsMobileMenuOpen(false)}
-          >
-            Admin
-          </Link>
-          <Link 
-            href="/auth/login" 
-            className="text-white no-underline text-base py-2 transition-colors duration-300 hover:text-cyan-400"
-            onClick={() => setIsMobileMenuOpen(false)}
-          >
-            Login
-          </Link>
-          <Link 
-            href="/auth/register" 
-            className="text-white no-underline text-base py-2 transition-colors duration-300 hover:text-cyan-400"
-            onClick={() => setIsMobileMenuOpen(false)}
-          >
-            Register
-          </Link>
-          <Link 
-            href="/account" 
-            className="text-white no-underline text-base py-2 transition-colors duration-300 hover:text-cyan-400"
             onClick={() => setIsMobileMenuOpen(false)}
           >
             Account

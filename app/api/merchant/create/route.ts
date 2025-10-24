@@ -8,7 +8,14 @@ import { createClient as createAdminClient } from '@supabase/supabase-js'
 function supaAuthFromCookies() {
   return createAuthClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false
+      }
+    }
   )
 }
 
@@ -19,16 +26,25 @@ const supaAdmin = createAdminClient(
 
 export async function POST(req: Request) {
   try {
-    const { businessName, phone, inviteCode } = await req.json()
+    const { businessName, phone, inviteCode, userId } = await req.json()
     
     if (!businessName || !phone || !inviteCode) {
       return NextResponse.json({ ok: false, reason: 'Missing required fields' }, { status: 400 })
     }
 
-    // 1) 读取会话（必须通过 cookies）
-    const auth = supaAuthFromCookies()
-    const { data: { user }, error: sessErr } = await auth.auth.getUser()
-    if (sessErr || !user) {
+    // 1) 检查用户ID（从前端传递）
+    if (!userId) {
+      return NextResponse.json({ ok: false, reason: 'not_authenticated' }, { status: 401 })
+    }
+
+    // 验证用户是否存在
+    const { data: user, error: userError } = await supaAdmin
+      .from('users')
+      .select('id, email')
+      .eq('id', userId)
+      .single()
+
+    if (userError || !user) {
       return NextResponse.json({ ok: false, reason: 'not_authenticated' }, { status: 401 })
     }
 

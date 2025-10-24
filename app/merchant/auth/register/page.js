@@ -93,7 +93,10 @@ export default function MerchantRegisterPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+          userId: user.id
+        }),
       })
 
       const data = await response.json()

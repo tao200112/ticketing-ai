@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Merchant Events</title>
+</head>
+<body>
+    <h1>Debug Merchant Events</h1>
+    <div id="output"></div>
+    
+    <script>
+        // 检查 localStorage 中的商家活动数据
+        function debugMerchantEvents() {
+            const output = document.getElementById('output');
+            
+            try {
+                const merchantEvents = JSON.parse(localStorage.getItem('merchantEvents') || '[]');
+                
+                output.innerHTML = `
+                    <h2>LocalStorage 中的商家活动数据:</h2>
+                    <p>活动数量: ${merchantEvents.length}</p>
+                    <pre>${JSON.stringify(merchantEvents, null, 2)}</pre>
+                    
+                    <h2>生成的 Slugs:</h2>
+                    ${merchantEvents.map((event, index) => {
+                        const slug = event.title
+                            .toLowerCase()
+                            .replace(/[^a-z0-9\s-]/g, '')
+                            .replace(/\s+/g, '-')
+                            .trim();
+                        return `
+                            <div>
+                                <strong>活动 ${index + 1}:</strong><br>
+                                标题: ${event.title}<br>
+                                生成的 Slug: ${slug}<br>
+                                预期 URL: /events/${slug}
+                            </div>
+                        `;
+                    }).join('<br>')}
+                `;
+            } catch (error) {
+                output.innerHTML = `<p style="color: red;">错误: ${error.message}</p>`;
+            }
+        }
+        
+        // 页面加载时执行
+        window.onload = debugMerchantEvents;
+    </script>
+</body>
+</html>

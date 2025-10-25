@@ -78,6 +78,13 @@ export default function EventPage() {
         slug: e.title.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').trim()
       })))
       
+      // 检查是否有任何活动数据
+      if (merchantEvents.length === 0) {
+        console.log('No merchant events found in localStorage')
+        setError('No events available')
+        return
+      }
+      
       // 根据slug查找事件
       const foundEvent = merchantEvents.find(e => {
         // 使用title字段生成slug（与EventCard组件保持一致）

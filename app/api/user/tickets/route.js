@@ -1,87 +1,64 @@
-import { NextResponse } from 'next/server'
-import { supabase } from '../../../../lib/supabaseClient'
-import { hasSupabase } from '../../../../lib/safeEnv'
+import { NextResponse } from 'next/server';
+import { supabaseAdmin } from '../../../../lib/supabase-admin';
 
-// 获取用户的票据历史
-export async function GET(request) {
+export async function GET() {
   try {
-    const { searchParams } = new URL(request.url)
-    const email = searchParams.get('email')
-    const userId = searchParams.get('userId')
+    // 获取所有票据（临时实现，实际应该根据用户身份过滤）
+    const { data: tickets, error } = await supabaseAdmin
+      .from('tickets')
+      .select(`
+        *,
+        orders (
+          id,
+          customer_email,
+          total_amount_cents,
+          status,
+          created_at
+        ),
+        events (
+          id,
+          title,
+          start_date,
+          end_date,
+          location
+        )
+      `)
+      .order('created_at', { ascending: false });
 
-    if (!email && !userId) {
+    if (error) {
+      console.error('[UserTickets] Tickets fetch error:', error);
       return NextResponse.json(
-        { error: '需要提供邮箱或用户ID' },
-        { status: 400 }
-      )
+        { error: 'Failed to fetch tickets' },
+        { status: 500 }
+      );
     }
 
-    if (hasSupabase()) {
-      if (supabase) {
-        let query = supabase
-          .from('tickets')
-          .select(`
-            id,
-            short_id,
-            tier,
-            holder_email,
-            status,
-            used_at,
-            created_at,
-            qr_payload,
-            orders (
-              id,
-              customer_email,
-              total_amount_cents,
-              currency,
-              status,
-              created_at
-            ),
-            events (
-              id,
-              title,
-              start_at,
-              end_at,
-              venue_name
-            )
-          `)
-          .order('created_at', { ascending: false })
+    // 转换数据格式
+    const formattedTickets = (tickets || []).map(ticket => ({
+      id: ticket.id,
+      short_id: ticket.short_id,
+      tier: ticket.tier,
+      price_cents: ticket.price_cents,
+      status: ticket.status,
+      issued_at: ticket.issued_at,
+      used_at: ticket.used_at,
+      qr_payload: ticket.qr_payload,
+      holder_email: ticket.holder_email,
+      event_title: ticket.events?.title,
+      event_start: ticket.events?.start_date,
+      event_location: ticket.events?.location,
+      order_id: ticket.orders?.id,
+      order_total: ticket.orders?.total_amount_cents,
+      order_status: ticket.orders?.status,
+      order_date: ticket.orders?.created_at
+    }));
 
-        if (userId) {
-          query = query.eq('user_id', userId)
-        } else if (email) {
-          query = query.eq('holder_email', email)
-        }
-
-        const { data: tickets, error } = await query
-
-        if (error) {
-          console.error('获取票据历史失败:', error)
-          return NextResponse.json(
-            { error: '获取票据历史失败' },
-            { status: 500 }
-          )
-        }
-
-        return NextResponse.json({
-          success: true,
-          tickets: tickets || []
-        })
-      }
-    }
-
-    // 降级到本地存储
-    return NextResponse.json({
-      success: true,
-      tickets: [],
-      message: 'Supabase 不可用，返回空票据列表'
-    })
-
+    return NextResponse.json(formattedTickets);
   } catch (error) {
-    console.error('获取票据历史错误:', error)
+    console.error('[UserTickets] Error fetching tickets:', error);
     return NextResponse.json(
-      { error: '服务器错误' },
+      { error: 'Failed to fetch tickets' },
       { status: 500 }
-    )
+    );
   }
 }

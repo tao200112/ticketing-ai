@@ -20,6 +20,7 @@ export default function AdminDashboard() {
   const [events, setEvents] = useState([])
   const [inviteCodes, setInviteCodes] = useState([])
   const [customers, setCustomers] = useState([])
+  const [tickets, setTickets] = useState([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('overview')
   const [showEventModal, setShowEventModal] = useState(false)
@@ -129,6 +130,19 @@ export default function AdminDashboard() {
       } else {
         console.error('Customers fetch failed:', customersResponse.status)
         setCustomers([])
+      }
+
+      // Load tickets
+      console.log('Fetching tickets...')
+      const ticketsResponse = await fetch('/api/admin/tickets')
+      console.log('Tickets response:', ticketsResponse.status)
+      if (ticketsResponse.ok) {
+        const ticketsData = await ticketsResponse.json()
+        console.log('Tickets data:', ticketsData)
+        setTickets(ticketsData)
+      } else {
+        console.error('Tickets fetch failed:', ticketsResponse.status)
+        setTickets([])
       }
       
     } catch (error) {
@@ -443,7 +457,7 @@ export default function AdminDashboard() {
           borderRadius: '8px',
           width: 'fit-content'
         }}>
-          {['overview', 'merchants', 'events', 'customers', 'invite-codes'].map(tab => (
+          {['overview', 'merchants', 'events', 'customers', 'tickets', 'invite-codes'].map(tab => (
                   <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -665,6 +679,21 @@ export default function AdminDashboard() {
                       </div>
                       <div style={{ display: 'flex', gap: '8px' }}>
                         <button
+                          onClick={() => window.open(`/events/${event.id}`, '_blank')}
+                          style={{
+                            background: 'rgba(34, 197, 94, 0.2)',
+                            border: '1px solid rgba(34, 197, 94, 0.3)',
+                            color: '#22c55e',
+                            padding: '6px 12px',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                            marginRight: '8px'
+                          }}
+                        >
+                          View
+                        </button>
+                        <button
                           onClick={() => handleEditEvent(event)}
                           style={{
                             background: 'rgba(34, 211, 238, 0.2)',
@@ -755,6 +784,81 @@ export default function AdminDashboard() {
             </div>
           )}
 
+          {activeTab === 'tickets' && (
+            <div>
+              <h2 style={{ color: 'white', marginBottom: '20px', fontSize: '20px' }}>Tickets Management</h2>
+              
+              <div style={{ color: 'rgba(255, 255, 255, 0.8)', marginBottom: '20px' }}>
+                {tickets.length} tickets sold
+              </div>
+
+              <div style={{ display: 'grid', gap: '16px' }}>
+                {tickets.map(ticket => (
+                  <div
+                    key={ticket.id}
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.03)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '12px',
+                      padding: '20px',
+                      transition: 'all 0.3s ease',
+                      boxShadow: '0 4px 16px rgba(0, 0, 0, 0.2)'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '12px' }}>
+                      <div>
+                        <h3 style={{ color: 'white', fontSize: '16px', marginBottom: '4px' }}>
+                          Ticket #{ticket.short_id || ticket.id.substring(0, 8)}
+                        </h3>
+                        <p style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '14px', marginBottom: '8px' }}>
+                          {ticket.holder_email || 'No email'}
+                        </p>
+                        <div style={{ display: 'flex', gap: '16px', fontSize: '12px', color: 'rgba(255, 255, 255, 0.6)' }}>
+                          <span>🎫 Tier: {ticket.tier || 'General'}</span>
+                          <span>💰 Price: ${ticket.price_cents ? (ticket.price_cents / 100).toFixed(2) : 'N/A'}</span>
+                          <span>📅 Issued: {new Date(ticket.issued_at || ticket.created_at).toLocaleDateString()}</span>
+                          <span>🔗 Order: {ticket.order_id ? ticket.order_id.substring(0, 8) + '...' : 'N/A'}</span>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <span style={{
+                          background: ticket.status === 'used' ? 'rgba(34, 197, 94, 0.2)' : 
+                                     ticket.status === 'unused' ? 'rgba(34, 211, 238, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                          color: ticket.status === 'used' ? '#22c55e' : 
+                                 ticket.status === 'unused' ? '#22D3EE' : '#ef4444',
+                          padding: '4px 8px',
+                          borderRadius: '4px',
+                          fontSize: '12px',
+                          textTransform: 'capitalize'
+                        }}>
+                          {ticket.status || 'Unknown'}
+                        </span>
+                        {ticket.used_at && (
+                          <span style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.6)' }}>
+                            Used: {new Date(ticket.used_at).toLocaleDateString()}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {ticket.qr_payload && (
+                      <div style={{ 
+                        marginTop: '12px', 
+                        padding: '8px', 
+                        background: 'rgba(255, 255, 255, 0.05)', 
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        color: 'rgba(255, 255, 255, 0.7)',
+                        wordBreak: 'break-all'
+                      }}>
+                        QR Payload: {ticket.qr_payload.substring(0, 100)}...
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {activeTab === 'invite-codes' && (
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
@@ -774,8 +878,50 @@ export default function AdminDashboard() {
               Generate New Code
             </button>
           </div>
-              <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
+              
+              <div style={{ color: 'rgba(255, 255, 255, 0.8)', marginBottom: '20px' }}>
                 {inviteCodes.length} invite codes available
+              </div>
+
+              <div style={{ display: 'grid', gap: '16px' }}>
+                {inviteCodes.map(inviteCode => (
+                  <div
+                    key={inviteCode.id}
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.03)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '12px',
+                      padding: '20px',
+                      transition: 'all 0.3s ease',
+                      boxShadow: '0 4px 16px rgba(0, 0, 0, 0.2)'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '12px' }}>
+                      <div>
+                        <h3 style={{ color: 'white', fontSize: '16px', marginBottom: '4px' }}>
+                          {inviteCode.code}
+                        </h3>
+                        <div style={{ display: 'flex', gap: '16px', fontSize: '12px', color: 'rgba(255, 255, 255, 0.6)' }}>
+                          <span>📅 Created: {new Date(inviteCode.created_at).toLocaleDateString()}</span>
+                          <span>⏰ Expires: {new Date(inviteCode.expires_at).toLocaleDateString()}</span>
+                          <span>👤 Used by: {inviteCode.used_by ? inviteCode.used_by.substring(0, 8) + '...' : 'Not used'}</span>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <span style={{
+                          background: inviteCode.is_active ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                          color: inviteCode.is_active ? '#22c55e' : '#ef4444',
+                          padding: '4px 8px',
+                          borderRadius: '4px',
+                          fontSize: '12px',
+                          textTransform: 'capitalize'
+                        }}>
+                          {inviteCode.is_active ? 'Active' : 'Inactive'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           )}

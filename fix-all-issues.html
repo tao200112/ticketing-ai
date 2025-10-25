@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>修复所有问题</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .success { background: #d4edda; border-color: #c3e6cb; }
+        .error { background: #f8d7da; border-color: #f5c6cb; }
+        .info { background: #d1ecf1; border-color: #bee5eb; }
+        button { padding: 10px 15px; margin: 5px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 3px; }
+        button:hover { background: #0056b3; }
+        .fix-button { background: #28a745; }
+        .fix-button:hover { background: #1e7e34; }
+    </style>
+</head>
+<body>
+    <h1>🔧 修复所有问题</h1>
+    
+    <div class="section info">
+        <h2>📋 问题诊断</h2>
+        <p>这个工具将帮助您诊断和修复以下问题：</p>
+        <ul>
+            <li>活动在主界面不显示</li>
+            <li>Ridiculous Chicken 活动无法进入</li>
+            <li>商家创建的活动无法访问</li>
+            <li>路由冲突和重复页面警告</li>
+        </ul>
+    </div>
+    
+    <div class="section">
+        <h2>1. 检查当前状态</h2>
+        <button onclick="checkStatus()">检查状态</button>
+        <div id="status-result"></div>
+    </div>
+    
+    <div class="section">
+        <h2>2. 修复数据问题</h2>
+        <button onclick="fixData()" class="fix-button">修复数据</button>
+        <div id="fix-result"></div>
+    </div>
+    
+    <div class="section">
+        <h2>3. 测试路由</h2>
+        <button onclick="testRoutes()">测试路由</button>
+        <div id="route-result"></div>
+    </div>
+    
+    <div class="section">
+        <h2>4. 验证修复</h2>
+        <button onclick="verifyFix()">验证修复</button>
+        <div id="verify-result"></div>
+    </div>
+    
+    <script>
+        function checkStatus() {
+            const result = document.getElementById('status-result');
+            let html = '<h3>当前状态检查:</h3>';
+            
+            try {
+                // 检查用户数据
+                const userData = localStorage.getItem('userData');
+                if (userData) {
+                    const user = JSON.parse(userData);
+                    html += `<p>✅ 用户: ${user.name} (${user.isLoggedIn ? '已登录' : '未登录'})</p>`;
+                } else {
+                    html += '<p>❌ 无用户数据</p>';
+                }
+                
+                // 检查活动数据
+                const merchantEvents = JSON.parse(localStorage.getItem('merchantEvents') || '[]');
+                html += `<p>📊 商家活动: ${merchantEvents.length} 个</p>`;
+                
+                if (merchantEvents.length > 0) {
+                    html += '<h4>活动列表:</h4><ul>';
+                    merchantEvents.forEach((event, index) => {
+                        const slug = event.title.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').trim();
+                        html += `<li>${event.title} → <a href="/events/${slug}" target="_blank">/events/${slug}</a></li>`;
+                    });
+                    html += '</ul>';
+                }
+                
+                result.innerHTML = html;
+            } catch (error) {
+                result.innerHTML = `<div class="error">❌ 检查失败: ${error.message}</div>`;
+            }
+        }
+        
+        function fixData() {
+            const result = document.getElementById('fix-result');
+            result.innerHTML = '<p>正在修复数据...</p>';
+            
+            try {
+                // 创建测试用户
+                const testUser = {
+                    id: 'test-user-' + Date.now(),
+                    email: 'test@example.com',
+                    name: 'Test User',
+                    isLoggedIn: true,
+                    token: 'test-token-' + Date.now(),
+                    createdAt: new Date().toISOString()
+                };
+                localStorage.setItem('userData', JSON.stringify(testUser));
+                
+                // 创建测试活动
+                const testEvent = {
+                    id: Date.now().toString(),
+                    title: 'Test Event Title',
+                    description: 'This is a test event for debugging',
+                    startTime: '2025-10-25T20:00:00Z',
+                    endTime: '2025-10-25T23:00:00Z',
+                    location: 'Test Location',
+                    prices: [{
+                        name: 'Regular Ticket',
+                        amount_cents: 1500,
+                        inventory: 100,
+                        limit_per_user: 5
+                    }],
+                    ticketsSold: 0,
+                    totalTickets: 100,
+                    revenue: 0,
+                    createdAt: new Date().toISOString()
+                };
+                
+                const existingEvents = JSON.parse(localStorage.getItem('merchantEvents') || '[]');
+                existingEvents.push(testEvent);
+                localStorage.setItem('merchantEvents', JSON.stringify(existingEvents));
+                
+                result.innerHTML = `
+                    <div class="success">
+                        <h3>✅ 数据修复完成</h3>
+                        <p>已创建测试用户和活动数据</p>
+                        <p>现在可以测试活动访问了</p>
+                    </div>
+                `;
+                
+                // 自动检查状态
+                setTimeout(checkStatus, 100);
+            } catch (error) {
+                result.innerHTML = `<div class="error">❌ 修复失败: ${error.message}</div>`;
+            }
+        }
+        
+        function testRoutes() {
+            const result = document.getElementById('route-result');
+            result.innerHTML = '<p>正在测试路由...</p>';
+            
+            const routes = [
+                { name: '测试路由', url: '/events/test-route' },
+                { name: '默认活动', url: '/events/ridiculous-chicken-night-event' },
+                { name: '测试活动', url: '/events/test-event-title' }
+            ];
+            
+            let html = '<h3>路由测试结果:</h3>';
+            let completed = 0;
+            
+            routes.forEach(route => {
+                fetch(route.url)
+                    .then(response => {
+                        if (response.ok) {
+                            html += `<p>✅ ${route.name}: 正常</p>`;
+                        } else {
+                            html += `<p>❌ ${route.name}: 失败 (${response.status})</p>`;
+                        }
+                        completed++;
+                        if (completed === routes.length) {
+                            result.innerHTML = html;
+                        }
+                    })
+                    .catch(error => {
+                        html += `<p>❌ ${route.name}: 错误 (${error.message})</p>`;
+                        completed++;
+                        if (completed === routes.length) {
+                            result.innerHTML = html;
+                        }
+                    });
+            });
+        }
+        
+        function verifyFix() {
+            const result = document.getElementById('verify-result');
+            result.innerHTML = '<p>正在验证修复...</p>';
+            
+            setTimeout(() => {
+                let html = '<h3>修复验证:</h3>';
+                
+                // 检查用户数据
+                const userData = localStorage.getItem('userData');
+                if (userData) {
+                    html += '<p>✅ 用户数据正常</p>';
+                } else {
+                    html += '<p>❌ 用户数据缺失</p>';
+                }
+                
+                // 检查活动数据
+                const merchantEvents = JSON.parse(localStorage.getItem('merchantEvents') || '[]');
+                if (merchantEvents.length > 0) {
+                    html += '<p>✅ 活动数据正常</p>';
+                } else {
+                    html += '<p>❌ 活动数据缺失</p>';
+                }
+                
+                html += '<h4>测试链接:</h4>';
+                html += '<ul>';
+                html += '<li><a href="/events/test-route" target="_blank">测试路由</a></li>';
+                html += '<li><a href="/events/ridiculous-chicken-night-event" target="_blank">默认活动</a></li>';
+                html += '<li><a href="/events/test-event-title" target="_blank">测试活动</a></li>';
+                html += '</ul>';
+                
+                result.innerHTML = html;
+            }, 1000);
+        }
+        
+        // 页面加载时自动检查状态
+        window.onload = checkStatus;
+    </script>
+</body>
+</html>

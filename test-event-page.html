@@ -25,6 +25,11 @@
         <button onclick="createTestEvent()">创建测试活动</button>
     </div>
     
+    <div>
+        <h2>创建测试用户:</h2>
+        <button onclick="createTestUser()">创建测试用户</button>
+    </div>
+    
     <script>
         function checkLocalStorage() {
             const output = document.getElementById('localStorage-data');
@@ -72,6 +77,23 @@
             localStorage.setItem('merchantEvents', JSON.stringify(existingEvents));
             
             alert('测试活动已创建！现在可以测试访问 /events/test-event-title');
+        }
+        
+        function createTestUser() {
+            const testUser = {
+                id: 'test-user-' + Date.now(),
+                email: 'test@example.com',
+                name: 'Test User',
+                isLoggedIn: true,
+                token: 'test-token-' + Date.now(),
+                createdAt: new Date().toISOString()
+            };
+            
+            localStorage.setItem('userData', JSON.stringify(testUser));
+            alert('测试用户已创建！现在可以访问活动页面了');
+            
+            // 刷新页面显示
+            checkLocalStorage();
         }
         
         // 页面加载时自动检查

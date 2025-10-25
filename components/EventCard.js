@@ -10,7 +10,7 @@ export default function EventCard({ event }) {
     .trim()
 
   return (
-    <Link href={`/events/dynamic/${eventSlug}`} style={{ display: 'block' }}>
+    <Link href={`/events/${eventSlug}`} style={{ display: 'block' }}>
       <div style={{
         background: 'rgba(15, 23, 42, 0.6)',
         border: '1px solid rgba(255, 255, 255, 0.1)',

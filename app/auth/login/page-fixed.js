@@ -214,13 +214,18 @@ export default function LoginPage() {
 
           <button
             type="submit"
-            className="btn-partytix-gradient"
             style={{
               width: '100%',
               padding: '12px',
               fontSize: '1.125rem',
+              background: 'linear-gradient(135deg, #7c3aed 0%, #a855f7 100%)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: loading ? 'not-allowed' : 'pointer',
               opacity: loading ? 0.7 : 1,
-              cursor: loading ? 'not-allowed' : 'pointer'
+              fontWeight: '600',
+              transition: 'all 0.3s ease'
             }}
             disabled={loading}
           >
@@ -241,7 +246,6 @@ export default function LoginPage() {
               {message}
             </div>
           )}
-
 
           <div style={{
             marginTop: '24px',

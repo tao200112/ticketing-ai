@@ -236,8 +236,6 @@ export default async function EventDetailPage({ params }: PageProps) {
  * 生成静态参数（可选，用于静态生成）
  */
 export async function generateStaticParams() {
-  // 如果需要静态生成，可以在这里预生成一些热门事件的页面
-  // 目前返回空数组，使用动态渲染
   return []
 }
 

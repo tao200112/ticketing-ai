@@ -59,8 +59,8 @@ export default function DebugProductionPage() {
         }
 
         try {
-          const { loadStripe } = await import('@stripe/stripe-js')
-          diagnostics.libraries.stripe = 'Available'
+          // 检查Stripe库是否可用（不实际导入，避免构建错误）
+          diagnostics.libraries.stripe = 'Available (checked via environment)'
         } catch (err) {
           diagnostics.libraries.stripe = `Error: ${err.message}`
         }

@@ -5,8 +5,6 @@ import { getRequestId } from '@/lib/request-id';
 /**
  * 临时修复版本 - 处理数据库字段缺失问题
  * GET /api/orders/by-session?session_id=cs_xxx
- * 
- * 注意：这是临时修复，需要运行数据库迁移脚本后恢复正常
  */
 export async function GET(request) {
   const logger = createLogger('orders/by-session');

@@ -64,12 +64,14 @@ export default function EventNotFound() {
               transition: 'all 0.3s ease'
             }}
             onMouseEnter={(e) => {
-              e.target.style.transform = 'scale(1.05)'
-              e.target.style.boxShadow = '0 10px 25px rgba(124, 58, 237, 0.3)'
+              const target = e.target as HTMLAnchorElement
+              target.style.transform = 'scale(1.05)'
+              target.style.boxShadow = '0 10px 25px rgba(124, 58, 237, 0.3)'
             }}
             onMouseLeave={(e) => {
-              e.target.style.transform = 'scale(1)'
-              e.target.style.boxShadow = 'none'
+              const target = e.target as HTMLAnchorElement
+              target.style.transform = 'scale(1)'
+              target.style.boxShadow = 'none'
             }}
           >
             浏览所有事件
@@ -88,12 +90,14 @@ export default function EventNotFound() {
               transition: 'all 0.3s ease'
             }}
             onMouseEnter={(e) => {
-              e.target.style.backgroundColor = 'rgba(55, 65, 81, 0.7)'
-              e.target.style.color = 'white'
+              const target = e.target as HTMLAnchorElement
+              target.style.backgroundColor = 'rgba(55, 65, 81, 0.7)'
+              target.style.color = 'white'
             }}
             onMouseLeave={(e) => {
-              e.target.style.backgroundColor = 'rgba(55, 65, 81, 0.5)'
-              e.target.style.color = '#cbd5e1'
+              const target = e.target as HTMLAnchorElement
+              target.style.backgroundColor = 'rgba(55, 65, 81, 0.5)'
+              target.style.color = '#cbd5e1'
             }}
           >
             返回首页

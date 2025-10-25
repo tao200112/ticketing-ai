@@ -22,6 +22,19 @@ export default function EventPage() {
   useEffect(() => {
     loadEvent()
     loadUserData()
+    
+    // 添加超时机制，防止无限加载
+    const timeout = setTimeout(() => {
+      if (loading) {
+        console.log('Event loading timeout, forcing completion')
+        setLoading(false)
+        if (!event) {
+          setError('Event loading timeout')
+        }
+      }
+    }, 5000) // 5秒超时
+    
+    return () => clearTimeout(timeout)
   }, [params.slug])
 
   const loadUserData = () => {

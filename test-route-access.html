@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Route Access</title>
+</head>
+<body>
+    <h1>测试路由访问</h1>
+    
+    <div>
+        <h2>直接测试链接:</h2>
+        <ul>
+            <li><a href="/events/ridiculous-chicken-night-event" target="_blank">默认活动 (直接链接)</a></li>
+            <li><a href="/events/test-event-title" target="_blank">测试活动 (直接链接)</a></li>
+        </ul>
+    </div>
+    
+    <div>
+        <h2>JavaScript 测试:</h2>
+        <button onclick="testRouteAccess()">测试路由访问</button>
+        <div id="route-test-results"></div>
+    </div>
+    
+    <div>
+        <h2>用户状态检查:</h2>
+        <div id="user-status"></div>
+        <button onclick="checkUserStatus()">检查用户状态</button>
+    </div>
+    
+    <script>
+        function testRouteAccess() {
+            const results = document.getElementById('route-test-results');
+            results.innerHTML = '<p>正在测试路由访问...</p>';
+            
+            // 测试默认活动
+            fetch('/events/ridiculous-chicken-night-event')
+                .then(response => {
+                    results.innerHTML += `<p>默认活动状态: ${response.status} ${response.statusText}</p>`;
+                    return response.text();
+                })
+                .then(html => {
+                    results.innerHTML += `<p>默认活动内容长度: ${html.length} 字符</p>`;
+                })
+                .catch(error => {
+                    results.innerHTML += `<p>默认活动错误: ${error.message}</p>`;
+                });
+            
+            // 测试测试活动
+            fetch('/events/test-event-title')
+                .then(response => {
+                    results.innerHTML += `<p>测试活动状态: ${response.status} ${response.statusText}</p>`;
+                    return response.text();
+                })
+                .then(html => {
+                    results.innerHTML += `<p>测试活动内容长度: ${html.length} 字符</p>`;
+                })
+                .catch(error => {
+                    results.innerHTML += `<p>测试活动错误: ${error.message}</p>`;
+                });
+        }
+        
+        function checkUserStatus() {
+            const statusDiv = document.getElementById('user-status');
+            
+            try {
+                const userData = localStorage.getItem('userData');
+                if (userData) {
+                    const user = JSON.parse(userData);
+                    statusDiv.innerHTML = `
+                        <h3>用户数据:</h3>
+                        <pre>${JSON.stringify(user, null, 2)}</pre>
+                        <p><strong>登录状态:</strong> ${user.isLoggedIn ? '已登录' : '未登录'}</p>
+                    `;
+                } else {
+                    statusDiv.innerHTML = '<p style="color: red;">无用户数据</p>';
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `<p style="color: red;">错误: ${error.message}</p>`;
+            }
+        }
+        
+        // 页面加载时自动检查用户状态
+        window.onload = checkUserStatus;
+    </script>
+</body>
+</html>

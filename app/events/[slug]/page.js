@@ -175,6 +175,31 @@ export default function EventPage() {
 
       if (!foundEvent) {
         console.log('Event not found for slug:', params.slug)
+        console.log('Available events and their slugs:')
+        merchantEvents.forEach((e, index) => {
+          const eventSlug = e.title
+            .toLowerCase()
+            .replace(/[^a-z0-9\s-]/g, '')
+            .replace(/\s+/g, '-')
+            .trim()
+          console.log(`  ${index}: "${e.title}" -> "${eventSlug}"`)
+        })
+        
+        // 尝试直接匹配title（不区分大小写）
+        const directMatch = merchantEvents.find(e => 
+          e.title.toLowerCase() === params.slug.toLowerCase()
+        )
+        
+        if (directMatch) {
+          console.log('Found direct title match:', directMatch)
+          setEvent(directMatch)
+          if (directMatch.prices && directMatch.prices.length > 0) {
+            setSelectedPrice(0)
+          }
+          setLoading(false)
+          return
+        }
+        
         setError('Event not found')
         setLoading(false)
         return

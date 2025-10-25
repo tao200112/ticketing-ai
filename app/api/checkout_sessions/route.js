@@ -174,6 +174,25 @@ export async function POST(request) {
       customerEmail: customerEmail
     });
 
+    // 智能重定向 URL 配置
+    const getBaseUrl = () => {
+      // 优先使用环境变量
+      if (process.env.NEXT_PUBLIC_SITE_URL) {
+        return process.env.NEXT_PUBLIC_SITE_URL
+      }
+      
+      // 生产环境默认 URL
+      if (process.env.NODE_ENV === 'production') {
+        return 'https://ticketing-ai-ypyj.vercel.app'
+      }
+      
+      // 开发环境
+      return 'http://localhost:3000'
+    }
+    
+    const baseUrl = getBaseUrl()
+    console.log('[CheckoutSessions] Using base URL for redirects:', baseUrl)
+
     // Create Stripe Checkout Session
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
@@ -194,8 +213,8 @@ export async function POST(request) {
           quantity: quantity,
         },
       ],
-      success_url: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/events/dynamic/${event.title.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').trim()}`,
+      success_url: `${baseUrl}/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${baseUrl}/events/${eventId}`,
       metadata: sessionMetadata,
       customer_email: customerEmail,
       // Allow customer to enter email

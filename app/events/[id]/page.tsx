@@ -77,7 +77,6 @@ export default async function EventDetailPage({ params }: PageProps) {
       
       // 检查是否是测试事件
       const isTestEvent = normalizedId.startsWith('test-') || 
-                         normalizedId.startsWith('aa') ||
                          normalizedId.startsWith('default-')
       
       if (isRidiculousChicken) {

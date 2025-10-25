@@ -61,7 +61,26 @@ export default function EventsPage() {
       }
       
       // 从本地存储加载商家创建的事件 (fallback)
-      const merchantEvents = JSON.parse(localStorage.getItem('merchantEvents') || '[]')
+      let merchantEvents = JSON.parse(localStorage.getItem('merchantEvents') || '[]')
+      
+      // 清理有问题的 "aa" 活动
+      merchantEvents = merchantEvents.filter(event => {
+        const isAAEvent = event.title === 'aa' || 
+                         event.id.includes('aa') ||
+                         event.id.startsWith('default-aa-')
+        
+        if (isAAEvent) {
+          console.log('🗑️ 自动清理有问题的活动:', event.title, event.id)
+          return false
+        }
+        return true
+      })
+      
+      // 保存清理后的数据
+      if (merchantEvents.length !== JSON.parse(localStorage.getItem('merchantEvents') || '[]').length) {
+        localStorage.setItem('merchantEvents', JSON.stringify(merchantEvents))
+        console.log('✅ 已清理有问题的活动数据')
+      }
       
       // 转换商家事件格式为公共事件格式
       const publicEvents = merchantEvents.map(event => ({

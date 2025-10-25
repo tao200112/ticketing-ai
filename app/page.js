@@ -65,34 +65,23 @@ export default function Home() {
       // Load events created by merchants from local storage (fallback)
       let merchantEvents = JSON.parse(localStorage.getItem('merchantEvents') || '[]')
       
-      // 如果没有商家活动，创建一个默认的 "aa" 活动
-      if (merchantEvents.length === 0) {
-        const defaultMerchantEvent = {
-          id: 'default-aa-' + Date.now(),
-          merchantId: 'default-merchant',
-          title: 'aa',
-          description: 'Default merchant event',
-          startTime: '2024-12-31T20:00:00.000Z',
-          endTime: '2025-01-01T02:00:00.000Z',
-          location: 'Default Venue',
-          poster: null,
-          prices: [
-            {
-              name: 'General Admission',
-              amount_cents: 2000,
-              inventory: 50,
-              limit_per_user: 4
-            }
-          ],
-          ticketsSold: 0,
-          totalTickets: 50,
-          revenue: 0,
-          createdAt: new Date().toISOString()
-        }
+      // 清理有问题的 "aa" 活动
+      merchantEvents = merchantEvents.filter(event => {
+        const isAAEvent = event.title === 'aa' || 
+                         event.id.includes('aa') ||
+                         event.id.startsWith('default-aa-')
         
-        merchantEvents = [defaultMerchantEvent]
+        if (isAAEvent) {
+          console.log('🗑️ 自动清理有问题的活动:', event.title, event.id)
+          return false
+        }
+        return true
+      })
+      
+      // 保存清理后的数据
+      if (merchantEvents.length !== JSON.parse(localStorage.getItem('merchantEvents') || '[]').length) {
         localStorage.setItem('merchantEvents', JSON.stringify(merchantEvents))
-        console.log('Created default merchant event:', defaultMerchantEvent)
+        console.log('✅ 已清理有问题的活动数据')
       }
       
       // Convert merchant event format to public event format

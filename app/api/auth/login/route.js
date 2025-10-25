@@ -22,7 +22,7 @@ export async function POST(request) {
     if (hasSupabase()) {
       try {
         // 使用服务端 Supabase 客户端
-        const supabase = createServerSupabaseClient()
+        const supabase = await createServerSupabaseClient()
         
         if (!supabase) {
           throw new Error('Supabase client initialization failed')

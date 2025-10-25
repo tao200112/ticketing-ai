@@ -26,7 +26,7 @@ export function getSupabaseClient(): SupabaseClient | null {
  * 服务端 Supabase 客户端（用于 API 路由和服务器组件）
  * 使用 createServerClient 和 cookies 进行正确的会话管理
  */
-export function createServerSupabaseClient() {
+export async function createServerSupabaseClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
@@ -36,19 +36,20 @@ export function createServerSupabaseClient() {
   }
 
   try {
+    const cookieStore = await cookies()
     return createServerClient(
       supabaseUrl,
       supabaseAnonKey,
       {
         cookies: {
           get: (name: string) => {
-            return cookies().get(name)?.value
+            return cookieStore.get(name)?.value
           },
           set: (name: string, value: string, options: any) => {
-            cookies().set({ name, value, ...options })
+            cookieStore.set({ name, value, ...options })
           },
           remove: (name: string, options: any) => {
-            cookies().set({ name, value: '', ...options })
+            cookieStore.set({ name, value: '', ...options })
           },
         },
       }

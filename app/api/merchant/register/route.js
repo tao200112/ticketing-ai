@@ -42,7 +42,7 @@ export async function POST(request) {
     if (hasSupabase()) {
       console.log('✅ Using Supabase for invite code validation')
       // 使用 Supabase 验证邀请码
-      const supabase = createServerSupabaseClient()
+      const supabase = await createServerSupabaseClient()
       if (supabase) {
         const { data: inviteCodeData, error } = await supabase
           .from('admin_invite_codes')
@@ -88,7 +88,7 @@ export async function POST(request) {
     let existingMerchant = null
     
     if (hasSupabase()) {
-      const supabase = createServerSupabaseClient()
+      const supabase = await createServerSupabaseClient()
       if (supabase) {
         const { data: merchantData, error } = await supabase
           .from('merchants')
@@ -122,7 +122,7 @@ export async function POST(request) {
 
     if (hasSupabase()) {
       // 使用 Supabase 创建商家账户
-      const supabase = createServerSupabaseClient()
+      const supabase = await createServerSupabaseClient()
       if (supabase) {
         // 首先创建用户账户
         const { data: newUser, error: userError } = await supabase

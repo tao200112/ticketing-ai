@@ -21,7 +21,8 @@ export async function POST(request) {
     // Check Stripe configuration - early return for demo mode
     if (!process.env.STRIPE_SECRET_KEY || 
         process.env.STRIPE_SECRET_KEY === 'your_str***************here' ||
-        process.env.STRIPE_SECRET_KEY.includes('your_str')) {
+        process.env.STRIPE_SECRET_KEY.includes('your_str') ||
+        process.env.STRIPE_SECRET_KEY.length < 20) {
       console.warn('[CheckoutSessions] STRIPE_SECRET_KEY is not configured, using demo mode');
       
       // Parse request body for demo mode

@@ -60,7 +60,7 @@ UPDATE events
 SET slug = LOWER(
     REGEXP_REPLACE(
         REGEXP_REPLACE(
-            COALESCE(title, name, description, 'event-' || SUBSTRING(id::text, 1, 8)),
+            COALESCE(title, description, 'event-' || SUBSTRING(id::text, 1, 8)),
             '[^a-zA-Z0-9\s-]', '', 'g'
         ),
         '\s+', '-', 'g'

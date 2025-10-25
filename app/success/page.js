@@ -105,19 +105,33 @@ export default function SuccessPage() {
         // 使用 async/await 而不是 .then()
         const generateQR = async () => {
           try {
+            console.log('Starting QR code generation for demo ticket:', {
+              ticketId: demoTicket.id,
+              eventName: demoTicket.eventName,
+              ticketType: demoTicket.ticketType,
+              verificationCode: verificationCode
+            })
+            
             const qrDataURL = await generateQRCode(demoTicket, verificationCode)
             console.log('QR code generation result:', qrDataURL ? 'Success' : 'Failed')
+            
             if (qrDataURL) {
               setQrCodeDataURL(qrDataURL)
               console.log('Demo QR Code generated successfully')
             } else {
-              console.error('Failed to generate demo QR code')
+              console.error('Failed to generate demo QR code - qrDataURL is null')
               // 设置一个默认的二维码占位符
               setQrCodeDataURL('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjU2IiBoZWlnaHQ9IjI1NiIgdmlld0JveD0iMCAwIDI1NiAyNTYiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyNTYiIGhlaWdodD0iMjU2IiBmaWxsPSIjRjNGNEY2Ii8+Cjx0ZXh0IHg9IjEyOCIgeT0iMTI4IiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTIiIGZpbGw9IiM2QjcyODAiIHRleHQtYW5jaG9yPSJtaWRkbGUiPk5vIFFSIGNvZGUgYXZhaWxhYmxlPC90ZXh0Pgo8L3N2Zz4=')
             }
           } catch (error) {
             console.error('Demo QR Code generation error:', error)
             console.error('Error stack:', error.stack)
+            console.error('Error details:', {
+              message: error.message,
+              name: error.name,
+              ticket: demoTicket,
+              verificationCode: verificationCode
+            })
             // 设置一个默认的二维码占位符
             setQrCodeDataURL('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjU2IiBoZWlnaHQ9IjI1NiIgdmlld0JveD0iMCAwIDI1NiAyNTYiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyNTYiIGhlaWdodD0iMjU2IiBmaWxsPSIjRjNGNEY2Ii8+Cjx0ZXh0IHg9IjEyOCIgeT0iMTI4IiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTIiIGZpbGw9IiM2QjcyODAiIHRleHQtYW5jaG9yPSJtaWRkbGUiPk5vIFFSIGNvZGUgYXZhaWxhYmxlPC90ZXh0Pgo8L3N2Zz4=')
           }
@@ -165,19 +179,33 @@ export default function SuccessPage() {
         // 使用 async/await 而不是 .then()
         const generateQR = async () => {
           try {
+            console.log('Starting QR code generation for real ticket:', {
+              ticketId: ticket.id,
+              eventName: ticket.eventName,
+              ticketType: ticket.ticketType,
+              verificationCode: verificationCode
+            })
+            
             const qrDataURL = await generateQRCode(ticket, verificationCode)
             console.log('QR code generation result:', qrDataURL ? 'Success' : 'Failed')
+            
             if (qrDataURL) {
               setQrCodeDataURL(qrDataURL)
               console.log('QR Code generated successfully')
             } else {
-              console.error('Failed to generate QR code')
+              console.error('Failed to generate QR code - qrDataURL is null')
               // 设置一个默认的二维码占位符
               setQrCodeDataURL('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjU2IiBoZWlnaHQ9IjI1NiIgdmlld0JveD0iMCAwIDI1NiAyNTYiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyNTYiIGhlaWdodD0iMjU2IiBmaWxsPSIjRjNGNEY2Ii8+Cjx0ZXh0IHg9IjEyOCIgeT0iMTI4IiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTIiIGZpbGw9IiM2QjcyODAiIHRleHQtYW5jaG9yPSJtaWRkbGUiPk5vIFFSIGNvZGUgYXZhaWxhYmxlPC90ZXh0Pgo8L3N2Zz4=')
             }
           } catch (error) {
             console.error('QR Code generation error:', error)
             console.error('Error stack:', error.stack)
+            console.error('Error details:', {
+              message: error.message,
+              name: error.name,
+              ticket: ticket,
+              verificationCode: verificationCode
+            })
             // 设置一个默认的二维码占位符
             setQrCodeDataURL('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjU2IiBoZWlnaHQ9IjI1NiIgdmlld0JveD0iMCAwIDI1NiAyNTYiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyNTYiIGhlaWdodD0iMjU2IiBmaWxsPSIjRjNGNEY2Ii8+Cjx0ZXh0IHg9IjEyOCIgeT0iMTI4IiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTIiIGZpbGw9IiM2QjcyODAiIHRleHQtYW5jaG9yPSJtaWRkbGUiPk5vIFFSIGNvZGUgYXZhaWxhYmxlPC90ZXh0Pgo8L3N2Zz4=')
           }

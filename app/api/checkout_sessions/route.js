@@ -18,15 +18,26 @@ export async function POST(request) {
   try {
     console.log('[CheckoutSessions] API Request: POST /api/checkout_sessions');
     
-    // Check Stripe configuration
-    if (!process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY === 'your_str***************here') {
+    // Check Stripe configuration - early return for demo mode
+    if (!process.env.STRIPE_SECRET_KEY || 
+        process.env.STRIPE_SECRET_KEY === 'your_str***************here' ||
+        process.env.STRIPE_SECRET_KEY.includes('your_str')) {
       console.warn('[CheckoutSessions] STRIPE_SECRET_KEY is not configured, using demo mode');
       
-      // Return demo mode response
+      // Parse request body for demo mode
+      const body = await request.json();
+      const { eventId, ticketType, quantity = 1, customerEmail, customerName } = body;
+      
+      // Return demo mode response immediately
       return NextResponse.json({
         url: '/success?session_id=demo_session_' + Date.now(),
         demo: true,
-        message: 'Demo mode - no actual payment processed'
+        message: 'Demo mode - no actual payment processed',
+        eventId,
+        ticketType,
+        quantity,
+        customerEmail,
+        customerName
       });
     }
     

@@ -15,6 +15,50 @@ export default function SuccessPage() {
     const sessionId = urlParams.get('session_id')
     
     if (sessionId) {
+      // 检查是否是演示模式
+      const isDemoMode = sessionId.startsWith('demo_session_')
+      
+      if (isDemoMode) {
+        console.log('Demo mode detected, creating demo ticket')
+        // 创建演示票券
+        const demoTicket = {
+          id: `demo_ticket_${Date.now()}`,
+          eventName: 'Demo Event',
+          ticketType: 'Demo Ticket',
+          quantity: 1,
+          price: '0.00',
+          purchaseDate: new Date().toLocaleDateString('en-US'),
+          ticketValidityDate: new Date().toISOString().split('T')[0],
+          ticketValidityStart: new Date().toISOString(),
+          ticketValidityEnd: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+          status: 'valid',
+          sessionId: sessionId,
+          customerEmail: 'demo@example.com',
+          customerName: 'Demo User'
+        }
+        
+        setTicket(demoTicket)
+        
+        // 生成验证码
+        const verificationCode = generateVerificationCode()
+        setVerificationCode(verificationCode)
+        
+        // 生成二维码
+        generateQRCode(demoTicket, verificationCode).then(qrDataURL => {
+          if (qrDataURL) {
+            setQrCodeDataURL(qrDataURL)
+            console.log('Demo QR Code generated successfully')
+          } else {
+            console.error('Failed to generate demo QR code')
+          }
+        }).catch(error => {
+          console.error('Demo QR Code generation error:', error)
+        })
+        
+        setLoading(false)
+        return
+      }
+      
       // 从localStorage获取最近的购买信息
       const recentPurchase = JSON.parse(localStorage.getItem('recentPurchase') || '{}')
       

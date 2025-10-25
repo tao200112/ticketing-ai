@@ -81,11 +81,12 @@ export default function SuccessPage() {
           eventName: recentPurchase.eventTitle || 'Demo Event',
           ticketType: recentPurchase.ticketType || 'Demo Ticket',
           quantity: recentPurchase.quantity || 1,
-          price: recentPurchase.price || '15.00', // 使用真实价格或默认价格
+          // 修复价格显示 - 使用正确的价格计算
+          price: recentPurchase.totalAmount ? (recentPurchase.totalAmount / 100).toFixed(2) : '15.00',
           purchaseDate: new Date().toLocaleDateString('en-US'),
-          ticketValidityDate: new Date().toISOString().split('T')[0],
-          ticketValidityStart: new Date().toISOString(),
-          ticketValidityEnd: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+          ticketValidityDate: recentPurchase.ticketValidityDate || new Date().toISOString().split('T')[0],
+          ticketValidityStart: recentPurchase.ticketValidityStart || new Date().toISOString(),
+          ticketValidityEnd: recentPurchase.ticketValidityEnd || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
           status: 'valid',
           sessionId: sessionId,
           customerEmail: recentPurchase.customerEmail || 'demo@example.com',
@@ -342,6 +343,22 @@ export default function SuccessPage() {
               Valid
             </div>
           </div>
+
+          {/* Customer Information */}
+          {ticket?.customerName && (
+            <div style={{
+              marginBottom: '1rem',
+              padding: '1rem',
+              backgroundColor: 'rgba(16, 185, 129, 0.1)',
+              borderRadius: '8px',
+              border: '1px solid rgba(16, 185, 129, 0.2)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', color: '#6ee7b7' }}>
+                <span style={{ marginRight: '0.5rem' }}>👤</span>
+                <span style={{ fontWeight: '500' }}>Customer: {ticket.customerName}</span>
+              </div>
+            </div>
+          )}
 
           {/* Ticket Details */}
           <div style={{ 

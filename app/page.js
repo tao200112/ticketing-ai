@@ -74,7 +74,7 @@ export default function Home() {
         location: event.location,
         poster_url: event.poster,
         starting_price: event.prices && event.prices.length > 0 ? 
-          Math.min(...event.prices.map(p => p.amount_cents * 100)) : 0, // Convert to cents
+          Math.min(...event.prices.map(p => p.amount_cents)) : 0, // amount_cents is already in cents
         status: 'active',
         ticketsSold: event.ticketsSold || 0,
         totalTickets: event.totalTickets || 0,

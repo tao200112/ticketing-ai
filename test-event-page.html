@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Event Page Access</title>
+</head>
+<body>
+    <h1>测试活动页面访问</h1>
+    
+    <div>
+        <h2>测试链接:</h2>
+        <ul>
+            <li><a href="/events/ridiculous-chicken-night-event" target="_blank">默认活动: Ridiculous Chicken Night Event</a></li>
+            <li><a href="/events/test-event-title" target="_blank">测试活动: Test Event Title</a></li>
+        </ul>
+    </div>
+    
+    <div>
+        <h2>LocalStorage 数据检查:</h2>
+        <div id="localStorage-data"></div>
+        <button onclick="checkLocalStorage()">检查 LocalStorage</button>
+    </div>
+    
+    <div>
+        <h2>创建测试活动:</h2>
+        <button onclick="createTestEvent()">创建测试活动</button>
+    </div>
+    
+    <script>
+        function checkLocalStorage() {
+            const output = document.getElementById('localStorage-data');
+            
+            try {
+                const merchantEvents = JSON.parse(localStorage.getItem('merchantEvents') || '[]');
+                const userData = localStorage.getItem('userData');
+                
+                output.innerHTML = `
+                    <h3>商家活动数据 (${merchantEvents.length} 个):</h3>
+                    <pre>${JSON.stringify(merchantEvents, null, 2)}</pre>
+                    
+                    <h3>用户数据:</h3>
+                    <pre>${userData || '无用户数据'}</pre>
+                `;
+            } catch (error) {
+                output.innerHTML = `<p style="color: red;">错误: ${error.message}</p>`;
+            }
+        }
+        
+        function createTestEvent() {
+            const testEvent = {
+                id: Date.now().toString(),
+                title: 'Test Event Title',
+                description: 'This is a test event created for debugging',
+                startTime: '2025-10-25T20:00:00Z',
+                endTime: '2025-10-25T23:00:00Z',
+                location: 'Test Location',
+                prices: [
+                    {
+                        name: 'Regular Ticket',
+                        amount_cents: 1500,
+                        inventory: 100,
+                        limit_per_user: 5
+                    }
+                ],
+                ticketsSold: 0,
+                totalTickets: 100,
+                revenue: 0,
+                createdAt: new Date().toISOString()
+            };
+            
+            const existingEvents = JSON.parse(localStorage.getItem('merchantEvents') || '[]');
+            existingEvents.push(testEvent);
+            localStorage.setItem('merchantEvents', JSON.stringify(existingEvents));
+            
+            alert('测试活动已创建！现在可以测试访问 /events/test-event-title');
+        }
+        
+        // 页面加载时自动检查
+        window.onload = checkLocalStorage;
+    </script>
+</body>
+</html>

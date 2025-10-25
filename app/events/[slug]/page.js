@@ -237,6 +237,9 @@ export default function EventPage() {
             margin: '0 auto 1rem auto'
           }}></div>
           <p style={{ color: '#94a3b8' }}>Loading event...</p>
+          <p style={{ color: '#6b7280', fontSize: '0.875rem', marginTop: '8px' }}>
+            Slug: {params.slug}
+          </p>
         </div>
       </div>
     )
@@ -261,7 +264,10 @@ export default function EventPage() {
           <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: 'white', marginBottom: '0.5rem' }}>
             Event Not Found
           </h2>
-          <p style={{ color: '#94a3b8', marginBottom: '1.5rem' }}>{error || 'The event you are looking for does not exist.'}</p>
+          <p style={{ color: '#94a3b8', marginBottom: '0.5rem' }}>{error || 'The event you are looking for does not exist.'}</p>
+          <p style={{ color: '#6b7280', fontSize: '0.875rem', marginBottom: '1.5rem' }}>
+            Looking for: {params.slug}
+          </p>
           <Link 
             href="/events"
             style={{

@@ -5,6 +5,15 @@ export const dynamic = 'force-dynamic'
 
 export async function GET() {
   try {
+    // 检查Supabase配置
+    if (!supabaseAdmin) {
+      console.log('Supabase not configured')
+      return NextResponse.json(
+        { error: 'Database not configured. Please set up Supabase environment variables.' },
+        { status: 500 }
+      )
+    }
+
     const [
       { count: users },
       { count: merchants },
@@ -29,7 +38,7 @@ export async function GET() {
   } catch (error) {
     console.error('Admin stats error:', error)
     return NextResponse.json(
-      { error: 'Failed to fetch statistics' },
+      { error: 'Failed to fetch statistics from database' },
       { status: 500 }
     )
   }

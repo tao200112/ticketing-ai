@@ -6,6 +6,7 @@ import NavbarPartyTix from "../components/NavbarPartyTix"
 import EventCard from "../components/EventCard"
 import { SkeletonGrid } from "../components/SkeletonCard"
 import { hasSupabase } from "../lib/safeEnv"
+import { getDefaultEvents } from "../lib/default-events"
 
 export default function Home() {
   const [events, setEvents] = useState([])
@@ -15,21 +16,26 @@ export default function Home() {
     loadEvents()
     
     // Listen to localStorage changes for real-time updates
-    const handleStorageChange = () => {
-      loadEvents()
+    const handleStorageChange = (e) => {
+      // Only reload if merchantEvents changed
+      if (e.key === 'merchantEvents') {
+        loadEvents()
+      }
     }
     
     // Listen to storage events
     window.addEventListener('storage', handleStorageChange)
     
-    // Periodically check localStorage changes (as backup)
-    const interval = setInterval(() => {
+    // Remove the aggressive polling - only check on focus
+    const handleFocus = () => {
       loadEvents()
-    }, 5000) // Check every 5 seconds
+    }
+    
+    window.addEventListener('focus', handleFocus)
     
     return () => {
       window.removeEventListener('storage', handleStorageChange)
-      clearInterval(interval)
+      window.removeEventListener('focus', handleFocus)
     }
   }, [])
 
@@ -37,7 +43,26 @@ export default function Home() {
     try {
       setLoading(true)
       
-      // Load events created by merchants from local storage
+      // Load events from database first
+      let dbEvents = []
+      try {
+        const response = await fetch('/api/events')
+        if (response.ok) {
+          const data = await response.json()
+          // 处理不同的数据格式
+          if (Array.isArray(data)) {
+            dbEvents = data
+          } else if (data && data.data && Array.isArray(data.data)) {
+            dbEvents = data.data
+          } else if (data && data.ok && data.data && Array.isArray(data.data)) {
+            dbEvents = data.data
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load events from database:', error)
+      }
+      
+      // Load events created by merchants from local storage (fallback)
       const merchantEvents = JSON.parse(localStorage.getItem('merchantEvents') || '[]')
       
       // Convert merchant event format to public event format
@@ -56,7 +81,14 @@ export default function Home() {
         revenue: event.revenue || 0
       }))
       
-      setEvents(publicEvents)
+      // Combine and deduplicate events (database events take priority)
+      const defaultEvents = getDefaultEvents()
+      const allEvents = [...dbEvents, ...publicEvents, ...defaultEvents]
+      const uniqueEvents = allEvents.filter((event, index, self) => 
+        index === self.findIndex(e => e.id === event.id)
+      )
+      
+      setEvents(uniqueEvents)
     } catch (err) {
       console.error('Error loading event data:', err)
       setEvents([])

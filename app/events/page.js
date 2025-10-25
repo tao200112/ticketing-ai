@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import EventCard from '../../components/EventCard'
+import { getDefaultEvents } from '../../lib/default-events'
 
 export default function EventsPage() {
   const [events, setEvents] = useState([])
@@ -20,25 +21,43 @@ export default function EventsPage() {
     
     window.addEventListener('storage', handleStorageChange)
     
-    // 定期检查localStorage变化（用于同一窗口内的变化）
-    const interval = setInterval(() => {
-      const currentEvents = JSON.parse(localStorage.getItem('merchantEvents') || '[]')
-      if (currentEvents.length !== events.length) {
-        loadEvents()
-      }
-    }, 2000)
+    // 只在窗口获得焦点时检查更新
+    const handleFocus = () => {
+      loadEvents()
+    }
+    
+    window.addEventListener('focus', handleFocus)
     
     return () => {
       window.removeEventListener('storage', handleStorageChange)
-      clearInterval(interval)
+      window.removeEventListener('focus', handleFocus)
     }
-  }, [events.length])
+  }, [])
 
   const loadEvents = async () => {
     try {
       setLoading(true)
       
-      // 从本地存储加载商家创建的事件
+      // Load events from database first
+      let dbEvents = []
+      try {
+        const response = await fetch('/api/events')
+        if (response.ok) {
+          const data = await response.json()
+          // 处理不同的数据格式
+          if (Array.isArray(data)) {
+            dbEvents = data
+          } else if (data && data.data && Array.isArray(data.data)) {
+            dbEvents = data.data
+          } else if (data && data.ok && data.data && Array.isArray(data.data)) {
+            dbEvents = data.data
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load events from database:', error)
+      }
+      
+      // 从本地存储加载商家创建的事件 (fallback)
       const merchantEvents = JSON.parse(localStorage.getItem('merchantEvents') || '[]')
       
       // 转换商家事件格式为公共事件格式
@@ -57,23 +76,14 @@ export default function EventsPage() {
         revenue: event.revenue || 0
       }))
       
-      // 如果没有商家事件，显示默认事件
-      if (publicEvents.length === 0) {
-        setEvents([
-          {
-            id: 'default-1',
-            name: 'Ridiculous Chicken Night Event',
-            description: 'Enjoy delicious chicken and an amazing night, the most popular event near Virginia Tech',
-            start_date: '2025-10-25T20:00:00Z',
-            location: '201 N Main St SUITE A, Blacksburg, VA',
-            poster_url: null,
-            starting_price: 5000, // $50
-            status: 'active'
-          }
-        ])
-      } else {
-        setEvents(publicEvents)
-      }
+      // Combine and deduplicate events (database events take priority)
+      const defaultEvents = getDefaultEvents()
+      const allEvents = [...dbEvents, ...publicEvents, ...defaultEvents]
+      const uniqueEvents = allEvents.filter((event, index, self) => 
+        index === self.findIndex(e => e.id === event.id)
+      )
+      
+      setEvents(uniqueEvents)
     } catch (err) {
       console.error('加载活动数据错误:', err)
       setEvents([])

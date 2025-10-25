@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
-import { supabase } from '../../../../lib/supabaseClient'
+import { createServerSupabaseClient } from '../../../../lib/supabase'
 import { hasSupabase } from '../../../../lib/safeEnv'
 import bcrypt from 'bcryptjs'
 import localUserStorage from '../../../../lib/user-storage'
+
+export const runtime = 'nodejs'
 
 export async function POST(request) {
   try {
@@ -34,7 +36,8 @@ export async function POST(request) {
     // 检查 Supabase 是否可用
     if (hasSupabase()) {
       try {
-        // Supabase client imported
+        // 使用服务端 Supabase 客户端
+        const supabase = createServerSupabaseClient()
         
         if (!supabase) {
           throw new Error('Supabase client initialization failed')

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import AuthGuard from '../../../../components/AuthGuard'
+import { getDefaultEvent } from '../../../../lib/default-events'
 
 export default function DynamicEventPage() {
   const params = useParams()
@@ -41,6 +42,31 @@ export default function DynamicEventPage() {
   const loadEvent = () => {
     try {
       setLoading(true)
+      
+      // 首先检查是否是默认的Ridiculous Chicken活动
+      if (params.slug === 'ridiculous-chicken-event') {
+        const defaultEvent = getDefaultEvent('ridiculous-chicken')
+        if (defaultEvent) {
+          // 转换默认活动数据格式以匹配页面期望的格式
+          const formattedEvent = {
+            id: defaultEvent.id,
+            title: defaultEvent.name,
+            description: defaultEvent.description,
+            startTime: defaultEvent.start_date,
+            endTime: defaultEvent.end_date,
+            location: defaultEvent.location,
+            maxAttendees: defaultEvent.max_attendees,
+            prices: defaultEvent.prices,
+            ticketsSold: 0,
+            totalTickets: defaultEvent.max_attendees
+          }
+          setEvent(formattedEvent)
+          if (formattedEvent.prices && formattedEvent.prices.length > 0) {
+            setSelectedPrice(0) // 选择第一个价格
+          }
+          return
+        }
+      }
       
       // 从本地存储加载商家事件
       const merchantEvents = JSON.parse(localStorage.getItem('merchantEvents') || '[]')

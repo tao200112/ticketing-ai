@@ -74,6 +74,23 @@ export default function RidiculousChickenEvent() {
     setError('')
 
     try {
+      // 获取用户认证信息
+      const userData = localStorage.getItem('userData')
+      let userToken = null
+      let userId = null
+      
+      if (userData) {
+        try {
+          const user = JSON.parse(userData)
+          if (user.isLoggedIn) {
+            userToken = user.token || 'demo-token'
+            userId = user.id || 'demo-user'
+          }
+        } catch (error) {
+          console.error('解析用户数据失败:', error)
+        }
+      }
+
       const response = await fetch('/api/checkout_sessions', {
         method: 'POST',
         headers: {
@@ -85,6 +102,8 @@ export default function RidiculousChickenEvent() {
           quantity: quantity,
           customerEmail: customerEmail,
           customerName: customerName,
+          userId: userId,
+          userToken: userToken,
           eventData: {
             title: event.name,
             description: event.description,
@@ -96,6 +115,9 @@ export default function RidiculousChickenEvent() {
       const data = await response.json()
 
       if (response.ok && data.url) {
+        window.location.href = data.url
+      } else if (response.ok && data.demo) {
+        // 演示模式
         window.location.href = data.url
       } else {
         setError(data.error || '创建支付会话失败')

@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import EventCreationForm from '../../components/EventCreationForm'
+import EventCreationForm from '../../../components/EventCreationForm'
+import NavbarPartyTix from '../../../components/NavbarPartyTix'
 
 export const dynamic = 'force-dynamic'
 
@@ -64,6 +65,13 @@ export default function AdminDashboard() {
         setStats(statsData)
       } else {
         console.error('Stats fetch failed:', statsResponse.status)
+        setStats({
+          users: 0,
+          merchants: 0,
+          events: 0,
+          orders: 0,
+          tickets: 0
+        })
       }
 
       // Load merchants
@@ -76,6 +84,7 @@ export default function AdminDashboard() {
         setMerchants(merchantsData)
       } else {
         console.error('Merchants fetch failed:', merchantsResponse.status)
+        setMerchants([])
       }
 
       // Load events
@@ -88,6 +97,7 @@ export default function AdminDashboard() {
         setEvents(eventsData)
       } else {
         console.error('Events fetch failed:', eventsResponse.status)
+        setEvents([])
       }
 
       // Load invite codes
@@ -97,9 +107,15 @@ export default function AdminDashboard() {
       if (inviteResponse.ok) {
         const inviteData = await inviteResponse.json()
         console.log('Invite codes data:', inviteData)
-        setInviteCodes(inviteData)
+        // Handle different response formats
+        if (inviteData.inviteCodes) {
+          setInviteCodes(inviteData.inviteCodes)
+        } else {
+          setInviteCodes(inviteData)
+        }
       } else {
         console.error('Invite codes fetch failed:', inviteResponse.status)
+        setInviteCodes([])
       }
 
       // Load customers
@@ -112,6 +128,7 @@ export default function AdminDashboard() {
         setCustomers(customersData)
       } else {
         console.error('Customers fetch failed:', customersResponse.status)
+        setCustomers([])
       }
       
     } catch (error) {
@@ -231,21 +248,23 @@ export default function AdminDashboard() {
     return (
       <div style={{
         minHeight: '100vh',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        background: 'linear-gradient(135deg, #0f172a 0%, #7c3aed 50%, #0f172a 100%)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         padding: '20px'
       }}>
         <div style={{
-          background: 'rgba(255, 255, 255, 0.1)',
-          backdropFilter: 'blur(10px)',
+          background: 'rgba(255, 255, 255, 0.05)',
+          backdropFilter: 'blur(12px)',
           borderRadius: '20px',
           padding: '40px',
           textAlign: 'center',
           color: 'white',
           maxWidth: '500px',
-          width: '100%'
+          width: '100%',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)'
         }}>
           <div style={{ fontSize: '18px', marginBottom: '20px' }}>Loading admin dashboard...</div>
           <div style={{
@@ -271,13 +290,13 @@ export default function AdminDashboard() {
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      paddingTop: '80px'
+      background: 'linear-gradient(135deg, #0f172a 0%, #7c3aed 50%, #0f172a 100%)'
     }}>
+      <NavbarPartyTix />
       <div style={{
         maxWidth: '1200px',
         margin: '0 auto',
-        padding: '20px'
+        padding: '100px 24px 40px 24px'
       }}>
         {/* Header */}
         <div style={{
@@ -301,14 +320,15 @@ export default function AdminDashboard() {
         </div>
         <button
           onClick={handleLogout}
+          className="btn-partytix-gradient"
           style={{
-              background: 'rgba(255, 255, 255, 0.1)',
-              border: '1px solid rgba(255, 255, 255, 0.2)',
-              color: 'white',
-              padding: '10px 20px',
-              borderRadius: '8px',
+            padding: '12px 24px',
+            borderRadius: '8px',
+            border: 'none',
             cursor: 'pointer',
-              transition: 'all 0.3s ease'
+            fontWeight: '600',
+            fontSize: '14px',
+            transition: 'all 0.3s ease'
           }}
         >
           Logout
@@ -323,12 +343,14 @@ export default function AdminDashboard() {
           marginBottom: '30px'
         }}>
       <div style={{
-            background: 'rgba(255, 255, 255, 0.1)',
-            backdropFilter: 'blur(10px)',
-        borderRadius: '12px',
-            padding: '24px',
+            background: 'rgba(255, 255, 255, 0.05)',
+            backdropFilter: 'blur(12px)',
+        borderRadius: '16px',
+            padding: '32px',
             textAlign: 'center',
-            border: '1px solid rgba(255, 255, 255, 0.1)'
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            transition: 'all 0.3s ease',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)'
           }}>
             <div style={{ fontSize: '32px', fontWeight: 'bold', color: 'white', marginBottom: '8px' }}>
               {stats.users}
@@ -339,12 +361,14 @@ export default function AdminDashboard() {
       </div>
 
           <div style={{
-            background: 'rgba(255, 255, 255, 0.1)',
-            backdropFilter: 'blur(10px)',
-            borderRadius: '12px',
-            padding: '24px',
+            background: 'rgba(255, 255, 255, 0.05)',
+            backdropFilter: 'blur(12px)',
+            borderRadius: '16px',
+            padding: '32px',
             textAlign: 'center',
-            border: '1px solid rgba(255, 255, 255, 0.1)'
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            transition: 'all 0.3s ease',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)'
           }}>
             <div style={{ fontSize: '32px', fontWeight: 'bold', color: 'white', marginBottom: '8px' }}>
               {stats.merchants}
@@ -355,12 +379,14 @@ export default function AdminDashboard() {
           </div>
 
           <div style={{
-            background: 'rgba(255, 255, 255, 0.1)',
-            backdropFilter: 'blur(10px)',
-            borderRadius: '12px',
-            padding: '24px',
+            background: 'rgba(255, 255, 255, 0.05)',
+            backdropFilter: 'blur(12px)',
+            borderRadius: '16px',
+            padding: '32px',
             textAlign: 'center',
-            border: '1px solid rgba(255, 255, 255, 0.1)'
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            transition: 'all 0.3s ease',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)'
           }}>
             <div style={{ fontSize: '32px', fontWeight: 'bold', color: 'white', marginBottom: '8px' }}>
               {stats.events}
@@ -371,12 +397,14 @@ export default function AdminDashboard() {
           </div>
 
           <div style={{
-            background: 'rgba(255, 255, 255, 0.1)',
-            backdropFilter: 'blur(10px)',
-            borderRadius: '12px',
-            padding: '24px',
+            background: 'rgba(255, 255, 255, 0.05)',
+            backdropFilter: 'blur(12px)',
+            borderRadius: '16px',
+            padding: '32px',
             textAlign: 'center',
-            border: '1px solid rgba(255, 255, 255, 0.1)'
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            transition: 'all 0.3s ease',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)'
           }}>
             <div style={{ fontSize: '32px', fontWeight: 'bold', color: 'white', marginBottom: '8px' }}>
               {stats.orders}
@@ -387,12 +415,14 @@ export default function AdminDashboard() {
           </div>
 
           <div style={{
-            background: 'rgba(255, 255, 255, 0.1)',
-            backdropFilter: 'blur(10px)',
-            borderRadius: '12px',
-            padding: '24px',
+            background: 'rgba(255, 255, 255, 0.05)',
+            backdropFilter: 'blur(12px)',
+            borderRadius: '16px',
+            padding: '32px',
             textAlign: 'center',
-            border: '1px solid rgba(255, 255, 255, 0.1)'
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            transition: 'all 0.3s ease',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)'
           }}>
             <div style={{ fontSize: '32px', fontWeight: 'bold', color: 'white', marginBottom: '8px' }}>
               {stats.tickets}
@@ -436,11 +466,12 @@ export default function AdminDashboard() {
 
         {/* Tab Content */}
         <div style={{
-          background: 'rgba(255, 255, 255, 0.1)',
-          backdropFilter: 'blur(10px)',
-          borderRadius: '12px',
-          padding: '24px',
-          border: '1px solid rgba(255, 255, 255, 0.1)'
+          background: 'rgba(255, 255, 255, 0.05)',
+          backdropFilter: 'blur(12px)',
+          borderRadius: '16px',
+          padding: '32px',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)'
         }}>
           {activeTab === 'overview' && (
             <div>
@@ -454,62 +485,151 @@ export default function AdminDashboard() {
           )}
 
           {activeTab === 'merchants' && (
-                    <div>
+            <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                 <h2 style={{ color: 'white', fontSize: '20px' }}>Merchants</h2>
-                        <button
+                <button
                   onClick={generateInviteCode}
-                          style={{
-                    background: 'linear-gradient(135deg, #7C3AED 0%, #22D3EE 100%)',
-                    color: 'white',
+                  className="btn-partytix-gradient"
+                  style={{
+                    padding: '12px 24px',
+                    borderRadius: '8px',
                     border: 'none',
-                    padding: '8px 16px',
-                            borderRadius: '6px',
                     cursor: 'pointer',
-                    fontSize: '14px'
+                    fontSize: '14px',
+                    fontWeight: '600'
                   }}
                 >
                   Generate Invite Code
-                        </button>
-                      </div>
-              <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
+                </button>
+              </div>
+              
+              <div style={{ color: 'rgba(255, 255, 255, 0.8)', marginBottom: '20px' }}>
                 {merchants.length} merchants registered
+              </div>
+
+              <div style={{ display: 'grid', gap: '16px' }}>
+                {merchants.map(merchant => (
+                  <div
+                    key={merchant.id}
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.03)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '12px',
+                      padding: '20px',
+                      transition: 'all 0.3s ease',
+                      boxShadow: '0 4px 16px rgba(0, 0, 0, 0.2)'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '12px' }}>
+                      <div>
+                        <h3 style={{ color: 'white', fontSize: '16px', marginBottom: '4px' }}>
+                          {merchant.name}
+                        </h3>
+                        <p style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '14px', marginBottom: '8px' }}>
+                          {merchant.contact_email}
+                        </p>
+                        <div style={{ display: 'flex', gap: '16px', fontSize: '12px', color: 'rgba(255, 255, 255, 0.6)' }}>
+                          <span>📞 {merchant.contact_phone || 'No phone'}</span>
+                          <span>✅ {merchant.verified ? 'Verified' : 'Unverified'}</span>
+                          <span>📊 Max Events: {merchant.max_events}</span>
+                          <span>📅 Created: {new Date(merchant.created_at).toLocaleDateString()}</span>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <span style={{
+                          background: merchant.status === 'active' ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                          color: merchant.status === 'active' ? '#22c55e' : '#ef4444',
+                          padding: '4px 8px',
+                          borderRadius: '4px',
+                          fontSize: '12px',
+                          textTransform: 'capitalize'
+                        }}>
+                          {merchant.status}
+                        </span>
+                      </div>
                     </div>
                   </div>
+                ))}
+              </div>
+            </div>
           )}
 
           {activeTab === 'events' && (
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                 <h2 style={{ color: 'white', fontSize: '20px' }}>Events Management</h2>
-                <button
-                  onClick={() => {
-                    setEditingEvent(null)
-                    setEventForm({
-                      title: '',
-                      description: '',
-                      startDate: '',
-                      endDate: '',
-                      location: '',
-                      maxAttendees: '',
-                      ticketTypes: [],
-                      merchantId: ''
-                    })
-                    setShowEventModal(true)
-                  }}
-                  style={{
-                    background: 'linear-gradient(135deg, #7C3AED 0%, #22D3EE 100%)',
-                    color: 'white',
-                    border: 'none',
-                    padding: '8px 16px',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    fontWeight: '500'
-                  }}
-                >
-                  Create Event
-                </button>
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  <button
+                    onClick={() => {
+                      // 编辑默认的Ridiculous Chicken活动
+                      const defaultEvent = {
+                        id: 'ridiculous-chicken',
+                        title: 'Ridiculous Chicken Night Event',
+                        description: 'Enjoy delicious chicken and an amazing night at Virginia Tech\'s most popular event. We provide the freshest ingredients, the most unique cooking methods, and the warmest service.',
+                        start_date: '2025-10-25T20:00:00Z',
+                        end_date: '2025-10-25T23:00:00Z',
+                        location: 'Shanghai Concert Hall',
+                        max_attendees: 150,
+                        merchant_id: 'default-merchant',
+                        ticket_types: [
+                          {
+                            name: 'Regular Ticket (21+)',
+                            amount_cents: 1500,
+                            inventory: 100,
+                            limit_per_user: 5
+                          },
+                          {
+                            name: 'Special Ticket (18-20)',
+                            amount_cents: 3000,
+                            inventory: 50,
+                            limit_per_user: 2
+                          }
+                        ]
+                      }
+                      handleEditEvent(defaultEvent)
+                    }}
+                    style={{
+                      background: 'rgba(34, 197, 94, 0.2)',
+                      border: '1px solid rgba(34, 197, 94, 0.3)',
+                      color: '#22c55e',
+                      padding: '12px 24px',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      fontWeight: '600'
+                    }}
+                  >
+                    Edit Ridiculous Chicken
+                  </button>
+                  <button
+                    onClick={() => {
+                      setEditingEvent(null)
+                      setEventForm({
+                        title: '',
+                        description: '',
+                        startDate: '',
+                        endDate: '',
+                        location: '',
+                        maxAttendees: '',
+                        ticketTypes: [],
+                        merchantId: ''
+                      })
+                      setShowEventModal(true)
+                    }}
+                    className="btn-partytix-gradient"
+                    style={{
+                      padding: '12px 24px',
+                      borderRadius: '8px',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      fontWeight: '600'
+                    }}
+                  >
+                    Create Event
+                  </button>
+                </div>
               </div>
               
               <div style={{ color: 'rgba(255, 255, 255, 0.8)', marginBottom: '20px' }}>
@@ -521,10 +641,12 @@ export default function AdminDashboard() {
                   <div
                     key={event.id}
                     style={{
-                      background: 'rgba(255, 255, 255, 0.05)',
+                      background: 'rgba(255, 255, 255, 0.03)',
                       border: '1px solid rgba(255, 255, 255, 0.1)',
-                      borderRadius: '8px',
-                      padding: '16px'
+                      borderRadius: '12px',
+                      padding: '20px',
+                      transition: 'all 0.3s ease',
+                      boxShadow: '0 4px 16px rgba(0, 0, 0, 0.2)'
                     }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '12px' }}>
@@ -578,14 +700,60 @@ export default function AdminDashboard() {
             </div>
           )}
 
-      {activeTab === 'customers' && (
+          {activeTab === 'customers' && (
             <div>
               <h2 style={{ color: 'white', marginBottom: '20px', fontSize: '20px' }}>Customers</h2>
-              <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
+              
+              <div style={{ color: 'rgba(255, 255, 255, 0.8)', marginBottom: '20px' }}>
                 {customers.length} customers registered
-          </div>
-        </div>
-      )}
+              </div>
+
+              <div style={{ display: 'grid', gap: '16px' }}>
+                {customers.map(customer => (
+                  <div
+                    key={customer.id}
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.03)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '12px',
+                      padding: '20px',
+                      transition: 'all 0.3s ease',
+                      boxShadow: '0 4px 16px rgba(0, 0, 0, 0.2)'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '12px' }}>
+                      <div>
+                        <h3 style={{ color: 'white', fontSize: '16px', marginBottom: '4px' }}>
+                          {customer.name}
+                        </h3>
+                        <p style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '14px', marginBottom: '8px' }}>
+                          {customer.email}
+                        </p>
+                        <div style={{ display: 'flex', gap: '16px', fontSize: '12px', color: 'rgba(255, 255, 255, 0.6)' }}>
+                          <span>👤 Age: {customer.age}</span>
+                          <span>🎭 Role: {customer.role}</span>
+                          <span>📅 Joined: {new Date(customer.created_at).toLocaleDateString()}</span>
+                          <span>✅ {customer.is_active ? 'Active' : 'Inactive'}</span>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <span style={{
+                          background: customer.is_active ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                          color: customer.is_active ? '#22c55e' : '#ef4444',
+                          padding: '4px 8px',
+                          borderRadius: '4px',
+                          fontSize: '12px',
+                          textTransform: 'capitalize'
+                        }}>
+                          {customer.is_active ? 'Active' : 'Inactive'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {activeTab === 'invite-codes' && (
             <div>
@@ -593,14 +761,14 @@ export default function AdminDashboard() {
                 <h2 style={{ color: 'white', fontSize: '20px' }}>Invite Codes</h2>
             <button
               onClick={generateInviteCode}
+              className="btn-partytix-gradient"
               style={{
-                    background: 'linear-gradient(135deg, #7C3AED 0%, #22D3EE 100%)',
-                color: 'white',
+                padding: '12px 24px',
+                borderRadius: '8px',
                 border: 'none',
-                    padding: '8px 16px',
-                    borderRadius: '6px',
                 cursor: 'pointer',
-                    fontSize: '14px'
+                fontSize: '14px',
+                fontWeight: '600'
               }}
             >
               Generate New Code
@@ -658,7 +826,7 @@ export default function AdminDashboard() {
               onCancel={() => setShowEventModal(false)}
               initialData={editingEvent}
               isEditing={!!editingEvent}
-              merchantId={editingEvent?.merchant_id || (merchants.length > 0 ? merchants[0].id : null)}
+              merchantId={editingEvent?.merchant_id || (merchants.length > 0 ? merchants[0].id : 'admin-created')}
             />
           </div>
         </div>

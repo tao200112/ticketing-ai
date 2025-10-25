@@ -17,11 +17,16 @@ export default function MerchantScanPage() {
   const canvasRef = useRef(null)
   const streamRef = useRef(null)
   const scanIntervalRef = useRef(null)
+  const toastTimeoutRef = useRef(null)
 
   useEffect(() => {
     checkCameraPermission()
     return () => {
       stopScanning()
+      // 清理toast定时器
+      if (toastTimeoutRef.current) {
+        clearTimeout(toastTimeoutRef.current)
+      }
     }
   }, [])
 
@@ -113,8 +118,13 @@ export default function MerchantScanPage() {
   }
 
   const showToast = (message, type = 'info') => {
+    // 清理之前的定时器
+    if (toastTimeoutRef.current) {
+      clearTimeout(toastTimeoutRef.current)
+    }
+    
     setToast({ message, type })
-    setTimeout(() => setToast(null), 3000)
+    toastTimeoutRef.current = setTimeout(() => setToast(null), 3000)
   }
 
   const clearResult = () => {

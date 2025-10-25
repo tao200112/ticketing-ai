@@ -5,6 +5,15 @@ export const dynamic = 'force-dynamic'
 
 export async function GET() {
   try {
+    // 检查Supabase配置
+    if (!supabaseAdmin) {
+      console.log('Supabase not configured')
+      return NextResponse.json(
+        { error: 'Database not configured. Please set up Supabase environment variables.' },
+        { status: 500 }
+      )
+    }
+
     const { data: merchants, error } = await supabaseAdmin
       .from('merchants')
       .select(`
@@ -21,7 +30,7 @@ export async function GET() {
     if (error) {
       console.error('Merchants fetch error:', error)
       return NextResponse.json(
-        { error: 'Failed to fetch merchants' },
+        { error: 'Failed to fetch merchants from database' },
         { status: 500 }
       )
     }
@@ -30,7 +39,7 @@ export async function GET() {
   } catch (error) {
     console.error('Merchants API error:', error)
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Failed to fetch merchants from database' },
       { status: 500 }
     )
   }

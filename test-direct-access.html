@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>直接访问测试</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test { margin: 10px 0; padding: 10px; border: 1px solid #ddd; }
+        .success { background: #d4edda; }
+        .error { background: #f8d7da; }
+        a { display: block; margin: 5px 0; padding: 10px; background: #007bff; color: white; text-decoration: none; border-radius: 3px; }
+        a:hover { background: #0056b3; }
+    </style>
+</head>
+<body>
+    <h1>直接访问测试</h1>
+    
+    <div class="test">
+        <h2>测试链接 (直接点击访问)</h2>
+        <a href="/events/test-route" target="_blank">测试路由: /events/test-route</a>
+        <a href="/events/ridiculous-chicken-night-event" target="_blank">默认活动: /events/ridiculous-chicken-night-event</a>
+        <a href="/events/test-event-title" target="_blank">测试活动: /events/test-event-title</a>
+    </div>
+    
+    <div class="test">
+        <h2>JavaScript 测试</h2>
+        <button onclick="testWithJS()">JavaScript 测试</button>
+        <div id="js-result"></div>
+    </div>
+    
+    <div class="test">
+        <h2>网络状态检查</h2>
+        <button onclick="checkNetwork()">检查网络</button>
+        <div id="network-result"></div>
+    </div>
+    
+    <script>
+        function testWithJS() {
+            const result = document.getElementById('js-result');
+            result.innerHTML = '<p>正在测试...</p>';
+            
+            // 测试基本连接
+            fetch('/')
+                .then(response => {
+                    if (response.ok) {
+                        result.innerHTML = '<div class="success">✅ 基本连接正常</div>';
+                        
+                        // 测试活动路由
+                        return fetch('/events/test-route');
+                    } else {
+                        result.innerHTML = '<div class="error">❌ 基本连接失败</div>';
+                        throw new Error('Basic connection failed');
+                    }
+                })
+                .then(response => {
+                    if (response.ok) {
+                        result.innerHTML += '<div class="success">✅ 活动路由正常</div>';
+                    } else {
+                        result.innerHTML += `<div class="error">❌ 活动路由失败: ${response.status}</div>`;
+                    }
+                })
+                .catch(error => {
+                    result.innerHTML += `<div class="error">❌ 测试失败: ${error.message}</div>`;
+                });
+        }
+        
+        function checkNetwork() {
+            const result = document.getElementById('network-result');
+            result.innerHTML = '<p>正在检查网络...</p>';
+            
+            // 检查当前页面位置
+            const currentUrl = window.location.href;
+            result.innerHTML = `
+                <p><strong>当前页面:</strong> ${currentUrl}</p>
+                <p><strong>协议:</strong> ${window.location.protocol}</p>
+                <p><strong>主机:</strong> ${window.location.host}</p>
+                <p><strong>端口:</strong> ${window.location.port}</p>
+            `;
+            
+            // 测试基本连接
+            fetch(window.location.origin)
+                .then(response => {
+                    if (response.ok) {
+                        result.innerHTML += '<div class="success">✅ 服务器连接正常</div>';
+                    } else {
+                        result.innerHTML += `<div class="error">❌ 服务器连接失败: ${response.status}</div>`;
+                    }
+                })
+                .catch(error => {
+                    result.innerHTML += `<div class="error">❌ 网络错误: ${error.message}</div>`;
+                });
+        }
+        
+        // 页面加载时自动检查网络
+        window.onload = checkNetwork;
+    </script>
+</body>
+</html>

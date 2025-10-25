@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>路由调试</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test { margin: 10px 0; padding: 10px; border: 1px solid #ddd; }
+        .success { background: #d4edda; }
+        .error { background: #f8d7da; }
+        .info { background: #d1ecf1; }
+        button { padding: 10px 15px; margin: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>路由调试工具</h1>
+    
+    <div class="test info">
+        <h2>当前环境信息</h2>
+        <div id="env-info"></div>
+    </div>
+    
+    <div class="test">
+        <h2>直接链接测试</h2>
+        <p>点击以下链接测试路由是否工作：</p>
+        <a href="/events/simple-test" target="_blank" style="display: block; margin: 5px 0; padding: 10px; background: #007bff; color: white; text-decoration: none; border-radius: 3px;">简单测试: /events/simple-test</a>
+        <a href="/events/test-route" target="_blank" style="display: block; margin: 5px 0; padding: 10px; background: #007bff; color: white; text-decoration: none; border-radius: 3px;">测试路由: /events/test-route</a>
+        <a href="/events/ridiculous-chicken-night-event" target="_blank" style="display: block; margin: 5px 0; padding: 10px; background: #007bff; color: white; text-decoration: none; border-radius: 3px;">默认活动: /events/ridiculous-chicken-night-event</a>
+    </div>
+    
+    <div class="test">
+        <h2>JavaScript 测试</h2>
+        <button onclick="testRoutes()">测试路由</button>
+        <div id="route-result"></div>
+    </div>
+    
+    <div class="test">
+        <h2>网络诊断</h2>
+        <button onclick="diagnoseNetwork()">网络诊断</button>
+        <div id="network-result"></div>
+    </div>
+    
+    <script>
+        function showEnvInfo() {
+            const envInfo = document.getElementById('env-info');
+            envInfo.innerHTML = `
+                <p><strong>当前 URL:</strong> ${window.location.href}</p>
+                <p><strong>协议:</strong> ${window.location.protocol}</p>
+                <p><strong>主机:</strong> ${window.location.host}</p>
+                <p><strong>端口:</strong> ${window.location.port}</p>
+                <p><strong>路径:</strong> ${window.location.pathname}</p>
+                <p><strong>用户代理:</strong> ${navigator.userAgent}</p>
+            `;
+        }
+        
+        function testRoutes() {
+            const result = document.getElementById('route-result');
+            result.innerHTML = '<p>正在测试路由...</p>';
+            
+            const routes = [
+                { name: '简单测试', url: '/events/simple-test' },
+                { name: '测试路由', url: '/events/test-route' },
+                { name: '默认活动', url: '/events/ridiculous-chicken-night-event' }
+            ];
+            
+            let html = '<h3>路由测试结果:</h3>';
+            let completed = 0;
+            
+            routes.forEach(route => {
+                fetch(route.url)
+                    .then(response => {
+                        if (response.ok) {
+                            html += `<p>✅ ${route.name}: 正常 (${response.status})</p>`;
+                        } else {
+                            html += `<p>❌ ${route.name}: 失败 (${response.status})</p>`;
+                        }
+                        completed++;
+                        if (completed === routes.length) {
+                            result.innerHTML = html;
+                        }
+                    })
+                    .catch(error => {
+                        html += `<p>❌ ${route.name}: 错误 (${error.message})</p>`;
+                        completed++;
+                        if (completed === routes.length) {
+                            result.innerHTML = html;
+                        }
+                    });
+            });
+        }
+        
+        function diagnoseNetwork() {
+            const result = document.getElementById('network-result');
+            result.innerHTML = '<p>正在诊断网络...</p>';
+            
+            // 测试基本连接
+            fetch('/')
+                .then(response => {
+                    if (response.ok) {
+                        result.innerHTML = '<div class="success">✅ 基本连接正常</div>';
+                        
+                        // 测试 API 路由
+                        return fetch('/api/events');
+                    } else {
+                        result.innerHTML = '<div class="error">❌ 基本连接失败</div>';
+                        throw new Error('Basic connection failed');
+                    }
+                })
+                .then(response => {
+                    if (response.ok) {
+                        result.innerHTML += '<div class="success">✅ API 路由正常</div>';
+                    } else {
+                        result.innerHTML += `<div class="error">❌ API 路由失败: ${response.status}</div>`;
+                    }
+                })
+                .catch(error => {
+                    result.innerHTML += `<div class="error">❌ 网络错误: ${error.message}</div>`;
+                });
+        }
+        
+        // 页面加载时显示环境信息
+        window.onload = showEnvInfo;
+    </script>
+</body>
+</html>

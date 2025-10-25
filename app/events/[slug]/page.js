@@ -71,6 +71,13 @@ export default function EventPage() {
       // 从本地存储加载商家事件
       const merchantEvents = JSON.parse(localStorage.getItem('merchantEvents') || '[]')
       
+      console.log('Looking for slug:', params.slug)
+      console.log('Available merchant events:', merchantEvents.map(e => ({
+        id: e.id,
+        title: e.title,
+        slug: e.title.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').trim()
+      })))
+      
       // 根据slug查找事件
       const foundEvent = merchantEvents.find(e => {
         // 使用title字段生成slug（与EventCard组件保持一致）
@@ -79,13 +86,17 @@ export default function EventPage() {
           .replace(/[^a-z0-9\s-]/g, '')
           .replace(/\s+/g, '-')
           .trim()
+        console.log(`Comparing: "${eventSlug}" === "${params.slug}"`)
         return eventSlug === params.slug
       })
 
       if (!foundEvent) {
+        console.log('Event not found for slug:', params.slug)
         setError('Event not found')
         return
       }
+      
+      console.log('Found event:', foundEvent)
       setEvent(foundEvent)
       if (foundEvent.prices && foundEvent.prices.length > 0) {
         setSelectedPrice(0) // 选择第一个价格

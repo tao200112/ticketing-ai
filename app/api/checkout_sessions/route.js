@@ -30,8 +30,11 @@ export async function POST(request) {
       const { eventId, ticketType, quantity = 1, customerEmail, customerName } = body;
       
       // Return demo mode response immediately
+      // 使用与Stripe相同的URL逻辑，确保在云端部署时使用正确的URL
+      const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
+      
       return NextResponse.json({
-        url: '/success?session_id=demo_session_' + Date.now(),
+        url: `${baseUrl}/success?session_id=demo_session_${Date.now()}`,
         demo: true,
         message: 'Demo mode - no actual payment processed',
         eventId,

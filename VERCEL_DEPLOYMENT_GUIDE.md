@@ -68,3 +68,4 @@ STRIPE_WEBHOOK_SECRET=你的Stripe Webhook密钥
 
 ### 问题：404错误
 **解决方案**: 确保部署的是最新代码，检查GitHub同步状态
+

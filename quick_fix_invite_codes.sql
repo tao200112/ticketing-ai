@@ -51,3 +51,4 @@ VALUES
 ON CONFLICT (code) DO NOTHING;
 
 SELECT 'Invite codes RLS fixed successfully' as status;
+

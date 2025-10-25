@@ -9,7 +9,13 @@
     "lint": "next lint",
     "clean": "powershell -ExecutionPolicy Bypass -File clean-dev.ps1",
     "dev:clean": "npm run clean && npm run dev",
-    "stripe:listen": "stripe listen --forward-to localhost:3000/api/stripe/webhook"
+    "stripe:listen": "stripe listen --forward-to localhost:3000/api/stripe/webhook",
+    "backup:db": "./scripts/backup_db.sh",
+    "restore:db": "./scripts/restore_db.sh",
+    "rollback": "./scripts/quick_rollback.sh",
+    "setup:version": "./scripts/setup_version_management.sh",
+    "version:check": "git describe --tags --abbrev=0",
+    "version:list": "git tag -l --sort=-version:refname"
   },
   "dependencies": {
     "@prisma/client": "^6.18.0",
@@ -24,7 +30,8 @@
     "qrcode": "^1.5.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "stripe": "^19.1.0"
+    "stripe": "^19.1.0",
+    "zod": "^4.1.12"
   },
   "devDependencies": {
     "@types/react": "19.2.2",

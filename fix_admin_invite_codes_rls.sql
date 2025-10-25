@@ -67,3 +67,4 @@ ON CONFLICT (code) DO NOTHING;
 
 -- 显示结果
 SELECT 'admin_invite_codes RLS policies configured successfully' as status;
+

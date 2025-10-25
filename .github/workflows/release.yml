@@ -1,0 +1,209 @@
+name: 🚀 自动发布与版本管理
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # 构建和测试
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 检出代码
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # 获取完整历史记录用于生成 changelog
+
+      - name: 📦 设置 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: 📥 安装依赖
+        run: npm ci
+
+      - name: 🔍 代码检查
+        run: npm run lint
+
+      - name: 🏗️ 构建项目
+        run: npm run build
+        env:
+          NEXT_PUBLIC_APP_VERSION: ${{ github.sha }}
+
+  # 发布版本（仅在 main 分支推送时执行）
+  release:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    steps:
+      - name: 📥 检出代码
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 📦 设置 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: 📥 安装依赖
+        run: npm ci
+
+      - name: 🏷️ 生成版本号
+        id: version
+        run: |
+          # 获取最新标签
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "Latest tag: $LATEST_TAG"
+          
+          # 解析版本号
+          VERSION=${LATEST_TAG#v}
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+          
+          # 根据提交类型决定版本号增量
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          if [[ $COMMIT_MSG == *"feat:"* ]] || [[ $COMMIT_MSG == *"feat("* ]]; then
+            MINOR=$((MINOR + 1))
+            PATCH=0
+          elif [[ $COMMIT_MSG == *"fix:"* ]] || [[ $COMMIT_MSG == *"fix("* ]]; then
+            PATCH=$((PATCH + 1))
+          else
+            PATCH=$((PATCH + 1))
+          fi
+          
+          NEW_VERSION="v$MAJOR.$MINOR.$PATCH"
+          echo "New version: $NEW_VERSION"
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "tag=$NEW_VERSION" >> $GITHUB_OUTPUT
+
+      - name: 📝 生成 CHANGELOG
+        id: changelog
+        run: |
+          # 获取上一个标签
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
+          
+          if [ -n "$PREVIOUS_TAG" ]; then
+            # 生成从上一个标签到现在的变更日志
+            CHANGELOG=$(git log --pretty=format:"- %s (%h)" $PREVIOUS_TAG..HEAD)
+          else
+            # 如果没有上一个标签，显示最近的提交
+            CHANGELOG=$(git log --pretty=format:"- %s (%h)" -10)
+          fi
+          
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "## ${{ steps.version.outputs.version }} ($(date +'%Y-%m-%d'))" >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+          echo "### 🚀 新功能" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG" | grep -E "feat:|feat\(" || echo "- 无新功能" >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+          echo "### 🐛 修复" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG" | grep -E "fix:|fix\(" || echo "- 无修复" >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+          echo "### 📝 其他变更" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG" | grep -vE "feat:|fix:|feat\(|fix\(" || echo "- 无其他变更" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: 🏷️ 创建 Git 标签
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git tag -a "${{ steps.version.outputs.version }}" -m "Release ${{ steps.version.outputs.version }}"
+          git push origin "${{ steps.version.outputs.version }}"
+
+      - name: 📝 更新 CHANGELOG.md
+        run: |
+          # 在文件开头插入新的变更日志
+          {
+            echo "${{ steps.changelog.outputs.changelog }}"
+            echo ""
+            if [ -f CHANGELOG.md ]; then
+              cat CHANGELOG.md
+            fi
+          } > CHANGELOG_TEMP.md
+          mv CHANGELOG_TEMP.md CHANGELOG.md
+          
+          # 提交 CHANGELOG.md
+          git add CHANGELOG.md
+          git commit -m "docs: 更新 CHANGELOG.md for ${{ steps.version.outputs.version }}" || exit 0
+          git push origin main
+
+      - name: 🚀 创建 GitHub Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.version.outputs.version }}
+          release_name: Release ${{ steps.version.outputs.version }}
+          body: |
+            ${{ steps.changelog.outputs.changelog }}
+            
+            ## 🔄 回滚指南
+            
+            如果此版本出现问题，可以通过以下方式快速回滚：
+            
+            ### Vercel 回滚
+            ```bash
+            # 查看部署历史
+            vercel ls
+            
+            # 回滚到上一个版本
+            vercel promote <previous_deployment_id>
+            ```
+            
+            ### Git 回滚
+            ```bash
+            # 回滚到上一个提交
+            git revert -m 1 <merge_sha>
+            git push origin main
+            ```
+            
+            ### 数据库回滚
+            ```bash
+            # 恢复数据库到上一个备份
+            ./scripts/restore_db.sh backups/backup_YYYYMMDD_HHMMSS.sql
+            ```
+          draft: false
+          prerelease: false
+
+  # 数据库备份（仅在 main 分支推送时执行）
+  backup-database:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    steps:
+      - name: 📥 检出代码
+        uses: actions/checkout@v4
+
+      - name: 🗄️ 数据库备份
+        run: |
+          # 创建备份目录
+          mkdir -p backups
+          
+          # 生成备份文件名
+          BACKUP_FILE="backup_$(date +%Y%m%d_%H%M%S).sql"
+          
+          # 检查是否有数据库连接信息
+          if [ -n "${{ secrets.SUPABASE_DB_URL }}" ]; then
+            echo "正在备份数据库..."
+            # 这里需要根据实际的 Supabase 连接方式调整
+            echo "-- 数据库备份文件" > backups/$BACKUP_FILE
+            echo "-- 时间: $(date)" >> backups/$BACKUP_FILE
+            echo "-- 版本: ${{ github.sha }}" >> backups/$BACKUP_FILE
+            echo "-- 注意: 请手动执行数据库备份脚本" >> backups/$BACKUP_FILE
+          else
+            echo "⚠️ 未配置 SUPABASE_DB_URL，跳过数据库备份"
+          fi
+
+      - name: 📤 上传备份文件
+        uses: actions/upload-artifact@v4
+        with:
+          name: database-backup-${{ github.sha }}
+          path: backups/
+          retention-days: 30

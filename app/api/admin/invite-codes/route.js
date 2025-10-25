@@ -1,13 +1,11 @@
 import { NextResponse } from 'next/server'
-import { createServerSupabaseClient } from '../../../../lib/supabase'
+import { supabase } from '../../../../lib/supabaseClient'
 import { hasSupabase } from '../../../../lib/safeEnv'
 
 // 获取所有邀请码
 export async function GET() {
   try {
     if (hasSupabase()) {
-      const supabase = await createServerSupabaseClient()
-      
       if (supabase) {
         const { data: inviteCodes, error } = await supabase
           .from('admin_invite_codes')
@@ -54,8 +52,6 @@ export async function POST(request) {
     const expiresAt = new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000).toISOString()
 
     if (hasSupabase()) {
-      const supabase = await createServerSupabaseClient()
-      
       if (supabase) {
         const { data: newInviteCode, error } = await supabase
           .from('admin_invite_codes')

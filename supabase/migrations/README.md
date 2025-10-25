@@ -1,122 +1,202 @@
-# Supabase 数据库迁移文件
+# 🗄️ 数据库迁移指南
 
-## 📁 文件说明
+本目录包含 Supabase 数据库迁移文件，用于版本控制和数据库结构管理。
 
-### 1. `partytix_mvp.sql`
-- **完整版本**：包含所有表、触发器、约束和视图
-- **适用场景**：本地开发或需要完整功能的部署
-- **特点**：包含复杂的约束检查和视图
+## 📁 文件结构
 
-### 2. `supabase_schema.sql` ⭐ **推荐**
-- **简化版本**：专门为 Supabase 优化
-- **适用场景**：Supabase 部署
-- **特点**：移除了可能导致问题的复杂约束，保留核心功能
+```
+supabase/migrations/
+├── README.md                    # 本文件
+├── 20241025_001_initial_setup.sql    # 初始设置
+├── 20241025_002_add_users_table.sql  # 用户表
+└── 20241025_003_add_events_table.sql # 事件表
+```
 
-### 3. `supabase_schema_fixed.sql` 🔥 **最新推荐**
-- **修复版本**：修复了所有已知问题
-- **适用场景**：Supabase 部署（推荐使用此版本）
-- **特点**：移除了视图和复杂约束，确保稳定运行
+## 🔄 迁移文件命名规则
+
+格式：`YYYYMMDD_HHMMSS_description.sql`
+
+- `YYYYMMDD`: 日期
+- `HHMMSS`: 时间（可选）
+- `description`: 描述性名称
+
+## 📝 迁移文件模板
+
+### 创建新迁移
+
+```sql
+-- ============================================
+-- 🗄️  迁移: 添加用户表
+-- ============================================
+-- 创建时间: 2024-10-25
+-- 描述: 创建用户表和相关索引
+-- ============================================
+
+-- 创建用户表
+CREATE TABLE IF NOT EXISTS users (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 创建索引
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_created_at ON users(created_at);
+
+-- 启用行级安全
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+
+-- 创建 RLS 策略
+CREATE POLICY "Users can view own data" ON users
+    FOR SELECT USING (auth.uid() = id);
+
+CREATE POLICY "Users can update own data" ON users
+    FOR UPDATE USING (auth.uid() = id);
+```
+
+### 回滚迁移
+
+```sql
+-- ============================================
+-- 🔄 回滚: 删除用户表
+-- ============================================
+-- 创建时间: 2024-10-25
+-- 描述: 删除用户表和相关数据
+-- ============================================
+
+-- 删除 RLS 策略
+DROP POLICY IF EXISTS "Users can view own data" ON users;
+DROP POLICY IF EXISTS "Users can update own data" ON users;
+
+-- 删除索引
+DROP INDEX IF EXISTS idx_users_email;
+DROP INDEX IF EXISTS idx_users_created_at;
+
+-- 删除表
+DROP TABLE IF EXISTS users;
+```
 
 ## 🚀 使用方法
 
-### 在 Supabase 中使用（推荐）
-
-1. 登录 [Supabase Dashboard](https://supabase.com/dashboard)
-2. 选择您的项目
-3. 进入 **SQL Editor**
-4. 复制 `supabase_schema_fixed.sql` 的内容（推荐使用此版本）
-5. 粘贴到 SQL Editor 中
-6. 点击 **Run** 执行
-
-### 在本地 PostgreSQL 中使用
+### 应用迁移
 
 ```bash
-# 使用完整版本
-psql -d your_database -f supabase/migrations/partytix_mvp.sql
+# 应用所有迁移
+psql "$SUPABASE_DB_URL" -f supabase/migrations/20241025_001_initial_setup.sql
 
-# 或使用简化版本
-psql -d your_database -f supabase/migrations/supabase_schema.sql
+# 应用特定迁移
+psql "$SUPABASE_DB_URL" -f supabase/migrations/20241025_002_add_users_table.sql
 ```
 
-## 📊 数据库表结构
+### 回滚迁移
 
-### 核心表
-- **users**: 用户表（包含密码哈希）
-- **merchants**: 商家表
-- **admin_invite_codes**: 管理员邀请码表
-- **events**: 活动表
-- **prices**: 价格表
-- **orders**: 订单表
-- **tickets**: 票据表
+```bash
+# 回滚特定迁移
+psql "$SUPABASE_DB_URL" -f supabase/migrations/20241025_002_add_users_table_rollback.sql
+```
 
-### 关系
-- 用户 → 商家（一对多）
-- 商家 → 活动（一对多）
-- 活动 → 价格（一对多）
-- 订单 → 票据（一对多）
-- 活动 → 票据（一对多）
+### 批量应用迁移
 
-## 🔧 功能特性
+```bash
+# 应用所有迁移（按顺序）
+for file in supabase/migrations/*.sql; do
+    echo "应用迁移: $file"
+    psql "$SUPABASE_DB_URL" -f "$file"
+done
+```
 
-### ✅ 已实现
-- 用户认证和管理
-- 商家注册和管理
-- 邀请码系统
-- 活动创建和管理
-- 价格管理
-- 订单处理
-- 票据生成和验证
-- 自动更新时间戳
-- 完整的索引优化
+## ⚠️ 注意事项
 
-### 🔒 安全特性
-- 数据完整性约束
-- 外键关系
-- 检查约束
-- 唯一性约束
+1. **备份优先**: 执行迁移前务必备份数据库
+2. **测试环境**: 先在测试环境验证迁移
+3. **原子操作**: 每个迁移文件应该是原子的
+4. **回滚准备**: 为每个迁移准备回滚脚本
+5. **版本控制**: 所有迁移文件必须提交到版本控制
 
-## 🚨 注意事项
+## 🔧 最佳实践
 
-1. **环境变量**：确保在 Vercel 中配置了正确的 Supabase 环境变量
-2. **RLS策略**：当前版本注释了 RLS 策略，如需要请取消注释
-3. **种子数据**：会自动插入 Ridiculous Chicken 商家数据
-4. **索引**：所有表都创建了必要的索引以优化查询性能
+### 1. 迁移前检查
 
-## 🔍 故障排除
+```sql
+-- 检查表是否存在
+SELECT EXISTS (
+    SELECT FROM information_schema.tables 
+    WHERE table_name = 'users'
+);
+```
+
+### 2. 安全迁移
+
+```sql
+-- 使用 IF NOT EXISTS 避免重复创建
+CREATE TABLE IF NOT EXISTS users (...);
+
+-- 使用 IF EXISTS 避免删除不存在的对象
+DROP TABLE IF EXISTS old_table;
+```
+
+### 3. 数据迁移
+
+```sql
+-- 迁移数据时使用事务
+BEGIN;
+
+-- 创建新表结构
+CREATE TABLE new_users (...);
+
+-- 迁移数据
+INSERT INTO new_users SELECT * FROM old_users;
+
+-- 重命名表
+ALTER TABLE users RENAME TO users_old;
+ALTER TABLE new_users RENAME TO users;
+
+COMMIT;
+```
+
+## 📊 迁移状态跟踪
+
+### 创建迁移记录表
+
+```sql
+CREATE TABLE IF NOT EXISTS migration_history (
+    id SERIAL PRIMARY KEY,
+    migration_name VARCHAR(255) NOT NULL,
+    applied_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    checksum VARCHAR(64),
+    UNIQUE(migration_name)
+);
+```
+
+### 记录迁移
+
+```sql
+INSERT INTO migration_history (migration_name, checksum)
+VALUES ('20241025_001_initial_setup', 'abc123...');
+```
+
+## 🆘 故障排除
 
 ### 常见问题
 
-1. **表已存在错误**
-   - 解决方案：使用 `IF NOT EXISTS` 语句，可以安全地重新运行
+1. **迁移失败**: 检查 SQL 语法和权限
+2. **重复执行**: 使用 IF NOT EXISTS/IF EXISTS
+3. **数据丢失**: 立即恢复备份
+4. **权限问题**: 检查 RLS 策略
 
-2. **权限错误**
-   - 解决方案：确保数据库用户有创建表和索引的权限
+### 紧急回滚
 
-3. **外键约束错误**
-   - 解决方案：确保引用的表已经存在
+```bash
+# 1. 停止应用
+# 2. 恢复数据库备份
+./scripts/restore_db.sh backups/latest_backup.sql
 
-### 验证安装
-
-运行以下查询来验证表是否创建成功：
-
-```sql
--- 检查所有表
-SELECT table_name 
-FROM information_schema.tables 
-WHERE table_schema = 'public' 
-ORDER BY table_name;
-
--- 检查邀请码表
-SELECT * FROM admin_invite_codes LIMIT 5;
-
--- 检查商家表
-SELECT * FROM merchants LIMIT 5;
+# 3. 检查数据完整性
+psql "$SUPABASE_DB_URL" -c "SELECT COUNT(*) FROM users;"
 ```
 
-## 📞 获取帮助
+---
 
-如果遇到问题：
-1. 检查 Supabase 项目的 API 设置
-2. 验证环境变量配置
-3. 查看 Supabase 日志
-4. 确认网络连接正常
+*最后更新: 2024年10月25日*

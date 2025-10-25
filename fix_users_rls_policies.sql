@@ -59,3 +59,4 @@ GRANT INSERT ON public.users TO anon;
 
 -- 显示结果
 SELECT 'users RLS policies configured successfully' as status;
+

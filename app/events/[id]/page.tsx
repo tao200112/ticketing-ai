@@ -63,32 +63,67 @@ export default async function EventDetailPage({ params }: PageProps) {
     if (error || !event) {
       console.warn('Event not found in database, using fallback data for:', id)
       
-      // 创建回退事件数据
-      event = {
-        id: id,
-        title: id === 'ridiculous-chicken' ? 'Ridiculous Chicken Night Event' : `Event ${id}`,
-        description: id === 'ridiculous-chicken' 
-          ? 'Enjoy delicious chicken and an amazing night at Virginia Tech\'s most popular event. We provide the freshest ingredients, the most unique cooking methods, and the warmest service.'
-          : `Description for ${id}`,
-        start_at: '2024-12-31T20:00:00.000Z',
-        end_at: '2025-01-01T02:00:00.000Z',
-        venue_name: id === 'ridiculous-chicken' ? 'Shanghai Concert Hall' : 'Default Venue',
-        location: id === 'ridiculous-chicken' ? 'Shanghai Concert Hall' : 'Default Location',
-        max_attendees: 100,
-        poster_url: null,
-        status: 'active',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        event_prices: [
-          {
-            id: 'general',
-            label: 'General Admission',
-            amount: 2000,
-            currency: 'USD',
-            inventory: 50,
-            limit_per_user: 4
-          }
-        ]
+      // 检查是否是默认事件
+      if (id === 'ridiculous-chicken') {
+        // 使用默认的 Ridiculous Chicken 事件数据
+        event = {
+          id: 'ridiculous-chicken',
+          title: 'Ridiculous Chicken Night Event',
+          description: 'Enjoy delicious chicken and an amazing night at Virginia Tech\'s most popular event. We provide the freshest ingredients, the most unique cooking methods, and the warmest service.',
+          start_at: '2025-10-25T20:00:00Z',
+          end_at: '2025-10-25T23:00:00Z',
+          venue_name: 'Shanghai Concert Hall',
+          location: 'Shanghai Concert Hall',
+          max_attendees: 150,
+          poster_url: null,
+          status: 'active',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          event_prices: [
+            {
+              id: 'regular',
+              label: 'Regular Ticket (21+)',
+              amount: 1500,
+              currency: 'USD',
+              inventory: 100,
+              limit_per_user: 5
+            },
+            {
+              id: 'special',
+              label: 'Special Ticket (18-20)',
+              amount: 3000,
+              currency: 'USD',
+              inventory: 50,
+              limit_per_user: 2
+            }
+          ]
+        }
+      } else {
+        // 创建通用回退事件数据
+        event = {
+          id: id,
+          title: `Event ${id}`,
+          description: `Description for ${id}`,
+          start_at: '2024-12-31T20:00:00.000Z',
+          end_at: '2025-01-01T02:00:00.000Z',
+          venue_name: 'Default Venue',
+          location: 'Default Location',
+          max_attendees: 100,
+          poster_url: null,
+          status: 'active',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          event_prices: [
+            {
+              id: 'general',
+              label: 'General Admission',
+              amount: 2000,
+              currency: 'USD',
+              inventory: 50,
+              limit_per_user: 4
+            }
+          ]
+        }
       }
     }
 

@@ -2,15 +2,15 @@ import Link from 'next/link'
 
 export default function EventCard({ event }) {
   // 生成事件页面的URL
-  // 注意：这里event.name是公共事件格式，对应商家事件的title字段
-  const eventSlug = event.name
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, '') // 移除特殊字符
-    .replace(/\s+/g, '-') // 空格替换为连字符
-    .trim()
+  // 优先使用 event.id，如果没有则使用 event.name 生成 slug
+  const eventId = event.id || event.name
+    ?.toLowerCase()
+    ?.replace(/[^a-z0-9\s-]/g, '') // 移除特殊字符
+    ?.replace(/\s+/g, '-') // 空格替换为连字符
+    ?.trim() || 'default-event'
 
   return (
-    <Link href={`/events/${eventSlug}`} style={{ display: 'block' }}>
+    <Link href={`/events/${eventId}`} style={{ display: 'block' }}>
       <div style={{
         background: 'rgba(15, 23, 42, 0.6)',
         border: '1px solid rgba(255, 255, 255, 0.1)',

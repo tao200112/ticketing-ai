@@ -156,10 +156,19 @@ BEGIN
     END IF;
 END $$;
 
--- 建立外键约束
-ALTER TABLE prices 
-ADD CONSTRAINT IF NOT EXISTS prices_event_id_fkey 
-FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE;
+-- 建立外键约束（如果不存在）
+DO $$ 
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.table_constraints 
+        WHERE constraint_name = 'prices_event_id_fkey' 
+        AND table_name = 'prices'
+    ) THEN
+        ALTER TABLE prices 
+        ADD CONSTRAINT prices_event_id_fkey 
+        FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE;
+    END IF;
+END $$;
 
 -- 创建索引
 CREATE INDEX IF NOT EXISTS idx_prices_event_id ON prices(event_id);
@@ -176,64 +185,136 @@ ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tickets ENABLE ROW LEVEL SECURITY;
 
 -- Events 公开读取策略
-CREATE POLICY IF NOT EXISTS "events_select_published"
-  ON events FOR SELECT
-  USING (status IN ('published', 'active'));
+DO $$ 
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies 
+        WHERE policyname = 'events_select_published' 
+        AND tablename = 'events'
+    ) THEN
+        CREATE POLICY "events_select_published"
+          ON events FOR SELECT
+          USING (status IN ('published', 'active'));
+    END IF;
+END $$;
 
 -- Events 商家管理策略
-CREATE POLICY IF NOT EXISTS "events_manage_own"
-  ON events FOR ALL
-  USING (
-    merchant_id IN (
-      SELECT id FROM merchants WHERE owner_user_id = auth.uid()
-    )
-  );
+DO $$ 
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies 
+        WHERE policyname = 'events_manage_own' 
+        AND tablename = 'events'
+    ) THEN
+        CREATE POLICY "events_manage_own"
+          ON events FOR ALL
+          USING (
+            merchant_id IN (
+              SELECT id FROM merchants WHERE owner_user_id = auth.uid()
+            )
+          );
+    END IF;
+END $$;
 
 -- Prices 公开读取策略
-CREATE POLICY IF NOT EXISTS "prices_select_active"
-  ON prices FOR SELECT
-  USING (
-    is_active = TRUE 
-    AND event_id IN (SELECT id FROM events WHERE status IN ('published', 'active'))
-    AND (valid_from IS NULL OR valid_from <= NOW())
-    AND (valid_to IS NULL OR valid_to >= NOW())
-  );
+DO $$ 
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies 
+        WHERE policyname = 'prices_select_active' 
+        AND tablename = 'prices'
+    ) THEN
+        CREATE POLICY "prices_select_active"
+          ON prices FOR SELECT
+          USING (
+            is_active = TRUE 
+            AND event_id IN (SELECT id FROM events WHERE status IN ('published', 'active'))
+            AND (valid_from IS NULL OR valid_from <= NOW())
+            AND (valid_to IS NULL OR valid_to >= NOW())
+          );
+    END IF;
+END $$;
 
 -- Prices 商家管理策略
-CREATE POLICY IF NOT EXISTS "prices_manage_own"
-  ON prices FOR ALL
-  USING (
-    event_id IN (
-      SELECT id FROM events 
-      WHERE merchant_id IN (
-        SELECT id FROM merchants WHERE owner_user_id = auth.uid()
-      )
-    )
-  );
+DO $$ 
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies 
+        WHERE policyname = 'prices_manage_own' 
+        AND tablename = 'prices'
+    ) THEN
+        CREATE POLICY "prices_manage_own"
+          ON prices FOR ALL
+          USING (
+            event_id IN (
+              SELECT id FROM events 
+              WHERE merchant_id IN (
+                SELECT id FROM merchants WHERE owner_user_id = auth.uid()
+              )
+            )
+          );
+    END IF;
+END $$;
 
 -- Orders 用户读取策略
-CREATE POLICY IF NOT EXISTS "orders_select_own"
-  ON orders FOR SELECT
-  USING (
-    customer_email = (SELECT email FROM users WHERE id = auth.uid())
-  );
+DO $$ 
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies 
+        WHERE policyname = 'orders_select_own' 
+        AND tablename = 'orders'
+    ) THEN
+        CREATE POLICY "orders_select_own"
+          ON orders FOR SELECT
+          USING (
+            customer_email = (SELECT email FROM users WHERE id = auth.uid())
+          );
+    END IF;
+END $$;
 
 -- Orders 服务端写入策略
-CREATE POLICY IF NOT EXISTS "orders_insert_allow"
-  ON orders FOR INSERT
-  WITH CHECK (true);
+DO $$ 
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies 
+        WHERE policyname = 'orders_insert_allow' 
+        AND tablename = 'orders'
+    ) THEN
+        CREATE POLICY "orders_insert_allow"
+          ON orders FOR INSERT
+          WITH CHECK (true);
+    END IF;
+END $$;
 
 -- Tickets 用户读取策略
-CREATE POLICY IF NOT EXISTS "tickets_select_own"
-  ON tickets FOR SELECT
-  USING (
-    holder_email = (SELECT email FROM users WHERE id = auth.uid())
-  );
+DO $$ 
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies 
+        WHERE policyname = 'tickets_select_own' 
+        AND tablename = 'tickets'
+    ) THEN
+        CREATE POLICY "tickets_select_own"
+          ON tickets FOR SELECT
+          USING (
+            holder_email = (SELECT email FROM users WHERE id = auth.uid())
+          );
+    END IF;
+END $$;
 
 -- Tickets 服务端写入策略
-CREATE POLICY IF NOT EXISTS "tickets_insert_allow"
-  ON tickets FOR INSERT
-  WITH CHECK (true);
+DO $$ 
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies 
+        WHERE policyname = 'tickets_insert_allow' 
+        AND tablename = 'tickets'
+    ) THEN
+        CREATE POLICY "tickets_insert_allow"
+          ON tickets FOR INSERT
+          WITH CHECK (true);
+    END IF;
+END $$;
 
 -- ========================================
 -- 5. 数据完整性检查

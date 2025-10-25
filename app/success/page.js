@@ -9,6 +9,52 @@ export default function SuccessPage() {
   const [qrCodeDataURL, setQrCodeDataURL] = useState('')
   const [verificationCode, setVerificationCode] = useState('')
 
+  // 生成二维码函数
+  const generateQRCode = async (ticket, verificationCode) => {
+    try {
+      console.log('Generating QR code for ticket:', ticket.id)
+      
+      const qrData = {
+        ticketId: ticket.id,
+        verificationCode: verificationCode,
+        eventName: ticket.eventName,
+        ticketType: ticket.ticketType,
+        purchaseDate: ticket.purchaseDate,
+        ticketValidityDate: ticket.ticketValidityDate,
+        ticketValidityStart: ticket.ticketValidityStart,
+        ticketValidityEnd: ticket.ticketValidityEnd,
+        price: ticket.price,
+        customerEmail: ticket.customerEmail,
+        customerName: ticket.customerName
+      }
+    
+      const qrString = JSON.stringify(qrData)
+      console.log('QR data string length:', qrString.length)
+      
+      const qrDataURL = await QRCode.toDataURL(qrString, {
+        width: 256,
+        margin: 2,
+        color: {
+          dark: '#000000',
+          light: '#FFFFFF'
+        },
+        errorCorrectionLevel: 'M'
+      })
+      
+      console.log('QR code generated successfully, length:', qrDataURL.length)
+      return qrDataURL
+    } catch (error) {
+      console.error('Error generating QR code:', error)
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        ticket: ticket,
+        verificationCode: verificationCode
+      })
+      return null
+    }
+  }
+
   useEffect(() => {
     // 从 URL 参数获取会话信息
     const urlParams = new URLSearchParams(window.location.search)
@@ -50,9 +96,13 @@ export default function SuccessPage() {
             console.log('Demo QR Code generated successfully')
           } else {
             console.error('Failed to generate demo QR code')
+            // 设置一个默认的二维码占位符
+            setQrCodeDataURL('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjU2IiBoZWlnaHQ9IjI1NiIgdmlld0JveD0iMCAwIDI1NiAyNTYiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyNTYiIGhlaWdodD0iMjU2IiBmaWxsPSIjRjNGNEY2Ii8+Cjx0ZXh0IHg9IjEyOCIgeT0iMTI4IiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTIiIGZpbGw9IiM2QjcyODAiIHRleHQtYW5jaG9yPSJtaWRkbGUiPk5vIFFSIGNvZGUgYXZhaWxhYmxlPC90ZXh0Pgo8L3N2Zz4=')
           }
         }).catch(error => {
           console.error('Demo QR Code generation error:', error)
+          // 设置一个默认的二维码占位符
+          setQrCodeDataURL('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjU2IiBoZWlnaHQ9IjI1NiIgdmlld0JveD0iMCAwIDI1NiAyNTYiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyNTYiIGhlaWdodD0iMjU2IiBmaWxsPSIjRjNGNEY2Ii8+Cjx0ZXh0IHg9IjEyOCIgeT0iMTI4IiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTIiIGZpbGw9IiM2QjcyODAiIHRleHQtYW5jaG9yPSJtaWRkbGUiPk5vIFFSIGNvZGUgYXZhaWxhYmxlPC90ZXh0Pgo8L3N2Zz4=')
         })
         
         setLoading(false)
@@ -294,51 +344,6 @@ export default function SuccessPage() {
     }
   }
 
-         // 生成二维码
-         const generateQRCode = async (ticket, verificationCode) => {
-           try {
-             console.log('Generating QR code for ticket:', ticket.id)
-             
-             const qrData = {
-               ticketId: ticket.id,
-               verificationCode: verificationCode,
-               eventName: ticket.eventName,
-               ticketType: ticket.ticketType,
-               purchaseDate: ticket.purchaseDate,
-               ticketValidityDate: ticket.ticketValidityDate,
-               ticketValidityStart: ticket.ticketValidityStart,
-               ticketValidityEnd: ticket.ticketValidityEnd,
-               price: ticket.price,
-               customerEmail: ticket.customerEmail,
-               customerName: ticket.customerName
-             }
-           
-             const qrString = JSON.stringify(qrData)
-             console.log('QR data string length:', qrString.length)
-             
-             const qrDataURL = await QRCode.toDataURL(qrString, {
-               width: 256,
-               margin: 2,
-               color: {
-                 dark: '#000000',
-                 light: '#FFFFFF'
-               },
-               errorCorrectionLevel: 'M'
-             })
-             
-             console.log('QR code generated successfully, length:', qrDataURL.length)
-             return qrDataURL
-           } catch (error) {
-             console.error('Error generating QR code:', error)
-             console.error('Error details:', {
-               message: error.message,
-               stack: error.stack,
-               ticket: ticket,
-               verificationCode: verificationCode
-             })
-             return null
-           }
-         }
 
   if (loading) {
     return (

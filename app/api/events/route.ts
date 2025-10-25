@@ -1,7 +1,10 @@
 // @ts-nocheck
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { createLogger } from '@/lib/logger'
+import { getRequestId } from '@/lib/request-id'
 
+const logger = createLogger('events')
 export const dynamic = 'force-dynamic'
 
 // 简单的内存缓存
@@ -9,19 +12,29 @@ let eventsCache: any[] | null = null
 let cacheTimestamp = 0
 const CACHE_DURATION = 30000 // 30秒缓存
 
-export async function GET() {
+export async function GET(request: Request) {
+  const requestId = getRequestId(request)
+  const startTime = Date.now()
+  
   try {
+    logger.start({ requestId, fn: 'events' })
+    
     // 检查缓存
     const now = Date.now()
     if (eventsCache && (now - cacheTimestamp) < CACHE_DURATION) {
-      console.log('Returning cached events')
-      return NextResponse.json(eventsCache)
+      logger.info('Returning cached events', { requestId })
+      return NextResponse.json({ ok: true, events: eventsCache })
     }
 
     // 检查Supabase配置
     if (!supabaseAdmin) {
-      console.log('Supabase not configured, returning empty events')
-      return NextResponse.json([])
+      logger.warn('Supabase not configured', { requestId })
+      return NextResponse.json({ 
+        ok: false, 
+        code: 'CONFIG_ERROR', 
+        message: 'Database not configured',
+        events: []
+      })
     }
 
     const { data: events, error } = await supabaseAdmin
@@ -34,18 +47,27 @@ export async function GET() {
           contact_email
         )
       `)
+      .eq('status', 'published')
       .order('created_at', { ascending: false })
 
     if (error) {
-      console.error('Events fetch error:', error)
-      return NextResponse.json([])
+      logger.error('Events fetch error', error, { 
+        requestId, 
+        supabaseError: error.message 
+      })
+      return NextResponse.json({ 
+        ok: false, 
+        code: 'DB_ERROR', 
+        message: 'Failed to fetch events',
+        events: []
+      })
     }
 
-    console.log('Events fetched:', events?.length || 0, 'events')
+    logger.info(`Events fetched: ${events?.length || 0} events`, { requestId })
     
     if (!events || events.length === 0) {
-      console.log('No events found')
-      return NextResponse.json([])
+      logger.info('No events found', { requestId })
+      return NextResponse.json({ ok: true, events: [] })
     }
 
     // 转换数据格式以匹配前端期望的格式
@@ -66,9 +88,24 @@ export async function GET() {
     eventsCache = formattedEvents
     cacheTimestamp = now
 
-    return NextResponse.json(formattedEvents)
+    logger.success('Events retrieved successfully', {
+      requestId,
+      eventCount: formattedEvents.length,
+      duration_ms: Date.now() - startTime
+    })
+
+    return NextResponse.json({ ok: true, events: formattedEvents })
   } catch (error) {
-    console.error('Events API error:', error)
-    return NextResponse.json([])
+    logger.error('Events API error', error, {
+      requestId,
+      duration_ms: Date.now() - startTime,
+      needs_attention: true
+    })
+    return NextResponse.json({ 
+      ok: false, 
+      code: 'INTERNAL_ERROR', 
+      message: 'Internal server error',
+      events: []
+    }, { status: 500 })
   }
 }

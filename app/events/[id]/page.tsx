@@ -33,23 +33,24 @@ export default async function EventDetailPage({ params }: PageProps) {
           start_at,
           end_at,
           venue_name,
-          location,
+          address,
           max_attendees,
           poster_url,
           status,
           created_at,
           updated_at,
-          event_prices (
+          prices (
             id,
-            label,
-            amount,
+            name,
+            description,
+            amount_cents,
             currency,
             inventory,
             limit_per_user
           )
         `)
         .eq('id', id)
-        .eq('status', 'active') // 只返回活跃状态的事件
+        .eq('status', 'published') // 只返回已发布的事件
         .single()
 
       event = result.data
@@ -163,29 +164,29 @@ export default async function EventDetailPage({ params }: PageProps) {
       }
     }
 
-    // 转换数据格式以匹配 Zod 模型
-    const formattedEvent = {
-      id: event.id,
-      title: event.title,
-      description: event.description,
-      start_time: event.start_at,
-      end_time: event.end_at,
-      venue: event.venue_name,
-      location: event.location,
-      max_attendees: event.max_attendees,
-      poster_url: event.poster_url,
-      status: event.status,
-      created_at: event.created_at,
-      updated_at: event.updated_at,
-      prices: event.event_prices?.map((price: any) => ({
-        id: price.id,
-        label: price.label,
-        amount: price.amount,
-        currency: price.currency || 'USD',
-        inventory: price.inventory,
-        limit_per_user: price.limit_per_user
-      })) || []
-    }
+        // 转换数据格式以匹配 Zod 模型
+        const formattedEvent = {
+          id: event.id,
+          title: event.title,
+          description: event.description,
+          start_time: event.start_at,
+          end_time: event.end_at,
+          venue: event.venue_name,
+          location: event.address,
+          max_attendees: event.max_attendees,
+          poster_url: event.poster_url,
+          status: event.status,
+          created_at: event.created_at,
+          updated_at: event.updated_at,
+          prices: event.prices?.map((price: any) => ({
+            id: price.id,
+            label: price.name,
+            amount: price.amount_cents,
+            currency: price.currency || 'USD',
+            inventory: price.inventory,
+            limit_per_user: price.limit_per_user
+          })) || []
+        }
 
     // 使用 Zod 验证数据
     const validatedEvent = validateEventDetail(formattedEvent)

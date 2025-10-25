@@ -41,23 +41,24 @@ export async function GET(
         start_at,
         end_at,
         venue_name,
-        location,
+        address,
         max_attendees,
         poster_url,
         status,
         created_at,
         updated_at,
-        event_prices (
+        prices (
           id,
-          label,
-          amount,
+          name,
+          description,
+          amount_cents,
           currency,
           inventory,
           limit_per_user
         )
       `)
       .eq('id', id)
-      .eq('status', 'active') // 只返回活跃状态的事件
+      .eq('status', 'published') // 只返回已发布的事件
       .single()
 
     if (error) {
@@ -83,16 +84,16 @@ export async function GET(
       start_time: event.start_at,
       end_time: event.end_at,
       venue: event.venue_name,
-      location: event.location,
+      location: event.address,
       max_attendees: event.max_attendees,
       poster_url: event.poster_url,
       status: event.status,
       created_at: event.created_at,
       updated_at: event.updated_at,
-      prices: event.event_prices?.map((price: any) => ({
+      prices: event.prices?.map((price: any) => ({
         id: price.id,
-        label: price.label,
-        amount: price.amount,
+        label: price.name,
+        amount: price.amount_cents,
         currency: price.currency || 'USD',
         inventory: price.inventory,
         limit_per_user: price.limit_per_user

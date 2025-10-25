@@ -27,7 +27,7 @@ export async function GET() {
       .from('events')
       .select(`
         *,
-        merchants!events_merchant_id_fkey (
+        merchants (
           id,
           name,
           contact_email

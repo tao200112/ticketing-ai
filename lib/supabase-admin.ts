@@ -13,3 +13,12 @@ export const supabaseAdmin = supabaseUrl && supabaseServiceKey
       }
     })
   : null
+
+// 添加调试信息
+if (process.env.NODE_ENV === 'production') {
+  console.log('Supabase Admin Configuration:', {
+    hasUrl: !!supabaseUrl,
+    hasServiceKey: !!supabaseServiceKey,
+    isConfigured: !!supabaseAdmin
+  })
+}

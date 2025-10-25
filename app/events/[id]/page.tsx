@@ -238,42 +238,8 @@ export async function generateStaticParams() {
 export async function generateMetadata({ params }: PageProps) {
   const { id } = await params
 
-  try {
-    if (!supabaseAdmin) {
-      return {
-        title: 'Event Not Found',
-        description: 'The requested event could not be found.'
-      }
-    }
-
-    const { data: event } = await supabaseAdmin
-      .from('events')
-      .select('title, description')
-      .eq('id', id)
-      .eq('status', 'active')
-      .single()
-
-    if (!event) {
-      return {
-        title: 'Event Not Found',
-        description: 'The requested event could not be found.'
-      }
-    }
-
-    return {
-      title: `${event.title} | PartyTix`,
-      description: event.description || `Join us for ${event.title} on PartyTix`,
-      openGraph: {
-        title: event.title,
-        description: event.description || `Join us for ${event.title} on PartyTix`,
-        type: 'website',
-      },
-    }
-  } catch (error) {
-    console.error('Error generating metadata:', error)
-    return {
-      title: 'Event | PartyTix',
-      description: 'Discover amazing events on PartyTix'
-    }
+  return {
+    title: `Event ${id} - PartyTix`,
+    description: `Join us for an amazing event: ${id}`,
   }
 }

@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Simple Event Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        button { padding: 10px 15px; margin: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>简单活动测试</h1>
+    
+    <div class="test-section">
+        <h2>1. 检查用户状态</h2>
+        <button onclick="checkUser()">检查用户</button>
+        <div id="user-result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>2. 检查活动数据</h2>
+        <button onclick="checkEvents()">检查活动</button>
+        <div id="events-result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>3. 测试活动访问</h2>
+        <button onclick="testEventAccess()">测试访问</button>
+        <div id="access-result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>4. 快速修复</h2>
+        <button onclick="quickFix()">创建测试数据</button>
+        <div id="fix-result"></div>
+    </div>
+    
+    <script>
+        function checkUser() {
+            const result = document.getElementById('user-result');
+            try {
+                const userData = localStorage.getItem('userData');
+                if (userData) {
+                    const user = JSON.parse(userData);
+                    result.innerHTML = `
+                        <div class="success">
+                            <p>✅ 用户已登录</p>
+                            <p>姓名: ${user.name}</p>
+                            <p>邮箱: ${user.email}</p>
+                            <p>登录状态: ${user.isLoggedIn ? '是' : '否'}</p>
+                        </div>
+                    `;
+                } else {
+                    result.innerHTML = '<div class="error">❌ 无用户数据</div>';
+                }
+            } catch (error) {
+                result.innerHTML = `<div class="error">❌ 错误: ${error.message}</div>`;
+            }
+        }
+        
+        function checkEvents() {
+            const result = document.getElementById('events-result');
+            try {
+                const events = JSON.parse(localStorage.getItem('merchantEvents') || '[]');
+                if (events.length > 0) {
+                    result.innerHTML = `
+                        <div class="success">
+                            <p>✅ 找到 ${events.length} 个活动</p>
+                            ${events.map((event, index) => `
+                                <p>${index + 1}. ${event.title} (ID: ${event.id})</p>
+                            `).join('')}
+                        </div>
+                    `;
+                } else {
+                    result.innerHTML = '<div class="error">❌ 无活动数据</div>';
+                }
+            } catch (error) {
+                result.innerHTML = `<div class="error">❌ 错误: ${error.message}</div>`;
+            }
+        }
+        
+        function testEventAccess() {
+            const result = document.getElementById('access-result');
+            result.innerHTML = '<p>正在测试...</p>';
+            
+            // 测试默认活动
+            fetch('/events/ridiculous-chicken-night-event')
+                .then(response => {
+                    if (response.ok) {
+                        result.innerHTML = '<div class="success">✅ 默认活动可以访问</div>';
+                    } else {
+                        result.innerHTML = `<div class="error">❌ 默认活动访问失败: ${response.status}</div>`;
+                    }
+                })
+                .catch(error => {
+                    result.innerHTML = `<div class="error">❌ 网络错误: ${error.message}</div>`;
+                });
+        }
+        
+        function quickFix() {
+            const result = document.getElementById('fix-result');
+            
+            // 创建测试用户
+            const testUser = {
+                id: 'test-user-' + Date.now(),
+                email: 'test@example.com',
+                name: 'Test User',
+                isLoggedIn: true,
+                token: 'test-token-' + Date.now()
+            };
+            localStorage.setItem('userData', JSON.stringify(testUser));
+            
+            // 创建测试活动
+            const testEvent = {
+                id: Date.now().toString(),
+                title: 'Test Event Title',
+                description: 'Test event for debugging',
+                startTime: '2025-10-25T20:00:00Z',
+                endTime: '2025-10-25T23:00:00Z',
+                location: 'Test Location',
+                prices: [{
+                    name: 'Regular Ticket',
+                    amount_cents: 1500,
+                    inventory: 100
+                }],
+                ticketsSold: 0,
+                totalTickets: 100
+            };
+            
+            const existingEvents = JSON.parse(localStorage.getItem('merchantEvents') || '[]');
+            existingEvents.push(testEvent);
+            localStorage.setItem('merchantEvents', JSON.stringify(existingEvents));
+            
+            result.innerHTML = '<div class="success">✅ 测试数据已创建！现在可以测试访问活动页面了。</div>';
+            
+            // 自动检查状态
+            setTimeout(() => {
+                checkUser();
+                checkEvents();
+            }, 100);
+        }
+        
+        // 页面加载时自动检查
+        window.onload = function() {
+            checkUser();
+            checkEvents();
+        };
+    </script>
+</body>
+</html>

@@ -22,8 +22,11 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
   const [paymentLoading, setPaymentLoading] = useState(false)
   const [paymentError, setPaymentError] = useState('')
 
-  // 安全获取用户数据
+  // 安全获取用户数据 - 确保只在客户端执行
   useEffect(() => {
+    // 检查是否在客户端环境
+    if (typeof window === 'undefined') return
+    
     try {
       const userData = localStorage.getItem('userData')
       if (userData) {
@@ -43,7 +46,12 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
   const totalPrice = selectedPrice ? (selectedPrice.amount * quantity) / 100 : 0
 
   const handleBuyTickets = async () => {
-    // 验证用户登录状态
+    // 验证用户登录状态 - 确保只在客户端执行
+    if (typeof window === 'undefined') {
+      setPaymentError('页面正在加载，请稍后重试')
+      return
+    }
+
     try {
       const userData = localStorage.getItem('userData')
       if (!userData) {
@@ -95,9 +103,16 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
       validityEndTime.setDate(validityEndTime.getDate() + 1)
       validityEndTime.setHours(2, 0, 0, 0) // 次日 02:00
 
-      // 获取用户信息
-      const userData = localStorage.getItem('userData')
-      const user = userData ? JSON.parse(userData) : null
+      // 获取用户信息 - 确保只在客户端执行
+      let user = null
+      if (typeof window !== 'undefined') {
+        try {
+          const userData = localStorage.getItem('userData')
+          user = userData ? JSON.parse(userData) : null
+        } catch (error) {
+          console.error('获取用户信息失败:', error)
+        }
+      }
 
       // 创建 Stripe 结账会话
       const response = await fetch('/api/checkout_sessions', {
@@ -123,23 +138,31 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
       const data = await response.json()
 
       if (response.ok) {
-        // 保存购买信息到 localStorage
-        const purchaseInfo = {
-          eventId: event.id,
-          eventTitle: event.title,
-          ticketType: selectedPrice.label,
-          quantity: quantity,
-          totalAmount: selectedPrice.amount * quantity,
-          customerEmail: customerEmail,
-          customerName: customerName,
-          ticketValidityDate: ticketValidityDate,
-          ticketValidityStart: validityStartTime.toISOString(),
-          ticketValidityEnd: validityEndTime.toISOString()
+        // 保存购买信息到 localStorage - 确保只在客户端执行
+        if (typeof window !== 'undefined') {
+          try {
+            const purchaseInfo = {
+              eventId: event.id,
+              eventTitle: event.title,
+              ticketType: selectedPrice.label,
+              quantity: quantity,
+              totalAmount: selectedPrice.amount * quantity,
+              customerEmail: customerEmail,
+              customerName: customerName,
+              ticketValidityDate: ticketValidityDate,
+              ticketValidityStart: validityStartTime.toISOString(),
+              ticketValidityEnd: validityEndTime.toISOString()
+            }
+            localStorage.setItem('recentPurchase', JSON.stringify(purchaseInfo))
+          } catch (error) {
+            console.error('保存购买信息失败:', error)
+          }
         }
-        localStorage.setItem('recentPurchase', JSON.stringify(purchaseInfo))
         
-        // 跳转到 Stripe 结账页面
-        window.location.href = data.url
+        // 跳转到 Stripe 结账页面 - 确保只在客户端执行
+        if (typeof window !== 'undefined') {
+          window.location.href = data.url
+        }
       } else {
         setPaymentError(`支付设置失败: ${data.error}`)
       }

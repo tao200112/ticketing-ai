@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>事件路由测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-button {
+            background: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .test-button:hover {
+            background: #0056b3;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .warning { background: #fff3cd; color: #856404; }
+    </style>
+</head>
+<body>
+    <h1>🧪 事件路由测试页面</h1>
+    
+    <div class="test-section">
+        <h2>📋 测试说明</h2>
+        <p>此页面用于测试事件详情页面的路由和 SSR 渲染是否正常工作。</p>
+        <ul>
+            <li>✅ 修复了动态路由冲突问题</li>
+            <li>✅ 添加了 SSR 回退机制</li>
+            <li>✅ 修复了客户端浏览器 API 调用问题</li>
+            <li>✅ 确保首帧稳定渲染</li>
+        </ul>
+    </div>
+
+    <div class="test-section">
+        <h2>🔗 测试链接</h2>
+        <p>点击以下链接测试不同的事件页面：</p>
+        
+        <a href="/events/ridiculous-chicken" class="test-button">
+            🐔 Ridiculous Chicken Event
+        </a>
+        
+        <a href="/events/test-event-1" class="test-button">
+            🎫 Test Event 1
+        </a>
+        
+        <a href="/events/aa" class="test-button">
+            📝 Event "aa"
+        </a>
+        
+        <a href="/events/random-id-123" class="test-button">
+            🎲 Random Event
+        </a>
+    </div>
+
+    <div class="test-section">
+        <h2>🔍 自动检测结果</h2>
+        <div id="test-results">
+            <div class="status warning">正在检测路由状态...</div>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>📊 修复内容总结</h2>
+        <h3>1. 路由冲突修复</h3>
+        <ul>
+            <li>删除了冲突的 <code>app/events/[slug]/page.js</code></li>
+            <li>保留新的 SSR 组件 <code>app/events/[id]/page.tsx</code></li>
+        </ul>
+        
+        <h3>2. SSR 回退机制</h3>
+        <ul>
+            <li>添加了 Supabase 配置检查</li>
+            <li>提供了回退事件数据</li>
+            <li>确保页面始终能正常渲染</li>
+        </ul>
+        
+        <h3>3. 客户端 API 安全调用</h3>
+        <ul>
+            <li>所有 <code>localStorage</code> 调用都包装在 <code>typeof window !== 'undefined'</code> 检查中</li>
+            <li>所有 <code>window</code> 对象访问都进行了安全检查</li>
+            <li>防止服务端渲染时的浏览器 API 调用错误</li>
+        </ul>
+        
+        <h3>4. 水合错误防护</h3>
+        <ul>
+            <li>使用可选链和兜底值处理所有可能为 undefined 的数据</li>
+            <li>添加了 ErrorBoundary 组件捕获渲染期异常</li>
+            <li>确保首帧渲染稳定</li>
+        </ul>
+    </div>
+
+    <script>
+        // 自动检测路由状态
+        async function testRoutes() {
+            const resultsDiv = document.getElementById('test-results');
+            const testRoutes = [
+                '/events/ridiculous-chicken',
+                '/events/test-event-1',
+                '/events/aa'
+            ];
+            
+            let successCount = 0;
+            let totalCount = testRoutes.length;
+            
+            for (const route of testRoutes) {
+                try {
+                    const response = await fetch(route);
+                    if (response.ok) {
+                        successCount++;
+                        console.log(`✅ ${route} - 路由正常`);
+                    } else {
+                        console.log(`❌ ${route} - 返回状态: ${response.status}`);
+                    }
+                } catch (error) {
+                    console.log(`❌ ${route} - 请求失败:`, error.message);
+                }
+            }
+            
+            if (successCount === totalCount) {
+                resultsDiv.innerHTML = '<div class="status success">✅ 所有路由测试通过！事件页面 SSR 修复成功。</div>';
+            } else if (successCount > 0) {
+                resultsDiv.innerHTML = `<div class="status warning">⚠️ 部分路由正常 (${successCount}/${totalCount})，请检查失败的路由。</div>`;
+            } else {
+                resultsDiv.innerHTML = '<div class="status error">❌ 路由测试失败，请检查服务器配置。</div>';
+            }
+        }
+        
+        // 页面加载后自动测试
+        document.addEventListener('DOMContentLoaded', testRoutes);
+    </script>
+</body>
+</html>

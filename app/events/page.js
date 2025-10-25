@@ -10,6 +10,9 @@ export default function EventsPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    // 确保只在客户端执行
+    if (typeof window === 'undefined') return
+    
     loadEvents()
     
     // 监听localStorage变化，当商家创建新事件时自动刷新

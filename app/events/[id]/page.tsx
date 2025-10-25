@@ -63,8 +63,12 @@ export default async function EventDetailPage({ params }: PageProps) {
     if (error || !event) {
       console.warn('Event not found in database, using fallback data for:', id)
       
-      // 检查是否是默认事件
-      if (id === 'ridiculous-chicken') {
+      // 检查是否是默认事件（支持多种格式）
+      const isRidiculousChicken = id === 'ridiculous-chicken' || 
+                                 id === 'ridiculous-chicken-night-event' ||
+                                 id.includes('ridiculous-chicken')
+      
+      if (isRidiculousChicken) {
         // 使用默认的 Ridiculous Chicken 事件数据
         event = {
           id: 'ridiculous-chicken',

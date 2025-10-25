@@ -3,11 +3,21 @@ import Link from 'next/link'
 export default function EventCard({ event }) {
   // 生成事件页面的URL
   // 优先使用 event.id，如果没有则使用 event.name 生成 slug
-  const eventId = event.id || event.name
-    ?.toLowerCase()
-    ?.replace(/[^a-z0-9\s-]/g, '') // 移除特殊字符
-    ?.replace(/\s+/g, '-') // 空格替换为连字符
-    ?.trim() || 'default-event'
+  let eventId = event.id
+  
+  // 如果没有 id，则从 name 生成 slug
+  if (!eventId && event.name) {
+    eventId = event.name
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, '') // 移除特殊字符
+      .replace(/\s+/g, '-') // 空格替换为连字符
+      .trim()
+  }
+  
+  // 如果还是没有，使用默认值
+  if (!eventId) {
+    eventId = 'default-event'
+  }
 
   return (
     <Link href={`/events/${eventId}`} style={{ display: 'block' }}>

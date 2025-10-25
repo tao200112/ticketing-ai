@@ -22,46 +22,41 @@ export default async function EventDetailPage({ params }: PageProps) {
     let event = null
     let error = null
 
-    // 检查 Supabase 配置
-    if (supabaseAdmin) {
-      try {
-        // 从 Supabase 查询事件详情
-        const result = await supabaseAdmin
-          .from('events')
-          .select(`
+    // 尝试从 Supabase 查询事件详情
+    try {
+      const result = await supabaseAdmin
+        .from('events')
+        .select(`
+          id,
+          title,
+          description,
+          start_at,
+          end_at,
+          venue_name,
+          location,
+          max_attendees,
+          poster_url,
+          status,
+          created_at,
+          updated_at,
+          event_prices (
             id,
-            title,
-            description,
-            start_at,
-            end_at,
-            venue_name,
-            location,
-            max_attendees,
-            poster_url,
-            status,
-            created_at,
-            updated_at,
-            event_prices (
-              id,
-              label,
-              amount,
-              currency,
-              inventory,
-              limit_per_user
-            )
-          `)
-          .eq('id', id)
-          .eq('status', 'active') // 只返回活跃状态的事件
-          .single()
+            label,
+            amount,
+            currency,
+            inventory,
+            limit_per_user
+          )
+        `)
+        .eq('id', id)
+        .eq('status', 'active') // 只返回活跃状态的事件
+        .single()
 
-        event = result.data
-        error = result.error
-      } catch (dbError) {
-        console.error('Database query error:', dbError)
-        error = dbError
-      }
-    } else {
-      console.warn('Supabase not configured, using fallback data')
+      event = result.data
+      error = result.error
+    } catch (dbError) {
+      console.error('Database query error:', dbError)
+      error = dbError
     }
 
     // 如果 Supabase 查询失败或未配置，使用回退数据

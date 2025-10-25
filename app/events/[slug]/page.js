@@ -55,11 +55,15 @@ export default function EventPage() {
   const loadEvent = () => {
     try {
       setLoading(true)
+      console.log('=== 开始加载活动 ===')
+      console.log('当前 slug:', params.slug)
       
       // 首先检查是否是默认的Ridiculous Chicken活动
       if (params.slug === 'ridiculous-chicken-night-event') {
+        console.log('匹配默认活动')
         const defaultEvent = getDefaultEvent('ridiculous-chicken')
         if (defaultEvent) {
+          console.log('找到默认活动:', defaultEvent)
           // 转换默认活动数据格式以匹配页面期望的格式
           const formattedEvent = {
             id: defaultEvent.id,
@@ -73,11 +77,15 @@ export default function EventPage() {
             ticketsSold: 0,
             totalTickets: defaultEvent.max_attendees
           }
+          console.log('格式化后的活动:', formattedEvent)
           setEvent(formattedEvent)
           if (formattedEvent.prices && formattedEvent.prices.length > 0) {
             setSelectedPrice(0) // 选择第一个价格
           }
+          setLoading(false)
           return
+        } else {
+          console.log('未找到默认活动')
         }
       }
       
@@ -95,6 +103,7 @@ export default function EventPage() {
       if (merchantEvents.length === 0) {
         console.log('No merchant events found in localStorage')
         setError('No events available')
+        setLoading(false)
         return
       }
       
@@ -113,6 +122,7 @@ export default function EventPage() {
       if (!foundEvent) {
         console.log('Event not found for slug:', params.slug)
         setError('Event not found')
+        setLoading(false)
         return
       }
       
@@ -121,6 +131,7 @@ export default function EventPage() {
       if (foundEvent.prices && foundEvent.prices.length > 0) {
         setSelectedPrice(0) // 选择第一个价格
       }
+      setLoading(false)
     } catch (err) {
       setError('Failed to load event')
       console.error('加载事件错误:', err)

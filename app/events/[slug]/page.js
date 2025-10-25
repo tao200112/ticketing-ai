@@ -281,8 +281,32 @@ export default function EventPage() {
       }
       
       console.log('Found event:', foundEvent)
-      setEvent(foundEvent)
-      if (foundEvent.prices && foundEvent.prices.length > 0) {
+      
+      // 确保活动数据完整性
+      const safeEvent = {
+        id: foundEvent.id || 'unknown',
+        title: foundEvent.title || 'Untitled Event',
+        description: foundEvent.description || 'No description available',
+        startTime: foundEvent.startTime || new Date().toISOString(),
+        endTime: foundEvent.endTime || new Date(Date.now() + 6 * 60 * 60 * 1000).toISOString(),
+        location: foundEvent.location || 'Location TBD',
+        maxAttendees: foundEvent.maxAttendees || 100,
+        prices: foundEvent.prices && Array.isArray(foundEvent.prices) ? foundEvent.prices : [
+          {
+            name: 'General Admission',
+            amount_cents: 2000,
+            inventory: 50,
+            limit_per_user: 4
+          }
+        ],
+        ticketsSold: foundEvent.ticketsSold || 0,
+        totalTickets: foundEvent.totalTickets || 100,
+        revenue: foundEvent.revenue || 0
+      }
+      
+      console.log('Safe event data:', safeEvent)
+      setEvent(safeEvent)
+      if (safeEvent.prices && safeEvent.prices.length > 0) {
         setSelectedPrice(0) // 选择第一个价格
       }
       setLoading(false)
@@ -418,6 +442,9 @@ export default function EventPage() {
           <p style={{ color: '#6b7280', fontSize: '0.875rem', marginTop: '8px' }}>
             Slug: {params.slug}
           </p>
+          <p style={{ color: '#6b7280', fontSize: '0.75rem', marginTop: '4px' }}>
+            If this takes too long, the page will auto-refresh
+          </p>
         </div>
       </div>
     )
@@ -446,20 +473,41 @@ export default function EventPage() {
           <p style={{ color: '#6b7280', fontSize: '0.875rem', marginBottom: '1.5rem' }}>
             Looking for: {params.slug}
           </p>
-          <Link 
-            href="/events"
-            style={{
-              backgroundColor: '#2563eb',
-              color: 'white',
-              padding: '0.75rem 1.5rem',
-              borderRadius: '0.5rem',
-              fontWeight: '500',
-              textDecoration: 'none',
-              display: 'inline-block'
-            }}
-          >
-            Back to Events
-          </Link>
+          <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+            <Link 
+              href="/events"
+              style={{
+                backgroundColor: '#2563eb',
+                color: 'white',
+                padding: '0.75rem 1.5rem',
+                borderRadius: '0.5rem',
+                fontWeight: '500',
+                textDecoration: 'none',
+                display: 'inline-block'
+              }}
+            >
+              Back to Events
+            </Link>
+            <button
+              onClick={() => {
+                console.log('Retrying event load...')
+                setError('')
+                setLoading(true)
+                loadEvent()
+              }}
+              style={{
+                backgroundColor: '#10b981',
+                color: 'white',
+                padding: '0.75rem 1.5rem',
+                borderRadius: '0.5rem',
+                fontWeight: '500',
+                border: 'none',
+                cursor: 'pointer'
+              }}
+            >
+              Retry
+            </button>
+          </div>
         </div>
       </div>
     )

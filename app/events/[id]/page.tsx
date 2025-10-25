@@ -22,42 +22,47 @@ export default async function EventDetailPage({ params }: PageProps) {
     let event = null
     let error = null
 
-    // 尝试从 Supabase 查询事件详情
-    try {
-      const result = await supabaseAdmin
-        .from('events')
-        .select(`
-          id,
-          title,
-          description,
-          start_at,
-          end_at,
-          venue_name,
-          address,
-          max_attendees,
-          poster_url,
-          status,
-          created_at,
-          updated_at,
-          prices (
+    // 检查 Supabase 配置
+    if (supabaseAdmin) {
+      try {
+        // 从 Supabase 查询事件详情
+        const result = await supabaseAdmin
+          .from('events')
+          .select(`
             id,
-            name,
+            title,
             description,
-            amount_cents,
-            currency,
-            inventory,
-            limit_per_user
-          )
-        `)
-        .eq('id', id)
-        .eq('status', 'published') // 只返回已发布的事件
-        .single()
+            start_at,
+            end_at,
+            venue_name,
+            address,
+            max_attendees,
+            poster_url,
+            status,
+            created_at,
+            updated_at,
+            prices (
+              id,
+              name,
+              description,
+              amount_cents,
+              currency,
+              inventory,
+              limit_per_user
+            )
+          `)
+          .eq('id', id)
+          .eq('status', 'published') // 只返回已发布的事件
+          .single()
 
-      event = result.data
-      error = result.error
-    } catch (dbError) {
-      console.error('Database query error:', dbError)
-      error = dbError
+        event = result.data
+        error = result.error
+      } catch (dbError) {
+        console.error('Database query error:', dbError)
+        error = dbError
+      }
+    } else {
+      console.warn('Supabase not configured, using fallback data')
     }
 
     // 如果 Supabase 查询失败或未配置，使用回退数据

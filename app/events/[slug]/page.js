@@ -52,6 +52,39 @@ export default function EventPage() {
     }
   }
 
+  const createDefaultEventData = () => {
+    console.log('创建默认活动数据...')
+    const defaultEvent = {
+      id: 'ridiculous-chicken',
+      title: 'Ridiculous Chicken Night Event',
+      description: 'Join us for an unforgettable night of ridiculous fun!',
+      startTime: '2024-12-31T20:00:00.000Z',
+      endTime: '2025-01-01T02:00:00.000Z',
+      location: 'PartyTix Venue',
+      maxAttendees: 100,
+      prices: [
+        {
+          id: 'regular',
+          name: 'Regular Ticket (21+)',
+          amount_cents: 1500,
+          inventory: 50,
+          limit_per_user: 4
+        }
+      ],
+      ticketsSold: 0,
+      totalTickets: 100,
+      created_at: new Date().toISOString()
+    }
+    
+    // 保存到 localStorage
+    const existingEvents = JSON.parse(localStorage.getItem('merchantEvents') || '[]')
+    const updatedEvents = [...existingEvents, defaultEvent]
+    localStorage.setItem('merchantEvents', JSON.stringify(updatedEvents))
+    
+    console.log('默认活动数据已创建')
+    return defaultEvent
+  }
+
   const loadEvent = () => {
     try {
       setLoading(true)
@@ -85,7 +118,28 @@ export default function EventPage() {
           setLoading(false)
           return
         } else {
-          console.log('未找到默认活动')
+          console.log('未找到默认活动，尝试创建默认数据...')
+          // 如果找不到默认活动，创建默认数据
+          const createdEvent = createDefaultEventData()
+          const formattedEvent = {
+            id: createdEvent.id,
+            title: createdEvent.title,
+            description: createdEvent.description,
+            startTime: createdEvent.startTime,
+            endTime: createdEvent.endTime,
+            location: createdEvent.location,
+            maxAttendees: createdEvent.maxAttendees,
+            prices: createdEvent.prices,
+            ticketsSold: createdEvent.ticketsSold,
+            totalTickets: createdEvent.totalTickets
+          }
+          console.log('使用创建的默认活动:', formattedEvent)
+          setEvent(formattedEvent)
+          if (formattedEvent.prices && formattedEvent.prices.length > 0) {
+            setSelectedPrice(0)
+          }
+          setLoading(false)
+          return
         }
       }
       

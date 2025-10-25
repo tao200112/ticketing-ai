@@ -1,7 +1,15 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   outputFileTracingRoot: __dirname,
-  serverExternalPackages: ['@prisma/client'],
+  
+  // 路径别名配置
+  webpack: (config) => {
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      '@': require('path').resolve(__dirname),
+    }
+    return config
+  },
   
   // 环境变量配置
   env: {

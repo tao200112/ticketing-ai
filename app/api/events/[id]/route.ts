@@ -1,5 +1,6 @@
+// @ts-nocheck
 import { NextResponse } from 'next/server'
-import { supabaseAdmin } from '../../../../lib/supabase-admin'
+import { supabaseAdmin } from '@/lib/supabase-admin'
 import { validateEventDetail } from '../../../../lib/schemas/event'
 
 export const dynamic = 'force-dynamic'

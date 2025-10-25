@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
-import { processPaidOrder } from '../../../../lib/ticket-service';
+import { createOrderFromStripeSession, getOrderByStripeSession, issueTicketsForOrder } from '@/lib/db';
+import { createLogger } from '@/lib/logger';
+import { getRequestId } from '@/lib/request-id';
 
 // 强制使用 Node.js runtime
 export const runtime = 'nodejs';
@@ -11,14 +13,24 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
 });
 
 export async function POST(request) {
+  const logger = createLogger('stripe/webhook');
+  const requestId = getRequestId(request);
+  
   try {
-    console.log('[StripeWebhook] API Request: POST /api/stripe/webhook');
+    logger.start({
+      requestId,
+      http: {
+        method: 'POST',
+        url: '/api/stripe/webhook'
+      }
+    });
     
     // 获取原始请求体
     const body = await request.text();
     const signature = request.headers.get('stripe-signature');
     
-    console.log('[StripeWebhook] Webhook received:', {
+    logger.info('Webhook received', {
+      requestId,
       hasBody: !!body,
       hasSignature: !!signature,
       bodyLength: body.length
@@ -26,7 +38,7 @@ export async function POST(request) {
     
     // 验证 Stripe webhook 签名
     if (!signature) {
-      console.warn('[StripeWebhook] Missing Stripe signature');
+      logger.warn('Missing Stripe signature', { requestId });
       return NextResponse.json(
         { error: 'Missing stripe-signature header' },
         { status: 400 }
@@ -42,16 +54,17 @@ export async function POST(request) {
         process.env.STRIPE_WEBHOOK_SECRET
       );
     } catch (err) {
-      console.error('[StripeWebhook] Webhook signature verification failed:', err.message);
+      logger.error('Webhook signature verification failed', err, { requestId });
       return NextResponse.json(
         { error: 'Webhook signature verification failed' },
         { status: 400 }
       );
     }
     
-    console.log('[StripeWebhook] Webhook event received:', {
-      type: event.type,
-      id: event.id,
+    logger.info('Webhook event received', {
+      requestId,
+      eventType: event.type,
+      eventId: event.id,
       created: event.created
     });
     
@@ -70,14 +83,21 @@ export async function POST(request) {
         break;
         
       default:
-        console.log(`[StripeWebhook] Unhandled event type: ${event.type}`);
+        logger.info(`Unhandled event type: ${event.type}`, { requestId });
     }
     
-    console.log('[StripeWebhook] API Response: 200 - Webhook processed successfully');
+    logger.success('Webhook processed successfully', {
+      requestId,
+      http: { status: 200 }
+    });
+    
     return NextResponse.json({ received: true });
     
   } catch (error) {
-    console.error('[StripeWebhook] Webhook processing error:', error);
+    logger.error('Webhook processing error', error, {
+      requestId,
+      needs_attention: true
+    });
     
     return NextResponse.json(
       { 
@@ -91,93 +111,65 @@ export async function POST(request) {
 
 // 处理 checkout session 完成事件
 async function handleCheckoutSessionCompleted(session) {
-  console.log('paid', session.id);
+  const logger = createLogger('stripe/webhook/checkout-completed');
+  const startTime = Date.now()
   
-  console.log('[StripeWebhook] Processing checkout.session.completed:', {
+  logger.info('Processing checkout.session.completed', {
     sessionId: session.id,
-    customerEmail: session.customer_email,
     amountTotal: session.amount_total,
     paymentStatus: session.payment_status,
-    currency: session.currency,
-    metadata: session.metadata
+    currency: session.currency
   });
   
   try {
-    // 根据价格判断票种类型
-    let ticketType = '';
-    let eventName = 'Ridiculous Chicken Night Event';
+    // 1. 幂等检查：先查询是否已有订单和票据
+    const existingOrder = await getOrderByStripeSession(session.id)
     
-    if (session.amount_total === 1500) { // $15.00 in cents
-      ticketType = 'Regular Ticket (21+)';
-    } else if (session.amount_total === 3000) { // $30.00 in cents
-      ticketType = 'Special Ticket (18-20)';
+    if (existingOrder && existingOrder.tickets && existingOrder.tickets.length > 0) {
+      logger.info('Order and tickets already exist, skipping creation', {
+        orderId: existingOrder.id,
+        ticketCount: existingOrder.tickets.length,
+        duration_ms: Date.now() - startTime
+      });
+      return { ok: true, skipped: true }
     }
-    
-    // 生成票券数据
-    const ticket = {
-      id: `ticket_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      eventName: eventName,
-      ticketType: ticketType,
-      price: (session.amount_total / 100).toFixed(2),
-      purchaseDate: new Date().toLocaleDateString('en-US'),
-      status: 'valid',
-      customerEmail: session.customer_email,
-      sessionId: session.id
-    };
-    
-    // 生成二维码数据
-    const qrData = {
-      ticketId: ticket.id,
-      eventName: ticket.eventName,
-      ticketType: ticket.ticketType,
-      purchaseDate: ticket.purchaseDate,
-      price: ticket.price,
-      customerEmail: ticket.customerEmail
-    };
-    
-    ticket.qrCode = JSON.stringify(qrData);
-    
-    console.log('[StripeWebhook] Ticket generated:', {
-      ticketId: ticket.id,
-      ticketType: ticket.ticketType,
-      price: ticket.price,
-      customerEmail: ticket.customerEmail
+
+    // 2. 创建或获取订单
+    let order
+    if (existingOrder) {
+      logger.info('Order exists but no tickets, creating tickets only');
+      order = existingOrder
+    } else {
+      logger.info('Creating new order');
+      order = await createOrderFromStripeSession(session)
+    }
+
+    // 3. 出票（幂等）
+    const tickets = await issueTicketsForOrder(order, {
+      quantity: 1, // 默认1张票，可根据业务逻辑调整
+      userEmail: session.customer_email,
+      eventId: order.eventId
+    })
+
+    logger.success('Successfully processed order and tickets', {
+      orderId: order.id,
+      ticketCount: tickets.length,
+      ticketIds: tickets.map(t => t.shortId),
+      duration_ms: Date.now() - startTime
     });
-    
-    // 这里可以保存到数据库或发送给用户
-    // 为了演示，我们记录到日志中
-    console.log('[StripeWebhook] QR Code generated for ticket:', ticket.qrCode);
-    
-    // 处理支付完成的订单，创建订单和票务
-    const result = await processPaidOrder(session);
-    
-    console.log('[StripeWebhook] Order processed successfully:', {
-      orderId: result.order.id,
-      ticketCount: result.tickets.length,
-      ticketIds: result.tickets.map(t => t.short_id || t.shortId)
-    });
-    
-    // 准备票据记录数据，供前端保存到localStorage
-    const ticketData = {
-      order: result.order,
-      tickets: result.tickets,
-      userId: session.metadata?.user_id,
-      customerEmail: session.customer_email,
-      eventTitle: session.metadata?.eventTitle,
-      tier: session.metadata?.tier,
-      amount: session.amount_total,
-      quantity: parseInt(session.metadata?.quantity) || 1
-    };
-    
-    console.log('[StripeWebhook] Ticket data prepared for localStorage:', ticketData);
-    
-    // 暂不发邮件，只记录日志
-    console.log('[StripeWebhook] Tickets generated for customer:', session.customer_email);
-    
+
+    return { ok: true, orderId: order.id, ticketCount: tickets.length }
+
   } catch (error) {
-    console.error('[StripeWebhook] Error processing order:', error);
-    // 不抛出错误，避免 webhook 重试
-    console.log('[StripeWebhook] Order processing failed, but webhook will return 200');
+    logger.error('Error processing order', error, {
+      sessionId: session.id,
+      duration_ms: Date.now() - startTime,
+      needs_attention: true
+    });
+    
+    // 不抛出错误，避免 webhook 重试死循环
+    // 但记录需要人工干预
+    return { ok: false, error: error.message, needs_manual_attention: true }
   }
 }
 

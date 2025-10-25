@@ -1,42 +1,102 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import QRCode from 'qrcode'
 
-export default function SuccessPage() {
-  const [ticket, setTicket] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [qrCodeDataURL, setQrCodeDataURL] = useState('')
-  const [verificationCode, setVerificationCode] = useState('')
+// 4 种 UI 状态
+const UI_STATES = {
+  LOADING: 'loading',      // "Generating QR Code..."
+  SUCCESS: 'success',      // 显示票据和二维码
+  TIMEOUT: 'timeout',      // "Taking longer than usual. Please retry."
+  ERROR: 'error'           // "Failed to load tickets."
+}
 
-  // 生成验证码函数
-  const generateVerificationCode = () => {
-    return Math.random().toString(36).substring(2, 8).toUpperCase()
+export default function SuccessPage() {
+  const [uiState, setUiState] = useState(UI_STATES.LOADING)
+  const [order, setOrder] = useState(null)
+  const [tickets, setTickets] = useState([])
+  const [retryCount, setRetryCount] = useState(0)
+  const [errorMessage, setErrorMessage] = useState('')
+  
+  const abortControllerRef = useRef(null)
+  const timeoutRef = useRef(null)
+
+  // 获取 session_id 从 URL
+  const getSessionId = () => {
+    const urlParams = new URLSearchParams(window.location.search)
+    return urlParams.get('session_id')
   }
 
-  // 生成二维码函数
-  const generateQRCode = async (ticket, verificationCode) => {
-    try {
-      console.log('Generating QR code for ticket:', ticket.id)
-      
-      const qrData = {
-        ticketId: ticket.id,
-        verificationCode: verificationCode,
-        eventName: ticket.eventName,
-        ticketType: ticket.ticketType,
-        purchaseDate: ticket.purchaseDate,
-        ticketValidityDate: ticket.ticketValidityDate,
-        ticketValidityStart: ticket.ticketValidityStart,
-        ticketValidityEnd: ticket.ticketValidityEnd,
-        price: ticket.price,
-        customerEmail: ticket.customerEmail,
-        customerName: ticket.customerName
-      }
+  // 获取订单和票据数据（带超时和重试）
+  const fetchOrderData = async (sessionId, attempt = 1) => {
+    const maxRetries = 3
+    const timeoutMs = 30000 // 30秒超时
     
-      const qrString = JSON.stringify(qrData)
-      console.log('QR data string length:', qrString.length)
+    console.log(`[SuccessPage] Fetching order data, attempt ${attempt}/${maxRetries}`)
+    
+    // 创建 AbortController
+    abortControllerRef.current = new AbortController()
+    
+    // 设置超时
+    timeoutRef.current = setTimeout(() => {
+      console.log(`[SuccessPage] Request timeout after ${timeoutMs}ms`)
+      abortControllerRef.current?.abort()
+    }, timeoutMs)
+    
+    try {
+      const response = await fetch(`/api/orders/by-session?session_id=${sessionId}`, {
+        signal: abortControllerRef.current.signal
+      })
       
-      const qrDataURL = await QRCode.toDataURL(qrString, {
+      clearTimeout(timeoutRef.current)
+      
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.message || `HTTP ${response.status}`)
+      }
+      
+      const data = await response.json()
+      
+      if (!data.ok) {
+        throw new Error(data.message || 'Failed to load order data')
+      }
+      
+      console.log(`[SuccessPage] Successfully loaded order data:`, {
+        orderId: data.order.id,
+        ticketCount: data.tickets.length,
+        attempt
+      })
+      
+      return data
+      
+    } catch (error) {
+      clearTimeout(timeoutRef.current)
+      
+      if (error.name === 'AbortError') {
+        console.log(`[SuccessPage] Request aborted (timeout)`)
+        throw new Error('Request timeout')
+      }
+      
+      console.error(`[SuccessPage] Fetch error (attempt ${attempt}):`, error.message)
+      
+      if (attempt < maxRetries) {
+        // 退避重试：5s, 10s, 15s
+        const delay = attempt * 5000
+        console.log(`[SuccessPage] Retrying in ${delay}ms...`)
+        await new Promise(resolve => setTimeout(resolve, delay))
+        return fetchOrderData(sessionId, attempt + 1)
+      }
+      
+      throw error
+    }
+  }
+
+  // 生成二维码（从服务端 qr_payload）
+  const generateQRCodeFromPayload = async (qrPayload) => {
+    try {
+      console.log('[SuccessPage] Generating QR code from payload')
+      
+      const qrDataURL = await QRCode.toDataURL(qrPayload, {
         width: 256,
         margin: 2,
         color: {
@@ -46,252 +106,277 @@ export default function SuccessPage() {
         errorCorrectionLevel: 'M'
       })
       
-      console.log('QR code generated successfully, length:', qrDataURL.length)
+      console.log('[SuccessPage] QR code generated successfully')
       return qrDataURL
     } catch (error) {
-      console.error('Error generating QR code:', error)
-      console.error('Error details:', {
-        message: error.message,
-        stack: error.stack,
-        ticket: ticket,
-        verificationCode: verificationCode
-      })
+      console.error('[SuccessPage] QR code generation error:', error)
       return null
     }
   }
 
-  useEffect(() => {
-    // 从 URL 参数获取会话信息
-    const urlParams = new URLSearchParams(window.location.search)
-    const sessionId = urlParams.get('session_id')
+  // 重试函数
+  const handleRetry = async () => {
+    const sessionId = getSessionId()
+    if (!sessionId) {
+      setUiState(UI_STATES.ERROR)
+      setErrorMessage('No session ID found in URL')
+      return
+    }
     
-    if (sessionId) {
-      // 检查是否是演示模式
-      const isDemoMode = sessionId.startsWith('demo_session_')
+    setUiState(UI_STATES.LOADING)
+    setRetryCount(prev => prev + 1)
+    
+    try {
+      const data = await fetchOrderData(sessionId)
       
-      if (isDemoMode) {
-        console.log('Demo mode detected, creating demo ticket')
-        
-        // 从localStorage获取最近的购买信息
-        const recentPurchase = JSON.parse(localStorage.getItem('recentPurchase') || '{}')
-        
-        // 创建演示票券，使用真实的购买信息
-        const demoTicket = {
-          id: `demo_ticket_${Date.now()}`,
-          eventName: recentPurchase.eventTitle || 'Demo Event',
-          ticketType: recentPurchase.ticketType || 'Demo Ticket',
-          quantity: recentPurchase.quantity || 1,
-          // 修复价格显示 - 使用正确的价格计算
-          price: recentPurchase.totalAmount ? (recentPurchase.totalAmount / 100).toFixed(2) : '15.00',
-          purchaseDate: new Date().toLocaleDateString('en-US'),
-          ticketValidityDate: recentPurchase.ticketValidityDate || new Date().toISOString().split('T')[0],
-          ticketValidityStart: recentPurchase.ticketValidityStart || new Date().toISOString(),
-          ticketValidityEnd: recentPurchase.ticketValidityEnd || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-          status: 'valid',
-          sessionId: sessionId,
-          customerEmail: recentPurchase.customerEmail || 'demo@example.com',
-          customerName: recentPurchase.customerName || 'Demo User'
-        }
-        
-        setTicket(demoTicket)
-        
-        // 生成验证码
-        const verificationCode = generateVerificationCode()
-        setVerificationCode(verificationCode)
-        
-        // 生成二维码
-        console.log('Starting QR code generation for demo ticket:', demoTicket)
-        
-        // 使用 async/await 而不是 .then()
-        const generateQR = async () => {
-          try {
-            console.log('Starting QR code generation for demo ticket:', {
-              ticketId: demoTicket.id,
-              eventName: demoTicket.eventName,
-              ticketType: demoTicket.ticketType,
-              verificationCode: verificationCode
-            })
-            
-            const qrDataURL = await generateQRCode(demoTicket, verificationCode)
-            console.log('QR code generation result:', qrDataURL ? 'Success' : 'Failed')
-            
-            if (qrDataURL) {
-              setQrCodeDataURL(qrDataURL)
-              console.log('Demo QR Code generated successfully')
-            } else {
-              console.error('Failed to generate demo QR code - qrDataURL is null')
-              // 设置一个默认的二维码占位符
-              setQrCodeDataURL('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjU2IiBoZWlnaHQ9IjI1NiIgdmlld0JveD0iMCAwIDI1NiAyNTYiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyNTYiIGhlaWdodD0iMjU2IiBmaWxsPSIjRjNGNEY2Ii8+Cjx0ZXh0IHg9IjEyOCIgeT0iMTI4IiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTIiIGZpbGw9IiM2QjcyODAiIHRleHQtYW5jaG9yPSJtaWRkbGUiPk5vIFFSIGNvZGUgYXZhaWxhYmxlPC90ZXh0Pgo8L3N2Zz4=')
-            }
+      // 为每个票据生成二维码
+      const ticketsWithQR = await Promise.all(
+        data.tickets.map(async (ticket) => {
+          const qrDataURL = await generateQRCodeFromPayload(ticket.qrPayload)
+          return { ...ticket, qrDataURL }
+        })
+      )
+      
+      setOrder(data.order)
+      setTickets(ticketsWithQR)
+      setUiState(UI_STATES.SUCCESS)
+      
           } catch (error) {
-            console.error('Demo QR Code generation error:', error)
-            console.error('Error stack:', error.stack)
-            console.error('Error details:', {
-              message: error.message,
-              name: error.name,
-              ticket: demoTicket,
-              verificationCode: verificationCode
-            })
-            // 设置一个默认的二维码占位符
-            setQrCodeDataURL('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjU2IiBoZWlnaHQ9IjI1NiIgdmlld0JveD0iMCAwIDI1NiAyNTYiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyNTYiIGhlaWdodD0iMjU2IiBmaWxsPSIjRjNGNEY2Ii8+Cjx0ZXh0IHg9IjEyOCIgeT0iMTI4IiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTIiIGZpbGw9IiM2QjcyODAiIHRleHQtYW5jaG9yPSJtaWRkbGUiPk5vIFFSIGNvZGUgYXZhaWxhYmxlPC90ZXh0Pgo8L3N2Zz4=')
-          }
-        }
-        
-        generateQR()
-        
-        setLoading(false)
+      console.error('[SuccessPage] Retry failed:', error)
+      setUiState(UI_STATES.ERROR)
+      setErrorMessage(error.message)
+    }
+  }
+
+  // 主加载逻辑
+  useEffect(() => {
+    const loadData = async () => {
+      const sessionId = getSessionId()
+      
+      if (!sessionId) {
+        console.error('[SuccessPage] No session_id in URL')
+        setUiState(UI_STATES.ERROR)
+        setErrorMessage('No session ID found in URL')
         return
       }
       
-      // 从localStorage获取最近的购买信息
-      const recentPurchase = JSON.parse(localStorage.getItem('recentPurchase') || '{}')
-      
-      if (recentPurchase.eventId && recentPurchase.ticketType) {
-        console.log('Found recent purchase data:', recentPurchase)
+      try {
+        const data = await fetchOrderData(sessionId)
         
-        // 创建票券对象
-        const ticket = {
-          id: `ticket_${Date.now()}`,
-          eventName: recentPurchase.eventTitle || 'Event',
-          ticketType: recentPurchase.ticketType,
-          quantity: recentPurchase.quantity || 1,
-          // 修复价格显示 - 使用正确的价格计算
-          price: recentPurchase.totalAmount ? (recentPurchase.totalAmount / 100).toFixed(2) : '15.00',
-          purchaseDate: new Date().toLocaleDateString('en-US'),
-          ticketValidityDate: recentPurchase.ticketValidityDate || new Date().toISOString().split('T')[0],
-          ticketValidityStart: recentPurchase.ticketValidityStart || new Date().toISOString(),
-          ticketValidityEnd: recentPurchase.ticketValidityEnd || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-          status: 'valid',
-          sessionId: sessionId,
-          customerEmail: recentPurchase.customerEmail || 'customer@example.com',
-          customerName: recentPurchase.customerName || 'Customer'
-        }
+        // 为每个票据生成二维码
+        const ticketsWithQR = await Promise.all(
+          data.tickets.map(async (ticket) => {
+            const qrDataURL = await generateQRCodeFromPayload(ticket.qrPayload)
+            return { ...ticket, qrDataURL }
+          })
+        )
         
-        setTicket(ticket)
+        setOrder(data.order)
+        setTickets(ticketsWithQR)
+        setUiState(UI_STATES.SUCCESS)
         
-        // 生成验证码
-        const verificationCode = generateVerificationCode()
-        setVerificationCode(verificationCode)
+      } catch (error) {
+        console.error('[SuccessPage] Load failed:', error)
         
-        // 生成二维码
-        console.log('Starting QR code generation for real ticket:', ticket)
-        
-        // 使用 async/await 而不是 .then()
-        const generateQR = async () => {
-          try {
-            console.log('Starting QR code generation for real ticket:', {
-              ticketId: ticket.id,
-              eventName: ticket.eventName,
-              ticketType: ticket.ticketType,
-              verificationCode: verificationCode
-            })
-            
-            const qrDataURL = await generateQRCode(ticket, verificationCode)
-            console.log('QR code generation result:', qrDataURL ? 'Success' : 'Failed')
-            
-            if (qrDataURL) {
-              setQrCodeDataURL(qrDataURL)
-              console.log('QR Code generated successfully')
+        if (error.message.includes('timeout')) {
+          setUiState(UI_STATES.TIMEOUT)
             } else {
-              console.error('Failed to generate QR code - qrDataURL is null')
-              // 设置一个默认的二维码占位符
-              setQrCodeDataURL('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjU2IiBoZWlnaHQ9IjI1NiIgdmlld0JveD0iMCAwIDI1NiAyNTYiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyNTYiIGhlaWdodD0iMjU2IiBmaWxsPSIjRjNGNEY2Ii8+Cjx0ZXh0IHg9IjEyOCIgeT0iMTI4IiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTIiIGZpbGw9IiM2QjcyODAiIHRleHQtYW5jaG9yPSJtaWRkbGUiPk5vIFFSIGNvZGUgYXZhaWxhYmxlPC90ZXh0Pgo8L3N2Zz4=')
-            }
-          } catch (error) {
-            console.error('QR Code generation error:', error)
-            console.error('Error stack:', error.stack)
-            console.error('Error details:', {
-              message: error.message,
-              name: error.name,
-              ticket: ticket,
-              verificationCode: verificationCode
-            })
-            // 设置一个默认的二维码占位符
-            setQrCodeDataURL('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjU2IiBoZWlnaHQ9IjI1NiIgdmlld0JveD0iMCAwIDI1NiAyNTYiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyNTYiIGhlaWdodD0iMjU2IiBmaWxsPSIjRjNGNEY2Ii8+Cjx0ZXh0IHg9IjEyOCIgeT0iMTI4IiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTIiIGZpbGw9IiM2QjcyODAiIHRleHQtYW5jaG9yPSJtaWRkbGUiPk5vIFFSIGNvZGUgYXZhaWxhYmxlPC90ZXh0Pgo8L3N2Zz4=')
-          }
+          setUiState(UI_STATES.ERROR)
+          setErrorMessage(error.message)
         }
-        
-        generateQR()
-        
-        // 保存到 localStorage 以便在账户页面显示
-        const existingTickets = JSON.parse(localStorage.getItem('userTickets') || '[]')
-        existingTickets.push(ticket)
-        localStorage.setItem('userTickets', JSON.stringify(existingTickets))
-        
-        // 更新商家事件统计
-        updateEventStats(recentPurchase)
-        
-        // 清除临时购买信息
-        localStorage.removeItem('recentPurchase')
-      } else {
-        // 如果没有购买信息，显示通用成功消息
-        setTicket({
-          id: `ticket_${Date.now()}`,
-          eventName: 'Event',
-          ticketType: 'Ticket',
-          quantity: 1,
-          price: '0.00',
-          purchaseDate: new Date().toLocaleDateString('en-US'),
-          status: 'valid',
-          sessionId: sessionId
-        })
       }
     }
     
-    setLoading(false)
+    loadData()
+    
+    // 清理函数
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+      }
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+      }
+    }
   }, [])
 
-  const updateEventStats = (purchaseData) => {
-    try {
-      // 更新商家事件统计
-      const merchantEvents = JSON.parse(localStorage.getItem('merchantEvents') || '[]')
-      const eventIndex = merchantEvents.findIndex(e => e.id === purchaseData.eventId)
-      
-      if (eventIndex !== -1) {
-        const event = merchantEvents[eventIndex]
-        const ticketInfo = event.prices.find(p => p.name === purchaseData.ticketType)
-        
-        if (ticketInfo) {
-          // 更新票务统计
-          if (!ticketInfo.sold) ticketInfo.sold = 0
-          ticketInfo.sold += purchaseData.quantity || 1
-          
-          // 更新总收入
-          if (!event.totalRevenue) event.totalRevenue = 0
-          event.totalRevenue += (ticketInfo.amount_cents / 100) * (purchaseData.quantity || 1)
-          
-          // 保存更新后的事件
-          merchantEvents[eventIndex] = event
-          localStorage.setItem('merchantEvents', JSON.stringify(merchantEvents))
-          
-          console.log('Event stats updated:', {
-            eventId: purchaseData.eventId,
-            ticketType: purchaseData.ticketType,
-            sold: ticketInfo.sold,
-            totalRevenue: event.totalRevenue
-          })
+  // 渲染加载状态
+  const renderLoading = () => (
+    <div style={{
+      minHeight: '100vh',
+      background: 'linear-gradient(135deg, #0f172a 0%, #7c3aed 50%, #0f172a 100%)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexDirection: 'column'
+    }}>
+      <div style={{
+        width: '60px',
+        height: '60px',
+        border: '4px solid rgba(124, 58, 237, 0.3)',
+        borderTop: '4px solid #7c3aed',
+        borderRadius: '50%',
+        animation: 'spin 1s linear infinite',
+        marginBottom: '1rem'
+      }} />
+      <div style={{ color: 'white', fontSize: '1.25rem', marginBottom: '0.5rem' }}>
+        Generating QR Code...
+      </div>
+      <div style={{ color: '#94a3b8', fontSize: '0.875rem' }}>
+        Please wait while we prepare your tickets
+      </div>
+      <style jsx>{`
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
         }
-      }
-    } catch (error) {
-      console.error('Error updating event stats:', error)
-    }
-  }
+      `}</style>
+    </div>
+  )
 
-  if (loading) {
-    return (
+  // 渲染超时状态
+  const renderTimeout = () => (
+    <div style={{
+      minHeight: '100vh',
+      background: 'linear-gradient(135deg, #0f172a 0%, #7c3aed 50%, #0f172a 100%)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexDirection: 'column',
+      padding: '2rem'
+    }}>
+      <div style={{
+        width: '80px',
+        height: '80px',
+        backgroundColor: '#f59e0b',
+        borderRadius: '50%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: '1.5rem'
+      }}>
+        <span style={{ color: 'white', fontSize: '2rem' }}>⏱️</span>
+      </div>
+      <h1 style={{ 
+        fontSize: '2rem', 
+        fontWeight: 'bold', 
+        color: 'white', 
+        marginBottom: '0.5rem',
+        textAlign: 'center'
+      }}>
+        Taking longer than usual
+      </h1>
+      <p style={{ 
+        fontSize: '1rem', 
+        color: '#94a3b8',
+        marginBottom: '2rem',
+        textAlign: 'center',
+        maxWidth: '400px'
+      }}>
+        We're experiencing some delays. Please try again or contact support if the issue persists.
+      </p>
+      <button
+        onClick={handleRetry}
+        style={{
+          backgroundColor: '#7c3aed',
+          color: 'white',
+          border: 'none',
+          borderRadius: '8px',
+          padding: '0.75rem 2rem',
+          fontSize: '1rem',
+          fontWeight: '500',
+          cursor: 'pointer',
+          transition: 'background-color 0.3s'
+        }}
+        onMouseEnter={(e) => e.target.style.backgroundColor = '#6d28d9'}
+        onMouseLeave={(e) => e.target.style.backgroundColor = '#7c3aed'}
+      >
+        Retry ({retryCount}/3)
+      </button>
+    </div>
+  )
+
+  // 渲染错误状态
+  const renderError = () => (
       <div style={{
         minHeight: '100vh',
         background: 'linear-gradient(135deg, #0f172a 0%, #7c3aed 50%, #0f172a 100%)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexDirection: 'column',
+      padding: '2rem'
+    }}>
+      <div style={{
+        width: '80px',
+        height: '80px',
+        backgroundColor: '#ef4444',
+        borderRadius: '50%',
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'center'
+        justifyContent: 'center',
+        marginBottom: '1.5rem'
       }}>
-        <div style={{ color: 'white', fontSize: '1.5rem' }}>Loading...</div>
+        <span style={{ color: 'white', fontSize: '2rem' }}>❌</span>
+      </div>
+      <h1 style={{ 
+        fontSize: '2rem', 
+        fontWeight: 'bold', 
+        color: 'white', 
+        marginBottom: '0.5rem',
+        textAlign: 'center'
+      }}>
+        Failed to load tickets
+      </h1>
+      <p style={{ 
+        fontSize: '1rem', 
+        color: '#94a3b8',
+        marginBottom: '2rem',
+        textAlign: 'center',
+        maxWidth: '400px'
+      }}>
+        {errorMessage || 'Something went wrong while loading your tickets.'}
+      </p>
+      <div style={{ display: 'flex', gap: '1rem' }}>
+        <button
+          onClick={handleRetry}
+          style={{
+            backgroundColor: '#7c3aed',
+            color: 'white',
+            border: 'none',
+            borderRadius: '8px',
+            padding: '0.75rem 2rem',
+            fontSize: '1rem',
+            fontWeight: '500',
+            cursor: 'pointer',
+            transition: 'background-color 0.3s'
+          }}
+        >
+          Try Again
+        </button>
+        <a
+          href="mailto:support@partytix.com"
+          style={{
+            backgroundColor: 'rgba(15, 23, 42, 0.8)',
+            color: '#94a3b8',
+            border: '1px solid rgba(148, 163, 184, 0.3)',
+            borderRadius: '8px',
+            padding: '0.75rem 2rem',
+            fontSize: '1rem',
+            fontWeight: '500',
+            textDecoration: 'none',
+            cursor: 'pointer',
+            transition: 'all 0.3s'
+          }}
+        >
+          Contact Support
+        </a>
+      </div>
       </div>
     )
-  }
 
-  return (
+  // 渲染成功状态
+  const renderSuccess = () => (
     <div style={{
       minHeight: '100vh',
       background: 'linear-gradient(135deg, #0f172a 0%, #7c3aed 50%, #0f172a 100%)',
@@ -325,12 +410,13 @@ export default function SuccessPage() {
             color: '#94a3b8',
             margin: 0 
           }}>
-            Your ticket has been generated and saved to your account.
+            Your {tickets.length} ticket{tickets.length > 1 ? 's have' : ' has'} been generated and saved to your account.
           </p>
         </div>
 
-        {/* Ticket Card */}
-        <div style={{
+        {/* Tickets List */}
+        {tickets.map((ticket, index) => (
+          <div key={ticket.id} style={{
           backgroundColor: 'rgba(15, 23, 42, 0.8)',
           borderRadius: '16px',
           padding: '2rem',
@@ -351,14 +437,14 @@ export default function SuccessPage() {
                 color: 'white', 
                 margin: '0 0 0.25rem 0' 
               }}>
-                {ticket?.eventName || 'Event'}
+                  Ticket #{index + 1}
               </h2>
               <p style={{ 
                 fontSize: '1rem', 
                 color: '#94a3b8', 
                 margin: 0 
               }}>
-                {ticket?.ticketType || 'Ticket'}
+                  {ticket.tier}
               </p>
             </div>
             <div style={{
@@ -369,49 +455,7 @@ export default function SuccessPage() {
               fontSize: '0.875rem',
               fontWeight: '500'
             }}>
-              Valid
-            </div>
-          </div>
-
-          {/* Customer Information */}
-          {ticket?.customerName && (
-            <div style={{
-              marginBottom: '1rem',
-              padding: '1rem',
-              backgroundColor: 'rgba(16, 185, 129, 0.1)',
-              borderRadius: '8px',
-              border: '1px solid rgba(16, 185, 129, 0.2)'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', color: '#6ee7b7' }}>
-                <span style={{ marginRight: '0.5rem' }}>👤</span>
-                <span style={{ fontWeight: '500' }}>Customer: {ticket.customerName}</span>
-              </div>
-            </div>
-          )}
-
-          {/* Ticket Details */}
-          <div style={{ 
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            alignItems: 'center',
-            marginBottom: '1.5rem',
-            padding: '1rem',
-            backgroundColor: 'rgba(59, 130, 246, 0.1)',
-            borderRadius: '8px',
-            border: '1px solid rgba(59, 130, 246, 0.2)'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center' }}>
-              <span style={{ 
-                fontSize: '1.5rem', 
-                fontWeight: 'bold', 
-                color: '#3b82f6' 
-              }}>
-                ${ticket?.price || '0.00'}
-              </span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', color: '#60a5fa' }}>
-              <span style={{ marginRight: '0.5rem' }}>📅</span>
-              <span>{ticket?.ticketValidityDate || new Date().toISOString().split('T')[0]}</span>
+                {ticket.status === 'unused' ? 'Valid' : 'Used'}
             </div>
           </div>
 
@@ -438,9 +482,9 @@ export default function SuccessPage() {
                 justifyContent: 'center',
                 padding: '0.5rem'
               }}>
-                {qrCodeDataURL ? (
+                  {ticket.qrDataURL ? (
                   <img 
-                    src={qrCodeDataURL} 
+                      src={ticket.qrDataURL} 
                     alt="QR Code" 
                     style={{ 
                       width: '100%', 
@@ -461,41 +505,17 @@ export default function SuccessPage() {
                 )}
               </div>
               
-              {/* Verification Code */}
-              <div style={{
-                backgroundColor: 'rgba(124, 58, 237, 0.2)',
-                borderRadius: '8px',
-                padding: '1rem',
-                border: '1px solid rgba(124, 58, 237, 0.3)',
-                marginBottom: '1rem'
-              }}>
-                <div style={{ 
+                <p style={{ 
                   fontSize: '0.875rem', 
-                  color: '#a78bfa', 
-                  marginBottom: '0.5rem' 
+                  color: '#94a3b8', 
+                  margin: 0 
                 }}>
-                  Verification Code:
-                </div>
-                <div style={{ 
-                  fontSize: '1.25rem', 
-                  fontWeight: 'bold', 
-                  color: '#7c3aed',
-                  fontFamily: 'monospace'
-                }}>
-                  {verificationCode || 'Generating...'}
-                </div>
+                  Show this QR code at the event entrance
+                </p>
               </div>
-              
-              <p style={{ 
-                fontSize: '0.875rem', 
-                color: '#94a3b8', 
-                margin: 0 
-              }}>
-                Show this QR code and verification code at the event entrance
-              </p>
             </div>
           </div>
-        </div>
+        ))}
 
         {/* Action Buttons */}
         <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem' }}>
@@ -541,25 +561,6 @@ export default function SuccessPage() {
           </button>
         </div>
 
-        {/* Additional Information */}
-        <div style={{
-          backgroundColor: 'rgba(59, 130, 246, 0.1)',
-          borderRadius: '12px',
-          padding: '1.5rem',
-          marginBottom: '2rem',
-          border: '1px solid rgba(59, 130, 246, 0.2)'
-        }}>
-          <h3 style={{ fontSize: '1.125rem', fontWeight: '500', color: '#3b82f6', marginBottom: '0.5rem' }}>
-            Important Information
-          </h3>
-          <ul style={{ fontSize: '0.875rem', color: '#60a5fa', listStyle: 'none', padding: 0 }}>
-            <li style={{ marginBottom: '0.25rem' }}>• Your ticket has been saved to your account</li>
-            <li style={{ marginBottom: '0.25rem' }}>• Bring a valid ID to the event for age verification</li>
-            <li style={{ marginBottom: '0.25rem' }}>• The QR code is valid for entry at the venue</li>
-            <li style={{ marginBottom: '0.25rem' }}>• Keep this ticket safe for event entry</li>
-          </ul>
-        </div>
-
         {/* Navigation */}
         <div style={{ textAlign: 'center' }}>
           <a
@@ -579,4 +580,18 @@ export default function SuccessPage() {
       </div>
     </div>
   )
+
+  // 主渲染逻辑
+  switch (uiState) {
+    case UI_STATES.LOADING:
+      return renderLoading()
+    case UI_STATES.SUCCESS:
+      return renderSuccess()
+    case UI_STATES.TIMEOUT:
+      return renderTimeout()
+    case UI_STATES.ERROR:
+      return renderError()
+    default:
+      return renderLoading()
+  }
 }

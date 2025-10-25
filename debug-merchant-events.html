@@ -1,49 +1,282 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Debug Merchant Events</title>
+    <title>商家活动调试</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .debug-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 8px; }
+        .success { background: #d4edda; }
+        .error { background: #f8d7da; }
+        .info { background: #d1ecf1; }
+        button { padding: 10px 15px; margin: 5px; cursor: pointer; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 4px; overflow-x: auto; }
+    </style>
 </head>
 <body>
-    <h1>Debug Merchant Events</h1>
-    <div id="output"></div>
+    <h1>🔍 商家活动调试工具</h1>
+    
+    <div class="debug-section info">
+        <h2>1. 检查商家活动数据</h2>
+        <button onclick="checkMerchantEvents()">检查商家活动</button>
+        <div id="merchant-events-result"></div>
+    </div>
+    
+    <div class="debug-section info">
+        <h2>2. 检查用户数据</h2>
+        <button onclick="checkUserData()">检查用户数据</button>
+        <div id="user-data-result"></div>
+    </div>
+    
+    <div class="debug-section info">
+        <h2>3. 测试活动路由</h2>
+        <button onclick="testEventRoutes()">测试路由</button>
+        <div id="route-test-result"></div>
+    </div>
+    
+    <div class="debug-section info">
+        <h2>4. 创建测试数据</h2>
+        <button onclick="createTestData()">创建测试数据</button>
+        <div id="test-data-result"></div>
+    </div>
+    
+    <div class="debug-section info">
+        <h2>5. 修复数据</h2>
+        <button onclick="fixData()">修复数据</button>
+        <div id="fix-result"></div>
+    </div>
     
     <script>
-        // 检查 localStorage 中的商家活动数据
-        function debugMerchantEvents() {
-            const output = document.getElementById('output');
+        function checkMerchantEvents() {
+            const result = document.getElementById('merchant-events-result');
+            result.innerHTML = '<p>正在检查商家活动数据...</p>';
             
             try {
                 const merchantEvents = JSON.parse(localStorage.getItem('merchantEvents') || '[]');
                 
-                output.innerHTML = `
-                    <h2>LocalStorage 中的商家活动数据:</h2>
-                    <p>活动数量: ${merchantEvents.length}</p>
-                    <pre>${JSON.stringify(merchantEvents, null, 2)}</pre>
-                    
-                    <h2>生成的 Slugs:</h2>
-                    ${merchantEvents.map((event, index) => {
-                        const slug = event.title
+                let html = '<h3>商家活动数据:</h3>';
+                html += `<p>活动数量: ${merchantEvents.length}</p>`;
+                
+                if (merchantEvents.length > 0) {
+                    html += '<h4>活动列表:</h4>';
+                    merchantEvents.forEach((event, index) => {
+                        const eventSlug = event.title
                             .toLowerCase()
                             .replace(/[^a-z0-9\s-]/g, '')
                             .replace(/\s+/g, '-')
                             .trim();
-                        return `
-                            <div>
-                                <strong>活动 ${index + 1}:</strong><br>
-                                标题: ${event.title}<br>
-                                生成的 Slug: ${slug}<br>
-                                预期 URL: /events/${slug}
+                        
+                        html += `
+                            <div style="margin: 10px 0; padding: 10px; border: 1px solid #ccc; border-radius: 4px;">
+                                <h5>活动 ${index + 1}:</h5>
+                                <p><strong>ID:</strong> ${event.id}</p>
+                                <p><strong>标题:</strong> ${event.title}</p>
+                                <p><strong>生成的Slug:</strong> ${eventSlug}</p>
+                                <p><strong>描述:</strong> ${event.description}</p>
+                                <p><strong>开始时间:</strong> ${event.startTime}</p>
+                                <p><strong>位置:</strong> ${event.location}</p>
+                                <p><strong>价格数量:</strong> ${event.prices ? event.prices.length : 0}</p>
+                                <a href="/events/${eventSlug}" target="_blank" style="color: #007bff;">测试链接: /events/${eventSlug}</a>
                             </div>
                         `;
-                    }).join('<br>')}
-                `;
+                    });
+                } else {
+                    html += '<p style="color: #dc3545;">❌ 没有找到商家活动数据</p>';
+                }
+                
+                result.innerHTML = html;
+                
             } catch (error) {
-                output.innerHTML = `<p style="color: red;">错误: ${error.message}</p>`;
+                result.innerHTML = `<p style="color: #dc3545;">❌ 检查失败: ${error.message}</p>`;
             }
         }
         
-        // 页面加载时执行
-        window.onload = debugMerchantEvents;
+        function checkUserData() {
+            const result = document.getElementById('user-data-result');
+            result.innerHTML = '<p>正在检查用户数据...</p>';
+            
+            try {
+                const userData = JSON.parse(localStorage.getItem('userData') || '{}');
+                const merchantUser = JSON.parse(localStorage.getItem('merchantUser') || '{}');
+                
+                let html = '<h3>用户数据:</h3>';
+                html += `<p>用户数据: ${userData.id ? '已设置' : '未设置'}</p>`;
+                html += `<p>商家用户: ${merchantUser.id ? '已设置' : '未设置'}</p>`;
+                
+                if (userData.id) {
+                    html += `<p>用户ID: ${userData.id}</p>`;
+                    html += `<p>用户邮箱: ${userData.email}</p>`;
+                    html += `<p>登录状态: ${userData.isLoggedIn ? '已登录' : '未登录'}</p>`;
+                }
+                
+                if (merchantUser.id) {
+                    html += `<p>商家ID: ${merchantUser.id}</p>`;
+                    html += `<p>商家邮箱: ${merchantUser.email}</p>`;
+                }
+                
+                result.innerHTML = html;
+                
+            } catch (error) {
+                result.innerHTML = `<p style="color: #dc3545;">❌ 检查失败: ${error.message}</p>`;
+            }
+        }
+        
+        function testEventRoutes() {
+            const result = document.getElementById('route-test-result');
+            result.innerHTML = '<p>正在测试路由...</p>';
+            
+            const merchantEvents = JSON.parse(localStorage.getItem('merchantEvents') || '[]');
+            
+            if (merchantEvents.length === 0) {
+                result.innerHTML = '<p style="color: #dc3545;">❌ 没有商家活动数据可以测试</p>';
+                return;
+            }
+            
+            let html = '<h3>路由测试:</h3>';
+            
+            merchantEvents.forEach((event, index) => {
+                const eventSlug = event.title
+                    .toLowerCase()
+                    .replace(/[^a-z0-9\s-]/g, '')
+                    .replace(/\s+/g, '-')
+                    .trim();
+                
+                html += `
+                    <div style="margin: 10px 0; padding: 10px; border: 1px solid #ccc; border-radius: 4px;">
+                        <p><strong>活动:</strong> ${event.title}</p>
+                        <p><strong>Slug:</strong> ${eventSlug}</p>
+                        <a href="/events/${eventSlug}" target="_blank" style="color: #007bff; text-decoration: none; padding: 5px 10px; background: #e3f2fd; border-radius: 4px;">测试访问: /events/${eventSlug}</a>
+                    </div>
+                `;
+            });
+            
+            result.innerHTML = html;
+        }
+        
+        function createTestData() {
+            const result = document.getElementById('test-data-result');
+            result.innerHTML = '<p>正在创建测试数据...</p>';
+            
+            try {
+                // 创建测试商家活动
+                const testEvent = {
+                    id: 'test-event-' + Date.now(),
+                    merchantId: 'test-merchant-123',
+                    title: 'Test Event Title',
+                    description: 'This is a test event created for debugging',
+                    startTime: '2024-12-31T20:00:00.000Z',
+                    endTime: '2025-01-01T02:00:00.000Z',
+                    location: 'Test Venue',
+                    poster: null,
+                    prices: [
+                        {
+                            name: 'General Admission',
+                            amount_cents: 2000,
+                            inventory: 100,
+                            limit_per_user: 4
+                        }
+                    ],
+                    ticketsSold: 0,
+                    totalTickets: 100,
+                    revenue: 0,
+                    createdAt: new Date().toISOString()
+                };
+                
+                // 保存到 localStorage
+                const existingEvents = JSON.parse(localStorage.getItem('merchantEvents') || '[]');
+                existingEvents.push(testEvent);
+                localStorage.setItem('merchantEvents', JSON.stringify(existingEvents));
+                
+                // 创建测试用户
+                const testUser = {
+                    id: 'test-user-' + Date.now(),
+                    email: 'test@example.com',
+                    name: 'Test User',
+                    isLoggedIn: true,
+                    token: 'test-token-' + Date.now()
+                };
+                localStorage.setItem('userData', JSON.stringify(testUser));
+                
+                result.innerHTML = `
+                    <div style="color: #28a745;">
+                        <p>✅ 测试数据创建成功！</p>
+                        <p>活动: ${testEvent.title}</p>
+                        <p>用户: ${testUser.name}</p>
+                        <a href="/events/test-event-title" target="_blank" style="color: #007bff;">测试活动链接</a>
+                    </div>
+                `;
+                
+            } catch (error) {
+                result.innerHTML = `<p style="color: #dc3545;">❌ 创建失败: ${error.message}</p>`;
+            }
+        }
+        
+        function fixData() {
+            const result = document.getElementById('fix-result');
+            result.innerHTML = '<p>正在修复数据...</p>';
+            
+            try {
+                // 检查并修复商家活动数据
+                const merchantEvents = JSON.parse(localStorage.getItem('merchantEvents') || '[]');
+                
+                if (merchantEvents.length === 0) {
+                    // 创建默认活动
+                    const defaultEvent = {
+                        id: 'default-event-' + Date.now(),
+                        merchantId: 'default-merchant',
+                        title: 'Default Event',
+                        description: 'This is a default event',
+                        startTime: '2024-12-31T20:00:00.000Z',
+                        endTime: '2025-01-01T02:00:00.000Z',
+                        location: 'Default Venue',
+                        poster: null,
+                        prices: [
+                            {
+                                name: 'Standard Ticket',
+                                amount_cents: 1500,
+                                inventory: 50,
+                                limit_per_user: 2
+                            }
+                        ],
+                        ticketsSold: 0,
+                        totalTickets: 50,
+                        revenue: 0,
+                        createdAt: new Date().toISOString()
+                    };
+                    
+                    localStorage.setItem('merchantEvents', JSON.stringify([defaultEvent]));
+                }
+                
+                // 确保用户数据存在
+                const userData = JSON.parse(localStorage.getItem('userData') || '{}');
+                if (!userData.id) {
+                    const testUser = {
+                        id: 'user-' + Date.now(),
+                        email: 'user@example.com',
+                        name: 'Test User',
+                        isLoggedIn: true,
+                        token: 'token-' + Date.now()
+                    };
+                    localStorage.setItem('userData', JSON.stringify(testUser));
+                }
+                
+                result.innerHTML = `
+                    <div style="color: #28a745;">
+                        <p>✅ 数据修复完成！</p>
+                        <p>商家活动数量: ${JSON.parse(localStorage.getItem('merchantEvents') || '[]').length}</p>
+                        <p>用户数据: ${localStorage.getItem('userData') ? '已设置' : '未设置'}</p>
+                    </div>
+                `;
+                
+            } catch (error) {
+                result.innerHTML = `<p style="color: #dc3545;">❌ 修复失败: ${error.message}</p>`;
+            }
+        }
+        
+        // 页面加载时自动检查数据
+        window.onload = function() {
+            checkMerchantEvents();
+            checkUserData();
+        };
     </script>
 </body>
 </html>

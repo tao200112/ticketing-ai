@@ -22,6 +22,38 @@ const nextConfig = {
       console.warn('无法获取 Git SHA，使用时间戳作为构建 ID');
       return Date.now().toString();
     }
+  },
+
+  // 线上部署优化配置
+  experimental: {
+    // 启用服务器组件缓存
+    serverComponentsExternalPackages: ['@prisma/client'],
+  },
+
+  // 重写规则 - 处理动态路由
+  async rewrites() {
+    return [
+      // 确保事件路由正确重写
+      {
+        source: '/events/:id',
+        destination: '/events/:id',
+      },
+    ]
+  },
+
+  // 错误处理
+  async headers() {
+    return [
+      {
+        source: '/events/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=60, stale-while-revalidate=300',
+          },
+        ],
+      },
+    ]
   }
 }
 

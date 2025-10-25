@@ -24,37 +24,42 @@ export default async function EventDetailPage({ params }: PageProps) {
 
     // 检查 Supabase 配置
     if (supabaseAdmin) {
-      // 从 Supabase 查询事件详情
-      const result = await supabaseAdmin
-        .from('events')
-        .select(`
-          id,
-          title,
-          description,
-          start_at,
-          end_at,
-          venue_name,
-          location,
-          max_attendees,
-          poster_url,
-          status,
-          created_at,
-          updated_at,
-          event_prices (
+      try {
+        // 从 Supabase 查询事件详情
+        const result = await supabaseAdmin
+          .from('events')
+          .select(`
             id,
-            label,
-            amount,
-            currency,
-            inventory,
-            limit_per_user
-          )
-        `)
-        .eq('id', id)
-        .eq('status', 'active') // 只返回活跃状态的事件
-        .single()
+            title,
+            description,
+            start_at,
+            end_at,
+            venue_name,
+            location,
+            max_attendees,
+            poster_url,
+            status,
+            created_at,
+            updated_at,
+            event_prices (
+              id,
+              label,
+              amount,
+              currency,
+              inventory,
+              limit_per_user
+            )
+          `)
+          .eq('id', id)
+          .eq('status', 'active') // 只返回活跃状态的事件
+          .single()
 
-      event = result.data
-      error = result.error
+        event = result.data
+        error = result.error
+      } catch (dbError) {
+        console.error('Database query error:', dbError)
+        error = dbError
+      }
     } else {
       console.warn('Supabase not configured, using fallback data')
     }
@@ -63,10 +68,17 @@ export default async function EventDetailPage({ params }: PageProps) {
     if (error || !event) {
       console.warn('Event not found in database, using fallback data for:', id)
       
-      // 检查是否是默认事件（支持多种格式）
-      const isRidiculousChicken = id === 'ridiculous-chicken' || 
-                                 id === 'ridiculous-chicken-night-event' ||
-                                 id.includes('ridiculous-chicken')
+      // 智能事件ID匹配 - 支持多种格式
+      const normalizedId = id.toLowerCase().trim()
+      const isRidiculousChicken = normalizedId === 'ridiculous-chicken' || 
+                                 normalizedId === 'ridiculous-chicken-night-event' ||
+                                 normalizedId.includes('ridiculous-chicken') ||
+                                 normalizedId.includes('chicken')
+      
+      // 检查是否是测试事件
+      const isTestEvent = normalizedId.startsWith('test-') || 
+                         normalizedId.startsWith('aa') ||
+                         normalizedId.startsWith('default-')
       
       if (isRidiculousChicken) {
         // 使用默认的 Ridiculous Chicken 事件数据
@@ -98,6 +110,32 @@ export default async function EventDetailPage({ params }: PageProps) {
               amount: 3000,
               currency: 'USD',
               inventory: 50,
+              limit_per_user: 2
+            }
+          ]
+        }
+      } else if (isTestEvent) {
+        // 创建测试事件数据
+        event = {
+          id: id,
+          title: `Test Event ${id}`,
+          description: `This is a test event for ${id}. Please note that this is a demo event and may not have real functionality.`,
+          start_at: '2024-12-31T20:00:00.000Z',
+          end_at: '2025-01-01T02:00:00.000Z',
+          venue_name: 'Test Venue',
+          location: 'Test Location',
+          max_attendees: 50,
+          poster_url: null,
+          status: 'active',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          event_prices: [
+            {
+              id: 'test-general',
+              label: 'Test General Admission',
+              amount: 1000,
+              currency: 'USD',
+              inventory: 25,
               limit_per_user: 2
             }
           ]
@@ -170,6 +208,17 @@ export default async function EventDetailPage({ params }: PageProps) {
 
   } catch (error) {
     console.error('[EventDetail] Server error:', error)
+    
+    // 在生产环境中，提供更详细的错误信息
+    if (process.env.NODE_ENV === 'production') {
+      console.error('Production error details:', {
+        id,
+        error: error.message,
+        stack: error.stack,
+        timestamp: new Date().toISOString()
+      })
+    }
+    
     notFound()
   }
 }

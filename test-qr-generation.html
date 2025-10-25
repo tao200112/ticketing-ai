@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR Code Generation Test</title>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
+</head>
+<body>
+    <h1>QR Code Generation Test</h1>
+    <div id="result"></div>
+    <div id="qr-container"></div>
+
+    <script>
+        async function testQRGeneration() {
+            const resultDiv = document.getElementById('result');
+            const qrContainer = document.getElementById('qr-container');
+            
+            try {
+                console.log('Testing QR code generation...');
+                
+                const testData = {
+                    ticketId: 'test_ticket_123',
+                    verificationCode: 'ABC123',
+                    eventName: 'Test Event',
+                    ticketType: 'Test Ticket',
+                    price: '15.00'
+                };
+                
+                const qrString = JSON.stringify(testData);
+                console.log('QR data string:', qrString);
+                
+                const qrDataURL = await QRCode.toDataURL(qrString, {
+                    width: 256,
+                    margin: 2,
+                    color: {
+                        dark: '#000000',
+                        light: '#FFFFFF'
+                    },
+                    errorCorrectionLevel: 'M'
+                });
+                
+                console.log('QR code generated successfully, length:', qrDataURL.length);
+                
+                resultDiv.innerHTML = '<p style="color: green;">✅ QR Code generation successful!</p>';
+                qrContainer.innerHTML = `<img src="${qrDataURL}" alt="QR Code" style="border: 1px solid #ccc;">`;
+                
+            } catch (error) {
+                console.error('QR code generation failed:', error);
+                resultDiv.innerHTML = `<p style="color: red;">❌ QR Code generation failed: ${error.message}</p>`;
+            }
+        }
+        
+        // Run test when page loads
+        testQRGeneration();
+    </script>
+</body>
+</html>

@@ -71,21 +71,25 @@ export default function SuccessPage() {
       
       if (isDemoMode) {
         console.log('Demo mode detected, creating demo ticket')
-        // 创建演示票券
+        
+        // 从localStorage获取最近的购买信息
+        const recentPurchase = JSON.parse(localStorage.getItem('recentPurchase') || '{}')
+        
+        // 创建演示票券，使用真实的购买信息
         const demoTicket = {
           id: `demo_ticket_${Date.now()}`,
-          eventName: 'Demo Event',
-          ticketType: 'Demo Ticket',
-          quantity: 1,
-          price: '0.00',
+          eventName: recentPurchase.eventTitle || 'Demo Event',
+          ticketType: recentPurchase.ticketType || 'Demo Ticket',
+          quantity: recentPurchase.quantity || 1,
+          price: recentPurchase.price || '15.00', // 使用真实价格或默认价格
           purchaseDate: new Date().toLocaleDateString('en-US'),
           ticketValidityDate: new Date().toISOString().split('T')[0],
           ticketValidityStart: new Date().toISOString(),
           ticketValidityEnd: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
           status: 'valid',
           sessionId: sessionId,
-          customerEmail: 'demo@example.com',
-          customerName: 'Demo User'
+          customerEmail: recentPurchase.customerEmail || 'demo@example.com',
+          customerName: recentPurchase.customerName || 'Demo User'
         }
         
         setTicket(demoTicket)
@@ -95,20 +99,30 @@ export default function SuccessPage() {
         setVerificationCode(verificationCode)
         
         // 生成二维码
-        generateQRCode(demoTicket, verificationCode).then(qrDataURL => {
-          if (qrDataURL) {
-            setQrCodeDataURL(qrDataURL)
-            console.log('Demo QR Code generated successfully')
-          } else {
-            console.error('Failed to generate demo QR code')
+        console.log('Starting QR code generation for demo ticket:', demoTicket)
+        
+        // 使用 async/await 而不是 .then()
+        const generateQR = async () => {
+          try {
+            const qrDataURL = await generateQRCode(demoTicket, verificationCode)
+            console.log('QR code generation result:', qrDataURL ? 'Success' : 'Failed')
+            if (qrDataURL) {
+              setQrCodeDataURL(qrDataURL)
+              console.log('Demo QR Code generated successfully')
+            } else {
+              console.error('Failed to generate demo QR code')
+              // 设置一个默认的二维码占位符
+              setQrCodeDataURL('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjU2IiBoZWlnaHQ9IjI1NiIgdmlld0JveD0iMCAwIDI1NiAyNTYiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyNTYiIGhlaWdodD0iMjU2IiBmaWxsPSIjRjNGNEY2Ii8+Cjx0ZXh0IHg9IjEyOCIgeT0iMTI4IiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTIiIGZpbGw9IiM2QjcyODAiIHRleHQtYW5jaG9yPSJtaWRkbGUiPk5vIFFSIGNvZGUgYXZhaWxhYmxlPC90ZXh0Pgo8L3N2Zz4=')
+            }
+          } catch (error) {
+            console.error('Demo QR Code generation error:', error)
+            console.error('Error stack:', error.stack)
             // 设置一个默认的二维码占位符
             setQrCodeDataURL('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjU2IiBoZWlnaHQ9IjI1NiIgdmlld0JveD0iMCAwIDI1NiAyNTYiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyNTYiIGhlaWdodD0iMjU2IiBmaWxsPSIjRjNGNEY2Ii8+Cjx0ZXh0IHg9IjEyOCIgeT0iMTI4IiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTIiIGZpbGw9IiM2QjcyODAiIHRleHQtYW5jaG9yPSJtaWRkbGUiPk5vIFFSIGNvZGUgYXZhaWxhYmxlPC90ZXh0Pgo8L3N2Zz4=')
           }
-        }).catch(error => {
-          console.error('Demo QR Code generation error:', error)
-          // 设置一个默认的二维码占位符
-          setQrCodeDataURL('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjU2IiBoZWlnaHQ9IjI1NiIgdmlld0JveD0iMCAwIDI1NiAyNTYiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyNTYiIGhlaWdodD0iMjU2IiBmaWxsPSIjRjNGNEY2Ii8+Cjx0ZXh0IHg9IjEyOCIgeT0iMTI4IiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTIiIGZpbGw9IiM2QjcyODAiIHRleHQtYW5jaG9yPSJtaWRkbGUiPk5vIFFSIGNvZGUgYXZhaWxhYmxlPC90ZXh0Pgo8L3N2Zz4=')
-        })
+        }
+        
+        generateQR()
         
         setLoading(false)
         return
@@ -144,20 +158,30 @@ export default function SuccessPage() {
         setVerificationCode(verificationCode)
         
         // 生成二维码
-        generateQRCode(ticket, verificationCode).then(qrDataURL => {
-          if (qrDataURL) {
-            setQrCodeDataURL(qrDataURL)
-            console.log('QR Code generated successfully')
-          } else {
-            console.error('Failed to generate QR code')
+        console.log('Starting QR code generation for real ticket:', ticket)
+        
+        // 使用 async/await 而不是 .then()
+        const generateQR = async () => {
+          try {
+            const qrDataURL = await generateQRCode(ticket, verificationCode)
+            console.log('QR code generation result:', qrDataURL ? 'Success' : 'Failed')
+            if (qrDataURL) {
+              setQrCodeDataURL(qrDataURL)
+              console.log('QR Code generated successfully')
+            } else {
+              console.error('Failed to generate QR code')
+              // 设置一个默认的二维码占位符
+              setQrCodeDataURL('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjU2IiBoZWlnaHQ9IjI1NiIgdmlld0JveD0iMCAwIDI1NiAyNTYiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyNTYiIGhlaWdodD0iMjU2IiBmaWxsPSIjRjNGNEY2Ii8+Cjx0ZXh0IHg9IjEyOCIgeT0iMTI4IiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTIiIGZpbGw9IiM2QjcyODAiIHRleHQtYW5jaG9yPSJtaWRkbGUiPk5vIFFSIGNvZGUgYXZhaWxhYmxlPC90ZXh0Pgo8L3N2Zz4=')
+            }
+          } catch (error) {
+            console.error('QR Code generation error:', error)
+            console.error('Error stack:', error.stack)
             // 设置一个默认的二维码占位符
             setQrCodeDataURL('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjU2IiBoZWlnaHQ9IjI1NiIgdmlld0JveD0iMCAwIDI1NiAyNTYiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyNTYiIGhlaWdodD0iMjU2IiBmaWxsPSIjRjNGNEY2Ii8+Cjx0ZXh0IHg9IjEyOCIgeT0iMTI4IiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTIiIGZpbGw9IiM2QjcyODAiIHRleHQtYW5jaG9yPSJtaWRkbGUiPk5vIFFSIGNvZGUgYXZhaWxhYmxlPC90ZXh0Pgo8L3N2Zz4=')
           }
-        }).catch(error => {
-          console.error('QR Code generation error:', error)
-          // 设置一个默认的二维码占位符
-          setQrCodeDataURL('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjU2IiBoZWlnaHQ9IjI1NiIgdmlld0JveD0iMCAwIDI1NiAyNTYiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyNTYiIGhlaWdodD0iMjU2IiBmaWxsPSIjRjNGNEY2Ii8+Cjx0ZXh0IHg9IjEyOCIgeT0iMTI4IiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTIiIGZpbGw9IiM2QjcyODAiIHRleHQtYW5jaG9yPSJtaWRkbGUiPk5vIFFSIGNvZGUgYXZhaWxhYmxlPC90ZXh0Pgo8L3N2Zz4=')
-        })
+        }
+        
+        generateQR()
         
         // 保存到 localStorage 以便在账户页面显示
         const existingTickets = JSON.parse(localStorage.getItem('userTickets') || '[]')

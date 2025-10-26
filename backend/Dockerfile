@@ -1,40 +1,36 @@
-# 后端 Dockerfile
-FROM node:20-alpine AS base
+# 后端 Dockerfile for Railway
+FROM node:20-alpine
 
-# 安装依赖
-FROM base AS deps
-RUN apk add --no-cache libc6-compat
+# 设置工作目录
 WORKDIR /app
 
 # 复制 package.json 和 package-lock.json
-COPY package.json package-lock.json* ./
-RUN npm ci --only=production
+COPY package.json package-lock.json ./
 
-# 构建阶段
-FROM base AS builder
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
+# 安装依赖
+RUN npm ci --only=production && npm cache clean --force
+
+# 复制应用代码
 COPY . .
 
-# 生产阶段
-FROM base AS runner
-WORKDIR /app
-
-ENV NODE_ENV=production
-
+# 创建非 root 用户
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 backend
 
-# 复制应用文件
-COPY --from=builder --chown=backend:nodejs /app/node_modules ./node_modules
-COPY --from=builder --chown=backend:nodejs /app/package.json ./package.json
-COPY --from=builder --chown=backend:nodejs /app/server.js ./server.js
-
+# 设置权限
+RUN chown -R backend:nodejs /app
 USER backend
 
-EXPOSE 3001
+# 暴露端口
+EXPOSE 8080
 
-ENV PORT=3001
-ENV HOSTNAME="0.0.0.0"
+# 设置环境变量
+ENV NODE_ENV=production
+ENV PORT=8080
 
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:8080/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"
+
+# 启动应用
 CMD ["node", "server.js"]

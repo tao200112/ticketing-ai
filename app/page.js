@@ -5,7 +5,7 @@ import React, { useState, useEffect } from "react"
 import NavbarPartyTix from "../components/NavbarPartyTix"
 import EventCard from "../components/EventCard"
 import { SkeletonGrid } from "../components/SkeletonCard"
-import { hasSupabase } from "../lib/safeEnv"
+// import { hasSupabase } from "../lib/safeEnv" // 已移除，使用新的 API 客户端
 import { getDefaultEvents } from "../lib/default-events"
 import { useEvents } from "../lib/hooks/use-api"
 

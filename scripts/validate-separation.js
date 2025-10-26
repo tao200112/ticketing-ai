@@ -66,13 +66,17 @@ frontendFiles.forEach(file => {
 });
 
 console.log('\n🔍 检查 API 路由状态:');
+const apiDir = path.join(process.cwd(), 'app/api');
 const apiRemovedDir = path.join(process.cwd(), 'app/api-removed');
-if (fs.existsSync(apiRemovedDir)) {
+
+if (fs.existsSync(apiDir) && fs.readdirSync(apiDir).length > 0) {
+  console.log('  ❌ 原始 API 路由目录 app/api 仍存在且包含文件');
+  separationStatus = false;
+  issues.push('原始 API 路由仍存在');
+} else if (fs.existsSync(apiRemovedDir) && fs.readdirSync(apiRemovedDir).length > 0) {
   console.log('  ✅ API 路由已移动到 api-removed 目录');
 } else {
-  console.log('  ❌ API 路由未正确移动');
-  separationStatus = false;
-  issues.push('API 路由未正确移动');
+  console.log('  ✅ 原始 API 路由目录 app/api 已清空或移除');
 }
 
 console.log('\n🔍 检查后端服务配置:');

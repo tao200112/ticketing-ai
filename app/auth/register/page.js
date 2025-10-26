@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { hasSupabase } from '../../../lib/safeEnv'
+// import { hasSupabase } from '../../../lib/safeEnv' // 已移除，使用新的 API 客户端
 
 export default function RegisterPage() {
   const router = useRouter()

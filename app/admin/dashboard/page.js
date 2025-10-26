@@ -476,6 +476,22 @@ export default function AdminDashboard() {
               {tab.replace('-', ' ')}
                   </button>
             ))}
+          <button
+            onClick={() => window.location.href = '/admin/contact-messages'}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '6px',
+              border: 'none',
+              background: 'transparent',
+              color: 'white',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: '500',
+              textTransform: 'capitalize'
+            }}
+          >
+            Contact Messages
+          </button>
         </div>
 
         {/* Tab Content */}

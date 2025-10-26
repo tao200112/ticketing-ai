@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '../../../../lib/supabase-admin';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 
 export async function GET() {
   try {
@@ -18,9 +18,9 @@ export async function GET() {
         events (
           id,
           title,
-          start_date,
-          end_date,
-          location
+          start_at,
+          end_at,
+          venue_name
         )
       `)
       .order('created_at', { ascending: false });
@@ -45,8 +45,8 @@ export async function GET() {
       qr_payload: ticket.qr_payload,
       holder_email: ticket.holder_email,
       event_title: ticket.events?.title,
-      event_start: ticket.events?.start_date,
-      event_location: ticket.events?.location,
+      event_start: ticket.events?.start_at,
+      event_location: ticket.events?.venue_name,
       order_id: ticket.orders?.id,
       order_total: ticket.orders?.total_amount_cents,
       order_status: ticket.orders?.status,

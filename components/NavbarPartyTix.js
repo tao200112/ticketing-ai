@@ -113,6 +113,18 @@ export default function NavbarPartyTix() {
               Merchant Console
             </Link>
             <Link 
+              href="/contact" 
+              style={{ 
+                color: 'white', 
+                textDecoration: 'none',
+                transition: 'color 0.3s ease'
+              }}
+              onMouseEnter={(e) => e.target.style.color = '#22D3EE'}
+              onMouseLeave={(e) => e.target.style.color = 'white'}
+            >
+              Contact Us
+            </Link>
+            <Link 
               href="/admin/login" 
               style={{ 
                 color: '#fbbf24', 

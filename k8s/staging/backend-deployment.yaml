@@ -1,0 +1,93 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: partytix-backend
+  namespace: partytix-staging
+  labels:
+    app: partytix-backend
+    environment: staging
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: partytix-backend
+  template:
+    metadata:
+      labels:
+        app: partytix-backend
+        environment: staging
+    spec:
+      containers:
+      - name: backend
+        image: partytix-backend:latest
+        ports:
+        - containerPort: 3001
+        env:
+        - name: NODE_ENV
+          value: "staging"
+        - name: PORT
+          value: "3001"
+        - name: SUPABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: partytix-secrets
+              key: supabase-url
+        - name: SUPABASE_SERVICE_ROLE_KEY
+          valueFrom:
+            secretKeyRef:
+              name: partytix-secrets
+              key: supabase-service-role-key
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: partytix-secrets
+              key: jwt-secret
+        - name: STRIPE_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: partytix-secrets
+              key: stripe-secret-key
+        - name: STRIPE_WEBHOOK_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: partytix-secrets
+              key: stripe-webhook-secret
+        - name: CORS_ORIGIN
+          value: "https://staging.partytix.com"
+        - name: REDIS_URL
+          value: "redis://redis-service:6379"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3001
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3001
+          initialDelaySeconds: 5
+          periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: partytix-backend-service
+  namespace: partytix-staging
+  labels:
+    app: partytix-backend
+spec:
+  selector:
+    app: partytix-backend
+  ports:
+  - port: 3001
+    targetPort: 3001
+    protocol: TCP
+  type: ClusterIP

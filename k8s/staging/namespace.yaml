@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: partytix-staging
+  labels:
+    name: partytix-staging
+    environment: staging

@@ -197,3 +197,4 @@ main().catch(error => {
   console.error('❌ 修复工具运行失败:', error.message);
   process.exit(1);
 });
+

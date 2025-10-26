@@ -3,62 +3,27 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import NavbarPartyTix from '../../components/NavbarPartyTix'
+import { useAuth } from '../../lib/auth-context'
+import { useUserTickets, useUserOrders } from '../../lib/hooks/use-api'
 
 export default function AccountPage() {
-  const [user, setUser] = useState(null)
-  const [tickets, setTickets] = useState([])
-  const [orders, setOrders] = useState([])
-  const [loading, setLoading] = useState(true)
+  const { user, logout, isAuthenticated, loading: authLoading } = useAuth()
+  const { data: tickets, loading: ticketsLoading } = useUserTickets()
+  const { data: orders, loading: ordersLoading } = useUserOrders()
   const router = useRouter()
 
   useEffect(() => {
-    // Check user login status
-    const userToken = localStorage.getItem('userToken')
-    const userData = localStorage.getItem('user')
-    
-    if (!userToken || !userData) {
+    if (!authLoading && !isAuthenticated()) {
       router.push('/auth/login')
-      return
     }
+  }, [authLoading, isAuthenticated, router])
 
-    setUser(JSON.parse(userData))
-    loadUserData()
-  }, [router])
-
-  const loadUserData = async () => {
-    try {
-      setLoading(true)
-      
-      // Load user tickets
-      const ticketsResponse = await fetch('/api/user/tickets')
-      if (ticketsResponse.ok) {
-        const ticketsData = await ticketsResponse.json()
-        setTickets(ticketsData)
-      }
-
-      // Load user orders (if API exists)
-      try {
-        const ordersResponse = await fetch('/api/user/orders')
-        if (ordersResponse.ok) {
-          const ordersData = await ordersResponse.json()
-          setOrders(ordersData)
-        }
-      } catch (error) {
-        console.log('Orders API not available yet')
-      }
-      
-    } catch (error) {
-      console.error('Error loading user data:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleLogout = () => {
-    localStorage.removeItem('userToken')
-    localStorage.removeItem('user')
+  const handleLogout = async () => {
+    await logout()
     router.push('/')
   }
+
+  const loading = authLoading || ticketsLoading || ordersLoading
 
   if (loading) {
     return (
@@ -201,10 +166,10 @@ export default function AccountPage() {
           boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)'
         }}>
           <h2 style={{ color: 'white', marginBottom: '20px', fontSize: '20px' }}>
-            My Tickets ({tickets.length})
+            My Tickets ({tickets?.length || 0})
           </h2>
           
-          {tickets.length === 0 ? (
+          {(tickets?.length || 0) === 0 ? (
             <div style={{ 
               textAlign: 'center', 
               color: 'rgba(255, 255, 255, 0.6)',
@@ -216,7 +181,7 @@ export default function AccountPage() {
             </div>
           ) : (
             <div style={{ display: 'grid', gap: '16px' }}>
-              {tickets.map(ticket => (
+              {(tickets || []).map(ticket => (
                 <div
                   key={ticket.id}
                   style={{
@@ -277,7 +242,7 @@ export default function AccountPage() {
         </div>
 
         {/* Purchase History */}
-        {orders.length > 0 && (
+        {(orders?.length || 0) > 0 && (
           <div style={{
             background: 'rgba(255, 255, 255, 0.05)',
             backdropFilter: 'blur(12px)',
@@ -287,11 +252,11 @@ export default function AccountPage() {
             boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)'
           }}>
             <h2 style={{ color: 'white', marginBottom: '20px', fontSize: '20px' }}>
-              Purchase History ({orders.length})
+              Purchase History ({orders?.length || 0})
             </h2>
             
             <div style={{ display: 'grid', gap: '16px' }}>
-              {orders.map(order => (
+              {(orders || []).map(order => (
                 <div
                   key={order.id}
                   style={{

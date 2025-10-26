@@ -1,0 +1,1258 @@
+openapi: 3.1.0
+info:
+  title: Partytix API
+  description: 票务系统前后端分离 API 契约
+  version: 1.0.0
+  contact:
+    name: Partytix Team
+    email: dev@partytix.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://api.partytix.com/v1
+    description: 生产环境
+  - url: https://staging-api.partytix.com/v1
+    description: 预发环境
+  - url: http://localhost:3001/v1
+    description: 开发环境
+
+security:
+  - BearerAuth: []
+  - ApiKeyAuth: []
+
+paths:
+  # 健康检查
+  /health:
+    get:
+      tags:
+        - 系统
+      summary: 健康检查
+      description: 检查服务健康状态
+      security: []
+      responses:
+        '200':
+          description: 服务正常
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "ok"
+                  timestamp:
+                    type: string
+                    format: date-time
+                  version:
+                    type: string
+                    example: "1.0.0"
+
+  # 认证相关
+  /auth/register:
+    post:
+      tags:
+        - 认证
+      summary: 用户注册
+      description: 注册新用户
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+                - name
+                - age
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: "user@example.com"
+                password:
+                  type: string
+                  minLength: 8
+                  example: "password123"
+                name:
+                  type: string
+                  example: "张三"
+                age:
+                  type: integer
+                  minimum: 18
+                  maximum: 100
+                  example: 25
+      responses:
+        '201':
+          description: 注册成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      user:
+                        $ref: '#/components/schemas/User'
+                      token:
+                        type: string
+                        example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                      refresh_token:
+                        type: string
+                        example: "refresh_token_here"
+        '400':
+          description: 请求参数错误
+        '409':
+          description: 用户已存在
+
+  /auth/login:
+    post:
+      tags:
+        - 认证
+      summary: 用户登录
+      description: 用户登录获取访问令牌
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: "user@example.com"
+                password:
+                  type: string
+                  example: "password123"
+      responses:
+        '200':
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      user:
+                        $ref: '#/components/schemas/User'
+                      token:
+                        type: string
+                        example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                      refresh_token:
+                        type: string
+                        example: "refresh_token_here"
+        '401':
+          description: 认证失败
+        '400':
+          description: 请求参数错误
+
+  /auth/verify:
+    get:
+      tags:
+        - 认证
+      summary: 验证令牌
+      description: 验证访问令牌有效性
+      responses:
+        '200':
+          description: 令牌有效
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      user:
+                        $ref: '#/components/schemas/User'
+        '401':
+          description: 令牌无效
+
+  /auth/refresh:
+    post:
+      tags:
+        - 认证
+      summary: 刷新令牌
+      description: 使用刷新令牌获取新的访问令牌
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - refresh_token
+              properties:
+                refresh_token:
+                  type: string
+                  example: "refresh_token_here"
+      responses:
+        '200':
+          description: 令牌刷新成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      token:
+                        type: string
+                        example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                      refresh_token:
+                        type: string
+                        example: "new_refresh_token_here"
+        '401':
+          description: 刷新令牌无效
+
+  /auth/logout:
+    post:
+      tags:
+        - 认证
+      summary: 用户登出
+      description: 用户登出，使令牌失效
+      responses:
+        '200':
+          description: 登出成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "登出成功"
+
+  # 用户相关
+  /users/profile:
+    get:
+      tags:
+        - 用户
+      summary: 获取用户资料
+      description: 获取当前用户的详细资料
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/User'
+        '401':
+          description: 未认证
+
+    put:
+      tags:
+        - 用户
+      summary: 更新用户资料
+      description: 更新当前用户的资料信息
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: "新姓名"
+                age:
+                  type: integer
+                  minimum: 18
+                  maximum: 100
+                  example: 26
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/User'
+        '401':
+          description: 未认证
+        '400':
+          description: 请求参数错误
+
+  /users/tickets:
+    get:
+      tags:
+        - 用户
+      summary: 获取用户票务
+      description: 获取当前用户的所有票务
+      parameters:
+        - name: status
+          in: query
+          description: 票务状态筛选
+          schema:
+            type: string
+            enum: [unused, used, expired]
+        - name: page
+          in: query
+          description: 页码
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          description: 每页数量
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Ticket'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '401':
+          description: 未认证
+
+  /users/orders:
+    get:
+      tags:
+        - 用户
+      summary: 获取用户订单
+      description: 获取当前用户的所有订单
+      parameters:
+        - name: status
+          in: query
+          description: 订单状态筛选
+          schema:
+            type: string
+            enum: [pending, paid, cancelled, refunded]
+        - name: page
+          in: query
+          description: 页码
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          description: 每页数量
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Order'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '401':
+          description: 未认证
+
+  # 活动相关
+  /events:
+    get:
+      tags:
+        - 活动
+      summary: 获取活动列表
+      description: 获取所有活动列表
+      security: []
+      parameters:
+        - name: status
+          in: query
+          description: 活动状态筛选
+          schema:
+            type: string
+            enum: [active, inactive, cancelled]
+        - name: category
+          in: query
+          description: 活动分类筛选
+          schema:
+            type: string
+        - name: page
+          in: query
+          description: 页码
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          description: 每页数量
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Event'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+    post:
+      tags:
+        - 活动
+      summary: 创建活动
+      description: 创建新活动（需要商家权限）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventCreate'
+      responses:
+        '201':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Event'
+        '401':
+          description: 未认证
+        '403':
+          description: 权限不足
+        '400':
+          description: 请求参数错误
+
+  /events/{id}:
+    get:
+      tags:
+        - 活动
+      summary: 获取活动详情
+      description: 根据ID获取活动详细信息
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 活动ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Event'
+        '404':
+          description: 活动不存在
+
+    put:
+      tags:
+        - 活动
+      summary: 更新活动
+      description: 更新活动信息（需要商家权限）
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 活动ID
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventUpdate'
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Event'
+        '401':
+          description: 未认证
+        '403':
+          description: 权限不足
+        '404':
+          description: 活动不存在
+
+    delete:
+      tags:
+        - 活动
+      summary: 删除活动
+      description: 删除活动（需要商家权限）
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 活动ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 删除成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "活动删除成功"
+        '401':
+          description: 未认证
+        '403':
+          description: 权限不足
+        '404':
+          description: 活动不存在
+
+  # 票务相关
+  /tickets:
+    get:
+      tags:
+        - 票务
+      summary: 获取票务列表
+      description: 获取票务列表（管理员权限）
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Ticket'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '401':
+          description: 未认证
+        '403':
+          description: 权限不足
+
+  /tickets/{id}:
+    get:
+      tags:
+        - 票务
+      summary: 获取票务详情
+      description: 根据ID获取票务详细信息
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 票务ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Ticket'
+        '401':
+          description: 未认证
+        '404':
+          description: 票务不存在
+
+  /tickets/verify:
+    post:
+      tags:
+        - 票务
+      summary: 验证票务
+      description: 验证票务二维码
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - qr_payload
+              properties:
+                qr_payload:
+                  type: string
+                  example: "TKT.123.1234567890.signature"
+      responses:
+        '200':
+          description: 验证成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      ticket:
+                        $ref: '#/components/schemas/Ticket'
+                      valid:
+                        type: boolean
+                        example: true
+        '400':
+          description: 请求参数错误
+        '404':
+          description: 票务不存在
+
+  /tickets/{id}/use:
+    post:
+      tags:
+        - 票务
+      summary: 使用票务
+      description: 标记票务为已使用
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 票务ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 使用成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Ticket'
+        '401':
+          description: 未认证
+        '404':
+          description: 票务不存在
+        '400':
+          description: 票务已使用
+
+  # 订单相关
+  /orders:
+    get:
+      tags:
+        - 订单
+      summary: 获取订单列表
+      description: 获取订单列表（管理员权限）
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Order'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '401':
+          description: 未认证
+        '403':
+          description: 权限不足
+
+  /orders/{id}:
+    get:
+      tags:
+        - 订单
+      summary: 获取订单详情
+      description: 根据ID获取订单详细信息
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 订单ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Order'
+        '401':
+          description: 未认证
+        '404':
+          description: 订单不存在
+
+  /orders/session/{sessionId}:
+    get:
+      tags:
+        - 订单
+      summary: 根据会话ID获取订单
+      description: 根据Stripe会话ID获取订单信息
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          description: Stripe会话ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Order'
+        '404':
+          description: 订单不存在
+
+  # 支付相关
+  /payments/checkout:
+    post:
+      tags:
+        - 支付
+      summary: 创建支付会话
+      description: 创建Stripe支付会话
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - event_id
+                - ticket_type
+                - quantity
+                - customer_email
+                - customer_name
+              properties:
+                event_id:
+                  type: string
+                  example: "event_123"
+                ticket_type:
+                  type: string
+                  example: "general"
+                quantity:
+                  type: integer
+                  minimum: 1
+                  example: 2
+                customer_email:
+                  type: string
+                  format: email
+                  example: "customer@example.com"
+                customer_name:
+                  type: string
+                  example: "张三"
+      responses:
+        '200':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      checkout_url:
+                        type: string
+                        example: "https://checkout.stripe.com/pay/cs_test_..."
+                      session_id:
+                        type: string
+                        example: "cs_test_1234567890"
+        '400':
+          description: 请求参数错误
+        '401':
+          description: 未认证
+
+  /payments/session/{sessionId}:
+    get:
+      tags:
+        - 支付
+      summary: 获取支付会话
+      description: 获取Stripe支付会话状态
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          description: Stripe会话ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      session_id:
+                        type: string
+                        example: "cs_test_1234567890"
+                      status:
+                        type: string
+                        example: "complete"
+                      payment_status:
+                        type: string
+                        example: "paid"
+        '404':
+          description: 会话不存在
+
+  # Webhook
+  /webhooks/stripe:
+    post:
+      tags:
+        - Webhook
+      summary: Stripe Webhook
+      description: 处理Stripe Webhook事件
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: string
+                  example: "evt_1234567890"
+                object:
+                  type: string
+                  example: "event"
+                type:
+                  type: string
+                  example: "checkout.session.completed"
+                data:
+                  type: object
+                  properties:
+                    object:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          example: "cs_test_1234567890"
+                        payment_intent:
+                          type: string
+                          example: "pi_1234567890"
+                        amount_total:
+                          type: integer
+                          example: 5000
+                        currency:
+                          type: string
+                          example: "cny"
+                        metadata:
+                          type: object
+      responses:
+        '200':
+          description: 处理成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Webhook处理成功"
+        '400':
+          description: 请求格式错误
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "user_123"
+        email:
+          type: string
+          format: email
+          example: "user@example.com"
+        name:
+          type: string
+          example: "张三"
+        age:
+          type: integer
+          example: 25
+        role:
+          type: string
+          enum: [user, merchant, admin]
+          example: "user"
+        created_at:
+          type: string
+          format: date-time
+          example: "2024-12-01T00:00:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          example: "2024-12-01T00:00:00Z"
+
+    Event:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "event_123"
+        title:
+          type: string
+          example: "音乐节2024"
+        description:
+          type: string
+          example: "年度音乐节活动"
+        start_date:
+          type: string
+          format: date-time
+          example: "2024-12-25T19:00:00Z"
+        end_date:
+          type: string
+          format: date-time
+          example: "2024-12-25T23:00:00Z"
+        location:
+          type: string
+          example: "北京国家体育场"
+        price:
+          type: integer
+          example: 5000
+        currency:
+          type: string
+          example: "CNY"
+        max_tickets:
+          type: integer
+          example: 1000
+        sold_tickets:
+          type: integer
+          example: 150
+        status:
+          type: string
+          enum: [active, inactive, cancelled]
+          example: "active"
+        created_at:
+          type: string
+          format: date-time
+          example: "2024-12-01T00:00:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          example: "2024-12-01T00:00:00Z"
+
+    EventCreate:
+      type: object
+      required:
+        - title
+        - description
+        - start_date
+        - end_date
+        - location
+        - price
+        - currency
+        - max_tickets
+      properties:
+        title:
+          type: string
+          example: "音乐节2024"
+        description:
+          type: string
+          example: "年度音乐节活动"
+        start_date:
+          type: string
+          format: date-time
+          example: "2024-12-25T19:00:00Z"
+        end_date:
+          type: string
+          format: date-time
+          example: "2024-12-25T23:00:00Z"
+        location:
+          type: string
+          example: "北京国家体育场"
+        price:
+          type: integer
+          example: 5000
+        currency:
+          type: string
+          example: "CNY"
+        max_tickets:
+          type: integer
+          example: 1000
+
+    EventUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+          example: "音乐节2024"
+        description:
+          type: string
+          example: "年度音乐节活动"
+        start_date:
+          type: string
+          format: date-time
+          example: "2024-12-25T19:00:00Z"
+        end_date:
+          type: string
+          format: date-time
+          example: "2024-12-25T23:00:00Z"
+        location:
+          type: string
+          example: "北京国家体育场"
+        price:
+          type: integer
+          example: 5000
+        currency:
+          type: string
+          example: "CNY"
+        max_tickets:
+          type: integer
+          example: 1000
+        status:
+          type: string
+          enum: [active, inactive, cancelled]
+          example: "active"
+
+    Ticket:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "ticket_123"
+        short_id:
+          type: string
+          example: "TKT123"
+        event_id:
+          type: string
+          example: "event_123"
+        event_title:
+          type: string
+          example: "音乐节2024"
+        user_id:
+          type: string
+          example: "user_123"
+        tier:
+          type: string
+          example: "general"
+        price_cents:
+          type: integer
+          example: 5000
+        status:
+          type: string
+          enum: [unused, used, expired]
+          example: "unused"
+        qr_payload:
+          type: string
+          example: "TKT.123.1234567890.signature"
+        issued_at:
+          type: string
+          format: date-time
+          example: "2024-12-01T00:00:00Z"
+        used_at:
+          type: string
+          format: date-time
+          example: "2024-12-25T20:00:00Z"
+        created_at:
+          type: string
+          format: date-time
+          example: "2024-12-01T00:00:00Z"
+
+    Order:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "order_123"
+        session_id:
+          type: string
+          example: "cs_test_1234567890"
+        user_id:
+          type: string
+          example: "user_123"
+        event_id:
+          type: string
+          example: "event_123"
+        ticket_type:
+          type: string
+          example: "general"
+        quantity:
+          type: integer
+          example: 2
+        total_amount_cents:
+          type: integer
+          example: 10000
+        currency:
+          type: string
+          example: "CNY"
+        status:
+          type: string
+          enum: [pending, paid, cancelled, refunded]
+          example: "paid"
+        payment_intent_id:
+          type: string
+          example: "pi_1234567890"
+        created_at:
+          type: string
+          format: date-time
+          example: "2024-12-01T00:00:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          example: "2024-12-01T00:00:00Z"
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+          example: 1
+        limit:
+          type: integer
+          example: 10
+        total:
+          type: integer
+          example: 100
+        pages:
+          type: integer
+          example: 10
+        has_next:
+          type: boolean
+          example: true
+        has_prev:
+          type: boolean
+          example: false
+
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+          example: "VALIDATION_ERROR"
+        message:
+          type: string
+          example: "请求参数错误"
+        details:
+          type: object
+          additionalProperties: true

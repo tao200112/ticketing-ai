@@ -2,9 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useAuth } from '../../../lib/auth-context'
 
 export default function LoginPage() {
   const router = useRouter()
+  const { login, isAuthenticated, loading: authLoading } = useAuth()
   const [formData, setFormData] = useState({
     email: '',
     password: ''
@@ -12,6 +14,13 @@ export default function LoginPage() {
   const [errors, setErrors] = useState({})
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
+
+  // 如果已经登录，重定向到账户页面
+  useEffect(() => {
+    if (isAuthenticated()) {
+      router.push('/account')
+    }
+  }, [isAuthenticated, router])
 
   const handleInputChange = (e) => {
     const { name, value } = e.target
@@ -59,45 +68,15 @@ export default function LoginPage() {
     try {
       console.log('🔍 Attempting login for:', formData.email)
       
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: formData.email,
-          password: formData.password
-        })
-      })
+      const result = await login(formData.email, formData.password)
       
-      const result = await response.json()
-      console.log('📋 Login response:', result)
-      
-      if (response.ok && result.ok) {
-        console.log('✅ Login successful, saving user data')
-        
-        // Save user info to localStorage
-        const userData = {
-          email: result.user.email,
-          name: result.user.name,
-          age: result.user.age,
-          id: result.user.id,
-          role: result.user.role,
-          loggedInAt: new Date().toISOString(),
-          isLoggedIn: true
-        }
-        localStorage.setItem('user', JSON.stringify(userData))
-        localStorage.setItem('userToken', 'mock-token-' + Date.now())
-        
+      if (result.success) {
+        console.log('✅ Login successful')
         setMessage('Login successful! Redirecting...')
-        
-        // Navigate immediately without delay
-        console.log('🚀 Redirecting to /account')
         router.push('/account')
-        
       } else {
-        console.error('❌ Login failed:', result.message)
-        setMessage(result.message || 'Login failed, please check email and password')
+        console.error('❌ Login failed:', result.error)
+        setMessage('Login failed, please check email and password')
       }
     } catch (error) {
       console.error('❌ Login error:', error)

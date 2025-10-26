@@ -1,67 +1,39 @@
 'use client'
 
 import Link from "next/link"
-import { useState, useEffect } from "react"
+import React, { useState, useEffect } from "react"
 import NavbarPartyTix from "../components/NavbarPartyTix"
 import EventCard from "../components/EventCard"
 import { SkeletonGrid } from "../components/SkeletonCard"
 import { hasSupabase } from "../lib/safeEnv"
 import { getDefaultEvents } from "../lib/default-events"
+import { useEvents } from "../lib/hooks/use-api"
 
 export default function Home() {
-  const [events, setEvents] = useState([])
+  // 使用新的 API 钩子
+  const { data: apiEvents, loading: apiLoading, error: apiError } = useEvents()
+  const [localEvents, setLocalEvents] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    loadEvents()
+    loadLocalEvents()
     
     // Listen to localStorage changes for real-time updates
     const handleStorageChange = (e) => {
-      // Only reload if merchantEvents changed
       if (e.key === 'merchantEvents') {
-        loadEvents()
+        loadLocalEvents()
       }
     }
     
-    // Listen to storage events
     window.addEventListener('storage', handleStorageChange)
-    
-    // Remove the aggressive polling - only check on focus
-    const handleFocus = () => {
-      loadEvents()
-    }
-    
-    window.addEventListener('focus', handleFocus)
     
     return () => {
       window.removeEventListener('storage', handleStorageChange)
-      window.removeEventListener('focus', handleFocus)
     }
   }, [])
 
-  const loadEvents = async () => {
+  const loadLocalEvents = () => {
     try {
-      setLoading(true)
-      
-      // Load events from database first
-      let dbEvents = []
-      try {
-        const response = await fetch('/api/events')
-        if (response.ok) {
-          const data = await response.json()
-          // 处理不同的数据格式
-          if (Array.isArray(data)) {
-            dbEvents = data
-          } else if (data && data.data && Array.isArray(data.data)) {
-            dbEvents = data.data
-          } else if (data && data.ok && data.data && Array.isArray(data.data)) {
-            dbEvents = data.data
-          }
-        }
-      } catch (error) {
-        console.error('Failed to load events from database:', error)
-      }
-      
       // Load events created by merchants from local storage (fallback)
       let merchantEvents = JSON.parse(localStorage.getItem('merchantEvents') || '[]')
       
@@ -93,28 +65,33 @@ export default function Home() {
         location: event.location,
         poster_url: event.poster,
         starting_price: event.prices && event.prices.length > 0 ? 
-          Math.min(...event.prices.map(p => p.amount_cents)) : 0, // amount_cents is already in cents
+          Math.min(...event.prices.map(p => p.amount_cents)) : 0,
         status: 'active',
         ticketsSold: event.ticketsSold || 0,
         totalTickets: event.totalTickets || 0,
         revenue: event.revenue || 0
       }))
       
-      // Combine and deduplicate events (database events take priority)
-      const defaultEvents = getDefaultEvents()
-      const allEvents = [...dbEvents, ...publicEvents, ...defaultEvents]
-      const uniqueEvents = allEvents.filter((event, index, self) => 
-        index === self.findIndex(e => e.id === event.id)
-      )
-      
-      setEvents(uniqueEvents)
+      setLocalEvents(publicEvents)
     } catch (err) {
-      console.error('Error loading event data:', err)
-      setEvents([])
-    } finally {
-      setLoading(false)
+      console.error('Error loading local events:', err)
+      setLocalEvents([])
     }
   }
+
+  // 合并 API 数据和本地数据
+  const events = React.useMemo(() => {
+    const defaultEvents = getDefaultEvents()
+    const allEvents = [...(apiEvents || []), ...localEvents, ...defaultEvents]
+    return allEvents.filter((event, index, self) => 
+      index === self.findIndex(e => e.id === event.id)
+    )
+  }, [apiEvents, localEvents])
+
+  // 更新加载状态
+  useEffect(() => {
+    setLoading(apiLoading)
+  }, [apiLoading])
 
   return (
     <div style={{

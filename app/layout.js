@@ -2,6 +2,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import NavbarPartyTix from "../components/NavbarPartyTix";
 import { DesktopVersionDisplay, MobileVersionDisplay } from "../components/VersionDisplay";
+import { AuthProvider } from "../lib/auth-context";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -22,18 +23,20 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
-        <NavbarPartyTix />
-        <div style={{ paddingTop: '80px' }}>
-          {children}
-        </div>
-        
-        {/* 版本信息显示 */}
-        <div className="hidden md:block">
-          <DesktopVersionDisplay />
-        </div>
-        <div className="block md:hidden">
-          <MobileVersionDisplay />
-        </div>
+        <AuthProvider>
+          <NavbarPartyTix />
+          <div style={{ paddingTop: '80px' }}>
+            {children}
+          </div>
+          
+          {/* 版本信息显示 */}
+          <div className="hidden md:block">
+            <DesktopVersionDisplay />
+          </div>
+          <div className="block md:hidden">
+            <MobileVersionDisplay />
+          </div>
+        </AuthProvider>
       </body>
     </html>
   );

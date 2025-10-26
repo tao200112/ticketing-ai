@@ -1,65 +1,39 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import EventCard from '../../components/EventCard'
 import { getDefaultEvents } from '../../lib/default-events'
+import { useEvents } from '../../lib/hooks/use-api'
 
 export default function EventsPage() {
-  const [events, setEvents] = useState([])
+  // 使用新的 API 钩子
+  const { data: apiEvents, loading: apiLoading, error: apiError } = useEvents()
+  const [localEvents, setLocalEvents] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     // 确保只在客户端执行
     if (typeof window === 'undefined') return
     
-    loadEvents()
+    loadLocalEvents()
     
     // 监听localStorage变化，当商家创建新事件时自动刷新
     const handleStorageChange = (e) => {
       if (e.key === 'merchantEvents') {
-        loadEvents()
+        loadLocalEvents()
       }
     }
     
     window.addEventListener('storage', handleStorageChange)
     
-    // 只在窗口获得焦点时检查更新
-    const handleFocus = () => {
-      loadEvents()
-    }
-    
-    window.addEventListener('focus', handleFocus)
-    
     return () => {
       window.removeEventListener('storage', handleStorageChange)
-      window.removeEventListener('focus', handleFocus)
     }
   }, [])
 
-  const loadEvents = async () => {
+  const loadLocalEvents = () => {
     try {
-      setLoading(true)
-      
-      // Load events from database first
-      let dbEvents = []
-      try {
-        const response = await fetch('/api/events')
-        if (response.ok) {
-          const data = await response.json()
-          // 处理不同的数据格式
-          if (Array.isArray(data)) {
-            dbEvents = data
-          } else if (data && data.data && Array.isArray(data.data)) {
-            dbEvents = data.data
-          } else if (data && data.ok && data.data && Array.isArray(data.data)) {
-            dbEvents = data.data
-          }
-        }
-      } catch (error) {
-        console.error('Failed to load events from database:', error)
-      }
-      
       // 从本地存储加载商家创建的事件 (fallback)
       let merchantEvents = JSON.parse(localStorage.getItem('merchantEvents') || '[]')
       
@@ -98,21 +72,26 @@ export default function EventsPage() {
         revenue: event.revenue || 0
       }))
       
-      // Combine and deduplicate events (database events take priority)
-      const defaultEvents = getDefaultEvents()
-      const allEvents = [...dbEvents, ...publicEvents, ...defaultEvents]
-      const uniqueEvents = allEvents.filter((event, index, self) => 
-        index === self.findIndex(e => e.id === event.id)
-      )
-      
-      setEvents(uniqueEvents)
+      setLocalEvents(publicEvents)
     } catch (err) {
-      console.error('加载活动数据错误:', err)
-      setEvents([])
-    } finally {
-      setLoading(false)
+      console.error('加载本地活动数据错误:', err)
+      setLocalEvents([])
     }
   }
+
+  // 合并 API 数据和本地数据
+  const events = React.useMemo(() => {
+    const defaultEvents = getDefaultEvents()
+    const allEvents = [...(apiEvents || []), ...localEvents, ...defaultEvents]
+    return allEvents.filter((event, index, self) => 
+      index === self.findIndex(e => e.id === event.id)
+    )
+  }, [apiEvents, localEvents])
+
+  // 更新加载状态
+  useEffect(() => {
+    setLoading(apiLoading)
+  }, [apiLoading])
 
   return (
     <div style={{

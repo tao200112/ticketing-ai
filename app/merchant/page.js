@@ -47,20 +47,25 @@ export default function MerchantOverviewPage() {
       // 获取订单数据
       const ordersResponse = await fetch('/api/admin/tickets')
       const ordersData = await ordersResponse.json()
+      console.log('🔍 商家页面 - 订单数据:', ordersData)
       
       // 获取活动数据
       const eventsResponse = await fetch('/api/events')
       const eventsData = await eventsResponse.json()
+      console.log('🔍 商家页面 - 活动数据:', eventsData)
       
       const allEvents = eventsData.success ? eventsData.data : []
       
       // 筛选当前商户的活动
       const merchantEvents = allEvents.filter(event => event.merchant_id === merchantId)
+      console.log('🔍 商家页面 - 商家活动:', merchantEvents)
+      console.log('🔍 商家页面 - 商家ID:', merchantId)
       
       // 筛选当前商户的票据
       const merchantTickets = ordersData.tickets?.filter(ticket => {
         return ticket.event_id && merchantEvents.some(e => e.id === ticket.event_id)
       }) || []
+      console.log('🔍 商家页面 - 商家票据:', merchantTickets)
       
       // 获取当前商户的订单
       const merchantOrders = ordersData.orders?.filter(order => {

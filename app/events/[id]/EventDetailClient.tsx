@@ -28,16 +28,16 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
     if (typeof window === 'undefined') return
     
     try {
-      const userData = localStorage.getItem('userData')
-      if (userData) {
-        const user = JSON.parse(userData)
-        if (user?.isLoggedIn) {
+      const userSession = localStorage.getItem('userSession')
+      if (userSession) {
+        const user = JSON.parse(userSession)
+        if (user?.id) {
           setCustomerEmail(user.email ?? '')
           setCustomerName(user.name ?? '')
         }
       }
     } catch (error) {
-      console.error('加载用户数据失败:', error)
+      console.error('Failed to load user data:', error)
     }
   }, [])
 
@@ -48,46 +48,46 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
   const handleBuyTickets = async () => {
     // 验证用户登录状态 - 确保只在客户端执行
     if (typeof window === 'undefined') {
-      setPaymentError('页面正在加载，请稍后重试')
+      setPaymentError('Page is loading, please try again later')
       return
     }
 
     try {
-      const userData = localStorage.getItem('userData')
-      if (!userData) {
-        setPaymentError('请先登录后再购买票据')
+      const userSession = localStorage.getItem('userSession')
+      if (!userSession) {
+        setPaymentError('Please login first to purchase tickets')
         return
       }
 
-      const user = JSON.parse(userData)
-      if (!user?.isLoggedIn || !user?.id) {
-        setPaymentError('请先登录后再购买票据')
+      const user = JSON.parse(userSession)
+      if (!user?.id) {
+        setPaymentError('Please login first to purchase tickets')
         return
       }
     } catch (error) {
-      console.error('验证用户登录状态失败:', error)
-      setPaymentError('请先登录后再购买票据')
+      console.error('Failed to verify user login status:', error)
+      setPaymentError('Please login first to purchase tickets')
       return
     }
 
     // 验证表单数据
     if (!customerEmail || !customerName) {
-      setPaymentError('请填写邮箱和姓名')
+      setPaymentError('Please fill in email and name')
       return
     }
 
     if (!ticketValidityDate) {
-      setPaymentError('请选择票券有效期')
+      setPaymentError('Please select ticket validity date')
       return
     }
 
     if (!selectedPrice) {
-      setPaymentError('请选择票种')
+      setPaymentError('Please select a ticket type')
       return
     }
 
     if (selectedPrice.inventory && selectedPrice.inventory < quantity) {
-      setPaymentError('票券库存不足')
+      setPaymentError('Insufficient ticket inventory')
       return
     }
 
@@ -107,10 +107,10 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
       let user = null
       if (typeof window !== 'undefined') {
         try {
-          const userData = localStorage.getItem('userData')
-          user = userData ? JSON.parse(userData) : null
+          const userSession = localStorage.getItem('userSession')
+          user = userSession ? JSON.parse(userSession) : null
         } catch (error) {
-          console.error('获取用户信息失败:', error)
+          console.error('Failed to get user information:', error)
         }
       }
 
@@ -155,7 +155,7 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
             }
             localStorage.setItem('recentPurchase', JSON.stringify(purchaseInfo))
           } catch (error) {
-            console.error('保存购买信息失败:', error)
+            console.error('Failed to save purchase information:', error)
           }
         }
         
@@ -164,11 +164,11 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
           window.location.href = data.url
         }
       } else {
-        setPaymentError(`支付设置失败: ${data.error}`)
+        setPaymentError(`Payment setup failed: ${data.error}`)
       }
     } catch (error) {
-      console.error('支付错误:', error)
-      setPaymentError('支付设置失败，请重试')
+      console.error('Payment error:', error)
+      setPaymentError('Payment setup failed, please try again')
     } finally {
       setPaymentLoading(false)
     }
@@ -193,7 +193,7 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
               fontSize: '0.875rem',
               fontWeight: '500'
             }}>
-              ← 返回活动列表
+              ← Back to Events
             </Link>
           </div>
 
@@ -211,7 +211,7 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
               color: 'white',
               marginBottom: '16px'
             }}>
-              {event?.title ?? '活动标题'}
+              {event?.title ?? 'Event Title'}
             </h1>
 
             <p style={{
@@ -220,7 +220,7 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
               lineHeight: '1.6',
               marginBottom: '24px'
             }}>
-              {event?.description ?? '暂无描述'}
+              {event?.description ?? 'No description available'}
             </p>
 
             {/* 活动信息 */}
@@ -240,15 +240,15 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
               }}>
                 <div style={{ fontSize: '1.5rem' }}>📅</div>
                 <div>
-                  <div style={{ color: '#94a3b8', fontSize: '0.875rem' }}>开始时间</div>
+                  <div style={{ color: '#94a3b8', fontSize: '0.875rem' }}>Start Time</div>
                   <div style={{ color: 'white', fontWeight: '500' }}>
-                    {event?.start_time ? new Date(event.start_time).toLocaleString('zh-CN', {
+                    {event?.start_time ? new Date(event.start_time).toLocaleString('en-US', {
                       year: 'numeric',
                       month: 'long',
                       day: 'numeric',
                       hour: '2-digit',
                       minute: '2-digit'
-                    }) : '时间待定'}
+                    }) : 'TBD'}
                   </div>
                 </div>
               </div>
@@ -264,9 +264,9 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
                 }}>
                   <div style={{ fontSize: '1.5rem' }}>🕐</div>
                   <div>
-                    <div style={{ color: '#94a3b8', fontSize: '0.875rem' }}>结束时间</div>
+                    <div style={{ color: '#94a3b8', fontSize: '0.875rem' }}>End Time</div>
                     <div style={{ color: 'white', fontWeight: '500' }}>
-                      {new Date(event.end_time).toLocaleString('zh-CN', {
+                      {new Date(event.end_time).toLocaleString('en-US', {
                         year: 'numeric',
                         month: 'long',
                         day: 'numeric',
@@ -288,9 +288,9 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
               }}>
                 <div style={{ fontSize: '1.5rem' }}>📍</div>
                 <div>
-                  <div style={{ color: '#94a3b8', fontSize: '0.875rem' }}>地点</div>
+                  <div style={{ color: '#94a3b8', fontSize: '0.875rem' }}>Venue</div>
                   <div style={{ color: 'white', fontWeight: '500' }}>
-                    {event?.venue ?? event?.location ?? '地点待定'}
+                    {event?.venue ?? event?.location ?? 'TBD'}
                   </div>
                 </div>
               </div>
@@ -306,9 +306,9 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
                 }}>
                   <div style={{ fontSize: '1.5rem' }}>👥</div>
                   <div>
-                    <div style={{ color: '#94a3b8', fontSize: '0.875rem' }}>最大参与人数</div>
+                    <div style={{ color: '#94a3b8', fontSize: '0.875rem' }}>Max Attendees</div>
                     <div style={{ color: 'white', fontWeight: '500' }}>
-                      {event.max_attendees} 人
+                      {event.max_attendees} people
                     </div>
                   </div>
                 </div>
@@ -330,7 +330,7 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
                 color: 'white',
                 marginBottom: '24px'
               }}>
-                选择票种
+                Select Ticket Type
               </h2>
 
               {/* 票种选择 */}
@@ -366,7 +366,7 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
                             fontSize: '0.875rem',
                             marginBottom: '8px'
                           }}>
-                            库存: {price.inventory} 张
+                            Stock: {price.inventory} tickets
                           </p>
                         )}
                         <div style={{
@@ -386,7 +386,7 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
                               fontSize: '0.875rem',
                               color: '#6b7280'
                             }}>
-                              (每人限购 {price.limit_per_user} 张)
+                              (Limit {price.limit_per_user} per person)
                             </span>
                           )}
                         </div>
@@ -423,7 +423,7 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
                   fontWeight: '600',
                   marginBottom: '16px'
                 }}>
-                  客户信息
+                  Customer Information
                 </h3>
                 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
@@ -435,13 +435,13 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
                       fontWeight: '500',
                       marginBottom: '8px'
                     }}>
-                      姓名 *
+                      Name *
                     </label>
                     <input
                       type="text"
                       value={customerName}
                       onChange={(e) => setCustomerName(e.target.value)}
-                      placeholder="请输入您的姓名"
+                      placeholder="Enter your name"
                       style={{
                         width: '100%',
                         padding: '12px 16px',
@@ -463,13 +463,13 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
                       fontWeight: '500',
                       marginBottom: '8px'
                     }}>
-                      邮箱 *
+                      Email *
                     </label>
                     <input
                       type="email"
                       value={customerEmail}
                       onChange={(e) => setCustomerEmail(e.target.value)}
-                      placeholder="请输入您的邮箱"
+                      placeholder="Enter your email"
                       style={{
                         width: '100%',
                         padding: '12px 16px',
@@ -494,7 +494,7 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
                   fontWeight: '500',
                   marginBottom: '8px'
                 }}>
-                  选择票券有效期 *
+                  Select Ticket Validity Date *
                 </label>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                   <div>
@@ -504,7 +504,7 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
                       fontSize: '0.75rem',
                       marginBottom: '4px'
                     }}>
-                      票券日期
+                      Ticket Date
                     </label>
                     <input
                       type="date"
@@ -530,7 +530,7 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
                       fontSize: '0.75rem',
                       marginBottom: '4px'
                     }}>
-                      有效期时间
+                      Validity Time
                     </label>
                     <div style={{
                       width: '100%',
@@ -542,7 +542,7 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
                       fontSize: '1rem',
                       cursor: 'not-allowed'
                     }}>
-                      16:00 - 次日 02:00
+                      4:00 PM - Next day 2:00 AM
                     </div>
                   </div>
                 </div>
@@ -555,7 +555,7 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
                   fontSize: '0.75rem',
                   color: '#6ee7b7'
                 }}>
-                  ℹ️ 票券有效期为选定日期的 16:00 至次日 02:00。请确保在有效期内使用。
+                  ℹ️ Ticket validity is from 4:00 PM on the selected date to 2:00 AM the next day. Please use within the validity period.
                 </div>
               </div>
 
@@ -568,7 +568,7 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
                   fontWeight: '500',
                   marginBottom: '8px'
                 }}>
-                  数量
+                  Quantity
                 </label>
                 <select
                   value={quantity}
@@ -585,7 +585,7 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
                   }}
                 >
                   {[1, 2, 3, 4, 5].map(num => (
-                    <option key={num} value={num}>{num} 张票</option>
+                    <option key={num} value={num}>{num} ticket(s)</option>
                   ))}
                 </select>
               </div>
@@ -602,7 +602,7 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
                   justifyContent: 'space-between',
                   alignItems: 'center'
                 }}>
-                  <span style={{ color: '#94a3b8' }}>总计</span>
+                  <span style={{ color: '#94a3b8' }}>Total</span>
                   <span style={{
                     fontSize: '1.5rem',
                     fontWeight: 'bold',
@@ -657,7 +657,7 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
                   }
                 }}
               >
-                {paymentLoading ? '处理中...' : '立即购票'}
+                {paymentLoading ? 'Processing...' : 'Purchase Now'}
               </button>
             </div>
           ) : (
@@ -670,10 +670,10 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
             }}>
               <div style={{ fontSize: '3rem', marginBottom: '16px' }}>🎫</div>
               <h3 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: 'white', marginBottom: '8px' }}>
-                暂无票券
+                No Tickets Available
               </h3>
               <p style={{ color: '#94a3b8' }}>
-                此活动暂无可售票券。
+                No tickets are available for this event at the moment.
               </p>
             </div>
           )}

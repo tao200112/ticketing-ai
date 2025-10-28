@@ -2,9 +2,10 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import Stripe from 'stripe'
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
+// 安全地初始化Stripe
+const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY, {
   apiVersion: '2023-10-16',
-})
+}) : null
 
 function generateShortTicketId() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
@@ -17,6 +18,14 @@ function generateShortTicketId() {
 
 export async function GET(request) {
   try {
+    // 检查Stripe是否已初始化
+    if (!stripe) {
+      return NextResponse.json({ 
+        ok: false, 
+        message: 'Stripe not configured' 
+      }, { status: 500 })
+    }
+
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 

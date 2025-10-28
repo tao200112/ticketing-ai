@@ -1,12 +1,26 @@
 import { NextResponse } from 'next/server'
 import Stripe from 'stripe'
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
+// 安全地初始化Stripe
+const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY, {
   apiVersion: '2023-10-16',
-})
+}) : null
 
 export async function POST(request) {
   try {
+    // 检查Stripe是否已初始化
+    if (!stripe) {
+      console.error('❌ Stripe未配置')
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'STRIPE_NOT_CONFIGURED',
+          message: '支付服务未配置'
+        },
+        { status: 500 }
+      )
+    }
+
     const body = await request.json()
     const { event_id, price_id, quantity = 1, customer_email, customer_name } = body
 

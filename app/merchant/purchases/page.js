@@ -48,27 +48,46 @@ export default function MerchantPurchasesPage() {
       const response = await fetch('/api/admin/tickets')
       const result = await response.json()
       
-      if (result && Array.isArray(result)) {
+      console.log('🔍 Purchase Records - API响应:', result)
+      
+      // 处理新的API响应格式 { tickets: [], orders: [] }
+      const tickets = result.tickets || result || []
+      const orders = result.orders || []
+      
+      if (tickets && Array.isArray(tickets)) {
+        // 获取当前商家的活动ID
+        const eventsResponse = await fetch('/api/events')
+        const eventsResult = await eventsResponse.json()
+        const allEvents = eventsResult.success ? eventsResult.data : []
+        const merchantEvents = allEvents.filter(event => event.merchant_id === merchantUser.merchant_id)
+        const merchantEventIds = merchantEvents.map(event => event.id)
+        
+        console.log('🔍 Purchase Records - 商家活动ID:', merchantEventIds)
+        
         // 筛选当前商家的票据
-        const merchantTickets = result.filter(ticket => {
-          // 通过订单关联找到商家的票据
-          // 这里需要根据实际的数据结构来调整
-          return ticket.orders && ticket.orders.customer_email
+        const merchantTickets = tickets.filter(ticket => {
+          return merchantEventIds.includes(ticket.event_id)
         })
+        
+        console.log('🔍 Purchase Records - 商家票据:', merchantTickets)
         
         // 转换为购买记录格式
         const purchases = merchantTickets.map(ticket => {
-          const eventName = ticket.event_id || 'Unknown Event'
-          const quantity = 1
-          const amount = ticket.orders?.total_amount_cents || 0
-          const customerEmail = ticket.holder_email || ticket.orders?.customer_email || ''
-          const purchaseDate = ticket.created_at || new Date().toISOString()
+          // 查找对应的活动信息
+          const event = merchantEvents.find(e => e.id === ticket.event_id)
+          const eventName = event?.title || event?.name || 'Unknown Event'
+          
+          // 查找对应的订单信息
+          const order = orders.find(o => o.id === ticket.order_id)
+          const amount = order?.total_amount_cents || 0
+          const customerEmail = ticket.holder_email || order?.customer_email || ''
+          const purchaseDate = order?.created_at || ticket.created_at || new Date().toISOString()
           
           return {
             id: ticket.id,
             eventName: eventName,
             ticketType: ticket.tier || 'General',
-            quantity: quantity,
+            quantity: 1,
             amount: amount,
             totalAmount: amount,
             customerName: customerEmail.split('@')[0],

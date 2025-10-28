@@ -14,10 +14,10 @@ export default function AuthGuard({ children, redirectTo = '/auth/login' }) {
 
   const checkAuthStatus = () => {
     try {
-      const userData = localStorage.getItem('userData')
-      if (userData) {
-        const user = JSON.parse(userData)
-        if (user.isLoggedIn) {
+      const userSession = localStorage.getItem('userSession')
+      if (userSession) {
+        const user = JSON.parse(userSession)
+        if (user.id) {
           setIsAuthenticated(true)
         } else {
           setIsAuthenticated(false)
@@ -26,7 +26,7 @@ export default function AuthGuard({ children, redirectTo = '/auth/login' }) {
         setIsAuthenticated(false)
       }
     } catch (error) {
-      console.error('检查认证状态失败:', error)
+      console.error('Failed to check authentication status:', error)
       setIsAuthenticated(false)
     } finally {
       setLoading(false)
@@ -95,7 +95,7 @@ export default function AuthGuard({ children, redirectTo = '/auth/login' }) {
             color: 'white',
             marginBottom: '1rem'
           }}>
-            需要登录才能购买票券
+            Login Required to Purchase Tickets
           </h1>
           
           <p style={{
@@ -103,7 +103,7 @@ export default function AuthGuard({ children, redirectTo = '/auth/login' }) {
             marginBottom: '2rem',
             lineHeight: '1.6'
           }}>
-            请先注册或登录您的账户，然后才能购买活动票券。
+            Please register or log in to your account first, then you can purchase event tickets.
           </p>
           
           <div style={{
@@ -127,7 +127,7 @@ export default function AuthGuard({ children, redirectTo = '/auth/login' }) {
               onMouseEnter={(e) => e.target.style.backgroundColor = '#6d28d9'}
               onMouseLeave={(e) => e.target.style.backgroundColor = '#7c3aed'}
             >
-              注册账户
+              Register Account
             </a>
             
             <a
@@ -146,7 +146,7 @@ export default function AuthGuard({ children, redirectTo = '/auth/login' }) {
               onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(55, 65, 81, 0.7)'}
               onMouseLeave={(e) => e.target.style.backgroundColor = 'rgba(55, 65, 81, 0.5)'}
             >
-              登录账户
+              Login Account
             </a>
           </div>
           
@@ -163,10 +163,10 @@ export default function AuthGuard({ children, redirectTo = '/auth/login' }) {
               margin: '0',
               lineHeight: '1.5'
             }}>
-              💡 注册账户后，您可以：
-              <br />• 购买活动票券
-              <br />• 查看购买历史
-              <br />• 管理个人信息
+              💡 After registering an account, you can:
+              <br />• Purchase event tickets
+              <br />• View purchase history
+              <br />• Manage personal information
             </p>
           </div>
         </div>

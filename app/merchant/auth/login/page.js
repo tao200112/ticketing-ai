@@ -66,14 +66,18 @@ export default function MerchantLoginPage() {
 
       const data = await response.json()
 
+      console.log('🔍 商家登录响应:', { status: response.status, data })
+      
       if (response.ok && data.success) {
         // Login successful, save user info to localStorage
         localStorage.setItem('merchantUser', JSON.stringify(data.user))
         localStorage.setItem('merchantToken', 'merchant-logged-in')
         
+        console.log('✅ 商家登录成功，跳转到商家页面')
         // Navigate to merchant dashboard
         router.push('/merchant')
       } else {
+        console.error('❌ 商家登录失败:', data)
         setErrors({ general: data.error || data.message || 'Login failed' })
       }
     } catch (error) {

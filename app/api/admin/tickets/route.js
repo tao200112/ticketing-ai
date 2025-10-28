@@ -13,7 +13,7 @@ export async function GET() {
     const supabase = createClient(supabaseUrl, supabaseKey)
 
     // 查询所有票据
-    const { data: tickets, error } = await supabase
+    const { data: tickets, error: ticketsError } = await supabase
       .from('tickets')
       .select(`
         *,
@@ -29,12 +29,26 @@ export async function GET() {
       `)
       .order('created_at', { ascending: false })
 
-    if (error) {
-      console.error('❌ 获取票据失败:', error)
-      return NextResponse.json([])
+    if (ticketsError) {
+      console.error('❌ 获取票据失败:', ticketsError)
+      return NextResponse.json({ tickets: [], orders: [] })
     }
 
-    return NextResponse.json(tickets || [])
+    // 查询所有订单
+    const { data: orders, error: ordersError } = await supabase
+      .from('orders')
+      .select('*')
+      .order('created_at', { ascending: false })
+
+    if (ordersError) {
+      console.error('❌ 获取订单失败:', ordersError)
+      return NextResponse.json({ tickets: tickets || [], orders: [] })
+    }
+
+    return NextResponse.json({
+      tickets: tickets || [],
+      orders: orders || []
+    })
   } catch (error) {
     console.error('Error fetching tickets:', error)
     return NextResponse.json(

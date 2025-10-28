@@ -1,6 +1,6 @@
 [build]
 rootDirectory = "backend"
-buildCommand = "npm ci --only=production"
+buildCommand = "npm ci --omit=dev"
 startCommand = "npm start"
 
 [deploy]

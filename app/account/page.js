@@ -109,7 +109,7 @@ export default function AccountPage() {
         setUser(userData)
       }
 
-      // 获取用户票务（按邮箱筛选）
+      // 获取用户票务（按用户ID筛选，优先使用user_id，回退到邮箱）
       const { data: ticketsData } = await client
         .from('tickets')
         .select(`
@@ -130,7 +130,7 @@ export default function AccountPage() {
             address
           )
         `)
-        .eq('holder_email', userData.email)
+        .or(`user_id.eq.${userData.id},holder_email.eq.${userData.email}`)
         .order('created_at', { ascending: false })
 
       if (ticketsData) {

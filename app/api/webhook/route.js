@@ -117,6 +117,7 @@ export async function POST(request) {
             event_id: eventId,
             tier: session.metadata?.price_name || 'general',
             holder_email: session.customer_email,
+            user_id: session.metadata?.user_id || null,
             status: 'unused',
             short_id: shortId
           })

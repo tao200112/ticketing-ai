@@ -22,9 +22,9 @@ export async function POST(request) {
     }
 
     const body = await request.json()
-    const { event_id, price_id, quantity = 1, customer_email, customer_name } = body
+    const { event_id, price_id, quantity = 1, customer_email, customer_name, userId } = body
 
-    console.log('📦 收到请求:', { event_id, price_id, quantity, customer_email, customer_name })
+    console.log('📦 收到请求:', { event_id, price_id, quantity, customer_email, customer_name, userId })
 
     if (!event_id || !price_id) {
       console.error('❌ 缺少必需字段:', { event_id, price_id })
@@ -93,6 +93,7 @@ export async function POST(request) {
         price_name: price.name,
         quantity: quantity.toString(),
         customer_name: customer_name || '',
+        user_id: userId || '',
       },
     })
 

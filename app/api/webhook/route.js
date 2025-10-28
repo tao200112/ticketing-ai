@@ -125,6 +125,10 @@ export async function POST(request) {
 
         if (ticketError) {
           console.error('❌ 创建票据失败:', ticketError)
+          return NextResponse.json({ 
+            error: 'Failed to create ticket', 
+            details: ticketError.message 
+          }, { status: 500 })
         } else {
           console.log('✅ 票据创建成功:', ticket.id)
           tickets.push(ticket)

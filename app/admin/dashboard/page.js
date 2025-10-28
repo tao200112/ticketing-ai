@@ -203,12 +203,31 @@ export default function AdminDashboard() {
       
       const method = editingEvent ? 'PUT' : 'POST'
       
+      // 转换字段名以匹配API期望
+      const apiData = {
+        title: eventData.title,
+        description: eventData.description,
+        startTime: eventData.startDate ? `${eventData.startDate}T${eventData.startTime || '00:00'}:00.000Z` : eventData.startTime,
+        endTime: eventData.endDate ? `${eventData.endDate}T${eventData.endTime || '23:59'}:59.999Z` : eventData.endTime,
+        location: eventData.location,
+        maxAttendees: eventData.maxAttendees,
+        merchant_id: eventData.merchantId,
+        prices: eventData.ticketTypes?.map(ticket => ({
+          name: ticket.name,
+          amount_cents: parseInt(ticket.amount_cents),
+          inventory: parseInt(ticket.inventory),
+          limit_per_user: parseInt(ticket.limit_per_user) || 4
+        })) || []
+      }
+      
+      console.log('🔍 发送事件数据:', apiData)
+      
       const response = await fetch(url, {
         method,
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(eventData)
+        body: JSON.stringify(apiData)
       })
 
       if (response.ok) {

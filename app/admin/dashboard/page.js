@@ -47,8 +47,15 @@ export default function AdminDashboard() {
       return
     }
 
-    setAdminUser(JSON.parse(adminUserData))
-    loadData()
+    try {
+      setAdminUser(JSON.parse(adminUserData))
+      loadData()
+    } catch (error) {
+      console.error('Failed to parse admin user data:', error)
+      localStorage.removeItem('adminToken')
+      localStorage.removeItem('adminUser')
+      router.push('/admin/login')
+    }
   }, [router])
 
   const loadData = async () => {
@@ -184,8 +191,8 @@ export default function AdminDashboard() {
   const handleEventSubmit = async (eventData) => {
     try {
       const url = editingEvent 
-        ? `/api/admin/events/${editingEvent.id}`
-        : '/api/admin/events/create'
+        ? `/api/events/${editingEvent.id}`
+        : '/api/events'
       
       const method = editingEvent ? 'PUT' : 'POST'
       
@@ -243,7 +250,7 @@ export default function AdminDashboard() {
     }
 
     try {
-      const response = await fetch(`/api/admin/events/${eventId}`, {
+      const response = await fetch(`/api/events/${eventId}`, {
         method: 'DELETE'
       })
 

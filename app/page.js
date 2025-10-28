@@ -15,6 +15,8 @@ export default function Home() {
   const [localEvents, setLocalEvents] = useState([])
   const [loading, setLoading] = useState(true)
 
+  console.log('🏠 Home 组件渲染:', { apiEvents, apiLoading, apiError })
+
   useEffect(() => {
     loadLocalEvents()
     
@@ -32,61 +34,40 @@ export default function Home() {
     }
   }, [])
 
+  // 不再使用 localStorage，所有活动从 Supabase API 获取
   const loadLocalEvents = () => {
-    try {
-      // Load events created by merchants from local storage (fallback)
-      let merchantEvents = JSON.parse(localStorage.getItem('merchantEvents') || '[]')
-      
-      // 清理有问题的 "aa" 活动
-      merchantEvents = merchantEvents.filter(event => {
-        const isAAEvent = event.title === 'aa' || 
-                         event.id.includes('aa') ||
-                         event.id.startsWith('default-aa-')
-        
-        if (isAAEvent) {
-          console.log('🗑️ 自动清理有问题的活动:', event.title, event.id)
-          return false
-        }
-        return true
-      })
-      
-      // 保存清理后的数据
-      if (merchantEvents.length !== JSON.parse(localStorage.getItem('merchantEvents') || '[]').length) {
-        localStorage.setItem('merchantEvents', JSON.stringify(merchantEvents))
-        console.log('✅ 已清理有问题的活动数据')
-      }
-      
-      // Convert merchant event format to public event format
-      const publicEvents = merchantEvents.map(event => ({
-        id: event.id,
-        name: event.title,
-        description: event.description,
-        start_date: event.startTime,
-        location: event.location,
-        poster_url: event.poster,
-        starting_price: event.prices && event.prices.length > 0 ? 
-          Math.min(...event.prices.map(p => p.amount_cents)) : 0,
-        status: 'active',
-        ticketsSold: event.ticketsSold || 0,
-        totalTickets: event.totalTickets || 0,
-        revenue: event.revenue || 0
-      }))
-      
-      setLocalEvents(publicEvents)
-    } catch (err) {
-      console.error('Error loading local events:', err)
-      setLocalEvents([])
-    }
+    setLocalEvents([])
   }
 
   // 合并 API 数据和本地数据
   const events = React.useMemo(() => {
+    console.log('🔍 开始合并活动数据:', { apiEvents, apiLoading, apiError })
+    
+    // 使用 API 返回的活动数据和默认活动
+    let allEvents = []
+    
+    // 添加 API 活动
+    if (apiEvents && Array.isArray(apiEvents) && apiEvents.length > 0) {
+      console.log('✅ 添加 API 活动:', apiEvents.length)
+      allEvents = [...apiEvents]
+    } else {
+      console.log('⚠️ API 活动为空或无效:', apiEvents)
+    }
+    
+    // 添加默认的 ridiculous-chicken 活动
     const defaultEvents = getDefaultEvents()
-    const allEvents = [...(apiEvents || []), ...localEvents, ...defaultEvents]
-    return allEvents.filter((event, index, self) => 
-      index === self.findIndex(e => e.id === event.id)
-    )
-  }, [apiEvents, localEvents])
+    allEvents = [...allEvents, ...defaultEvents]
+    
+    // 过滤掉测试活动
+    const filteredEvents = allEvents.filter(event => {
+      const title = event.title || event.name || ''
+      return title.length > 1 && title !== '11' && title !== 'bb' && title !== 'aa'
+    })
+    
+    console.log(`📊 活动统计 - API: ${apiEvents?.length || 0}, Default: ${defaultEvents.length}, 最终: ${filteredEvents.length}`)
+    
+    return filteredEvents
+  }, [apiEvents])
 
   // 更新加载状态
   useEffect(() => {

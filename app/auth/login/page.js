@@ -68,15 +68,37 @@ export default function LoginPage() {
     try {
       console.log('🔍 Attempting login for:', formData.email)
       
-      const result = await login(formData.email, formData.password)
-      
-      if (result.success) {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: formData.email, password: formData.password }),
+      })
+
+      const result = await response.json()
+
+      if (response.ok && result.success) {
         console.log('✅ Login successful')
         setMessage('Login successful! Redirecting...')
-        router.push('/account')
+        
+        // 使用 Supabase 创建会话
+        const { createClient } = await import('@supabase/supabase-js')
+        const supabase = createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL,
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+        )
+        
+        // 创建一个自定义会话（因为我们在自己的users表中管理用户）
+        // 注意：这是简化的实现，实际应该使用 Supabase Auth
+        localStorage.setItem('userSession', JSON.stringify(result.data))
+        
+        setTimeout(() => {
+          router.push('/account')
+        }, 1000)
       } else {
         console.error('❌ Login failed:', result.error)
-        setMessage('Login failed, please check email and password')
+        setMessage(result.message || 'Login failed, please check email and password')
       }
     } catch (error) {
       console.error('❌ Login error:', error)

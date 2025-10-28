@@ -1,3 +1,6 @@
+// 加载环境变量
+require('./load-env');
+
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -35,6 +38,25 @@ const limiter = rateLimit({
   max: 100 // 限制每个IP 100次请求
 });
 app.use(limiter);
+
+// 根路径
+app.get('/', (req, res) => {
+  res.json({
+    message: 'PartyTix Backend API',
+    status: 'running',
+    timestamp: new Date().toISOString(),
+    version: '1.0.0',
+    endpoints: {
+      health: '/health',
+      api: '/v1',
+      events: '/v1/events',
+      auth: '/v1/auth',
+      users: '/v1/users',
+      tickets: '/v1/tickets',
+      payments: '/v1/payments'
+    }
+  });
+});
 
 // 健康检查
 app.get('/health', (req, res) => {
@@ -435,6 +457,115 @@ app.post('/v1/payments/checkout', authenticateToken, async (req, res) => {
 });
 
 // 用户认证路由
+app.post('/v1/auth/register', async (req, res) => {
+  try {
+    const { email, name, age, password, confirmPassword } = req.body;
+
+    // 验证输入
+    if (!email || !name || !age || !password || !confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        error: 'MISSING_FIELDS',
+        message: 'All fields are required'
+      });
+    }
+
+    if (password !== confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        error: 'PASSWORD_MISMATCH',
+        message: 'Passwords do not match'
+      });
+    }
+
+    if (password.length < 8) {
+      return res.status(400).json({
+        success: false,
+        error: 'WEAK_PASSWORD',
+        message: 'Password must be at least 8 characters'
+      });
+    }
+
+    if (age < 16) {
+      return res.status(400).json({
+        success: false,
+        error: 'INVALID_AGE',
+        message: 'You must be at least 16 years old'
+      });
+    }
+
+    // 检查用户是否已存在
+    const { data: existingUser } = await supabase
+      .from('users')
+      .select('id')
+      .eq('email', email)
+      .single();
+
+    if (existingUser) {
+      return res.status(409).json({
+        success: false,
+        error: 'USER_EXISTS',
+        message: 'User with this email already exists'
+      });
+    }
+
+    // 加密密码
+    const saltRounds = parseInt(process.env.BCRYPT_SALT_ROUNDS) || 12;
+    const passwordHash = await bcrypt.hash(password, saltRounds);
+
+    // 创建用户
+    const { data: user, error } = await supabase
+      .from('users')
+      .insert({
+        email,
+        name,
+        age: parseInt(age),
+        password_hash: passwordHash,
+        role: 'user'
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Registration error:', error);
+      return res.status(500).json({
+        success: false,
+        error: 'REGISTRATION_FAILED',
+        message: 'Failed to create user account',
+        details: error.message,
+        code: error.code
+      });
+    }
+
+    // 生成JWT
+    const token = jwt.sign(
+      { userId: user.id, email: user.email },
+      JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+
+    res.status(201).json({
+      success: true,
+      data: {
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role
+        },
+        token
+      }
+    });
+  } catch (error) {
+    console.error('Registration error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'INTERNAL_ERROR',
+      message: 'Internal server error'
+    });
+  }
+});
+
 app.post('/v1/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -499,6 +630,25 @@ app.post('/v1/auth/login', async (req, res) => {
       message: 'Internal server error'
     });
   }
+});
+
+// 错误处理中间件
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err);
+  res.status(500).json({
+    success: false,
+    error: 'INTERNAL_ERROR',
+    message: 'Internal server error'
+  });
+});
+
+// 404 处理
+app.use('*', (req, res) => {
+  res.status(404).json({
+    success: false,
+    error: 'NOT_FOUND',
+    message: 'Endpoint not found'
+  });
 });
 
 // 启动服务器

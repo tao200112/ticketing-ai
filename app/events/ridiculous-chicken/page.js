@@ -9,6 +9,7 @@ export default function RidiculousChickenEvent() {
   const [selectedPrice, setSelectedPrice] = useState('regular')
   const [customerEmail, setCustomerEmail] = useState('')
   const [customerName, setCustomerName] = useState('')
+  const [selectedDate, setSelectedDate] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -65,8 +66,13 @@ export default function RidiculousChickenEvent() {
   const totalPrice = selectedPriceData ? selectedPriceData.price * quantity : 0
 
   const handleBuyTickets = async () => {
+    if (!selectedDate) {
+      setError('Please select a purchase date')
+      return
+    }
+
     if (!customerEmail || !customerName) {
-      setError('请填写邮箱和姓名')
+      setError('Please fill in email and name')
       return
     }
 
@@ -97,18 +103,11 @@ export default function RidiculousChickenEvent() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          eventId: 'ridiculous-chicken',
-          ticketType: selectedPriceData.name,
+          event_id: 'ridiculous-chicken',
+          price_id: selectedPrice,
           quantity: quantity,
-          customerEmail: customerEmail,
-          customerName: customerName,
-          userId: userId,
-          userToken: userToken,
-          eventData: {
-            title: event.name,
-            description: event.description,
-            prices: prices
-          }
+          customer_email: customerEmail,
+          customer_name: customerName
         }),
       })
 
@@ -120,10 +119,10 @@ export default function RidiculousChickenEvent() {
         // 演示模式
         window.location.href = data.url
       } else {
-        setError(data.error || '创建支付会话失败')
+        setError(data.error || 'Failed to create payment session')
       }
     } catch (err) {
-      setError('网络错误，请重试')
+      setError('Network error, please try again')
     } finally {
       setLoading(false)
     }
@@ -344,6 +343,57 @@ export default function RidiculousChickenEvent() {
             ))}
           </div>
 
+          {/* 购票日期选择 */}
+          <div style={{ marginBottom: '24px' }}>
+            <label style={{
+              display: 'block',
+              color: 'white',
+              fontSize: '0.875rem',
+              fontWeight: '500',
+              marginBottom: '8px'
+            }}>
+              Purchase Date *
+            </label>
+            <select
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '12px 16px',
+                backgroundColor: 'rgba(55, 65, 81, 0.5)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '8px',
+                color: 'white',
+                fontSize: '1rem',
+                outline: 'none',
+                marginBottom: '8px'
+              }}
+            >
+              <option value="">Please select purchase date</option>
+              {[0, 1, 2, 3, 4, 5, 6].map(days => {
+                const date = new Date()
+                date.setDate(date.getDate() + days)
+                const dateStr = date.toISOString().split('T')[0]
+                const displayStr = date.toLocaleDateString('zh-CN', { 
+                  year: 'numeric', 
+                  month: '2-digit', 
+                  day: '2-digit',
+                  weekday: 'short'
+                })
+                return (
+                  <option key={dateStr} value={dateStr}>{displayStr}</option>
+                )
+              })}
+            </select>
+            <div style={{
+              color: '#94a3b8',
+              fontSize: '0.875rem',
+              marginTop: '4px'
+            }}>
+              ⚠️ Ticket validity: Same day 4:00 PM - Next day 3:00 AM
+            </div>
+          </div>
+
           {/* 客户信息 */}
           <div style={{ marginBottom: '24px' }}>
             <h3 style={{
@@ -352,7 +402,7 @@ export default function RidiculousChickenEvent() {
               fontWeight: '600',
               marginBottom: '16px'
             }}>
-              客户信息
+              Customer Information
             </h3>
             
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
@@ -364,13 +414,13 @@ export default function RidiculousChickenEvent() {
                   fontWeight: '500',
                   marginBottom: '8px'
                 }}>
-                  姓名 *
+                  Name *
                 </label>
                 <input
                   type="text"
                   value={customerName}
                   onChange={(e) => setCustomerName(e.target.value)}
-                  placeholder="请输入您的姓名"
+                  placeholder="Enter your name"
                   style={{
                     width: '100%',
                     padding: '12px 16px',
@@ -392,13 +442,13 @@ export default function RidiculousChickenEvent() {
                   fontWeight: '500',
                   marginBottom: '8px'
                 }}>
-                  邮箱 *
+                  Email *
                 </label>
                 <input
                   type="email"
                   value={customerEmail}
                   onChange={(e) => setCustomerEmail(e.target.value)}
-                  placeholder="请输入您的邮箱"
+                  placeholder="Enter your email"
                   style={{
                     width: '100%',
                     padding: '12px 16px',
@@ -423,7 +473,7 @@ export default function RidiculousChickenEvent() {
               fontWeight: '500',
               marginBottom: '8px'
             }}>
-              数量
+              Quantity
             </label>
             <select
               value={quantity}
@@ -512,7 +562,7 @@ export default function RidiculousChickenEvent() {
               }
             }}
           >
-            {loading ? '处理中...' : '立即购票'}
+            {loading ? 'Processing...' : 'Purchase Now'}
           </button>
         </div>
       </div>

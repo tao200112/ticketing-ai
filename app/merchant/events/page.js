@@ -42,13 +42,31 @@ export default function MerchantEventsPage() {
         return
       }
       
-      // 从本地存储加载事件，只显示当前商家的事件
-      const storedEvents = localStorage.getItem('merchantEvents')
-      
-      if (storedEvents) {
-        const allEvents = JSON.parse(storedEvents)
-        // 只显示当前商家创建的事件
-        const merchantEvents = allEvents.filter(event => event.merchantId === merchantUser.id)
+      // 从 API 加载活动
+      const response = await fetch('/api/events')
+      const result = await response.json()
+
+      if (result.success && result.data) {
+        // 过滤出当前商家的活动
+        const merchantId = merchantUser.merchant_id || merchantUser.merchant?.id
+        console.log('🔍 商家 ID:', merchantId)
+        console.log('🔍 商家用户数据:', { id: merchantUser.id, merchant_id: merchantUser.merchant_id, merchant: merchantUser.merchant })
+        console.log('🔍 所有活动数量:', result.data.length)
+        
+        let merchantEvents = []
+        
+        if (merchantId) {
+          // 如果有 merchant_id，过滤出该商家的活动
+          merchantEvents = result.data.filter(event => 
+            event.merchant_id === merchantId
+          )
+        } else {
+          // 如果没有 merchant_id，显示所有活动（临时方案）
+          merchantEvents = result.data
+          console.warn('⚠️ 未找到 merchant_id，显示所有活动')
+        }
+        
+        console.log('✅ 匹配的活动数量:', merchantEvents.length)
         setEvents(merchantEvents)
       } else {
         setEvents([])
@@ -61,25 +79,64 @@ export default function MerchantEventsPage() {
     }
   }
 
-  const handleEditEvent = (eventId) => {
-    router.push(`/merchant/events/edit/${eventId}`)
+  const handleEditEvent = async (eventId) => {
+    // 简单的编辑功能：将活动状态改为 published 或 draft
+    if (confirm('确定要修改这个事件吗？')) {
+      try {
+        // 获取当前事件信息
+        const response = await fetch(`/api/events/${eventId}`)
+        const result = await response.json()
+        
+        if (result.success && result.data) {
+          const event = result.data
+          // 切换状态
+          const newStatus = event.status === 'published' ? 'draft' : 'published'
+          
+          // 更新事件
+          const updateResponse = await fetch(`/api/events/${eventId}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              ...event,
+              status: newStatus
+            })
+          })
+          
+          const updateResult = await updateResponse.json()
+          
+          if (updateResult.success) {
+            loadEvents()
+          } else {
+            setError(updateResult.message || '更新事件失败')
+          }
+        }
+      } catch (err) {
+        setError('编辑事件失败')
+        console.error('编辑事件错误:', err)
+      }
+    }
   }
 
-  const handleDeleteEvent = (eventId) => {
+  const handleDeleteEvent = async (eventId) => {
     if (confirm('确定要删除这个事件吗？')) {
-      // 从本地存储中删除事件
-      const storedEvents = localStorage.getItem('merchantEvents')
-      if (storedEvents) {
-        const allEvents = JSON.parse(storedEvents)
-        const updatedEvents = allEvents.filter(event => event.id !== eventId)
-        localStorage.setItem('merchantEvents', JSON.stringify(updatedEvents))
-        
-        // 更新当前显示的事件列表
-        const merchantEvents = updatedEvents.filter(event => event.merchantId === merchantUser.id)
-        setEvents(merchantEvents)
-        
-        // 触发localStorage事件，通知其他页面更新
-        window.dispatchEvent(new Event('storage'))
+      try {
+        const response = await fetch(`/api/events/${eventId}`, {
+          method: 'DELETE'
+        })
+
+        const result = await response.json()
+
+        if (result.success) {
+          // 重新加载活动列表
+          loadEvents()
+        } else {
+          setError(result.message || '删除事件失败')
+        }
+      } catch (err) {
+        setError('删除事件失败')
+        console.error('删除事件错误:', err)
       }
     }
   }
@@ -296,7 +353,7 @@ export default function MerchantEventsPage() {
                       onClick={() => handleEditEvent(event.id)}
                       style={{
                         flex: 1,
-                        backgroundColor: '#2563eb',
+                        backgroundColor: event.status === 'published' ? '#10b981' : '#2563eb',
                         color: 'white',
                         padding: '0.75rem 1.5rem',
                         borderRadius: '0.5rem',
@@ -305,10 +362,10 @@ export default function MerchantEventsPage() {
                         cursor: 'pointer',
                         transition: 'background-color 0.2s'
                       }}
-                      onMouseEnter={(e) => e.target.style.backgroundColor = '#1d4ed8'}
-                      onMouseLeave={(e) => e.target.style.backgroundColor = '#2563eb'}
+                      onMouseEnter={(e) => e.target.style.backgroundColor = event.status === 'published' ? '#059669' : '#1d4ed8'}
+                      onMouseLeave={(e) => e.target.style.backgroundColor = event.status === 'published' ? '#10b981' : '#2563eb'}
                     >
-                      Edit Event
+                      {event.status === 'published' ? '发布中 (点击设为草稿)' : '草稿 (点击发布)'}
                     </button>
                     <button 
                       onClick={() => handleDeleteEvent(event.id)}

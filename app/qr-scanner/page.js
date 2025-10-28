@@ -37,7 +37,7 @@ export default function QRScannerPage() {
       
       setIsScanning(true)
     } catch (err) {
-      setError('无法访问摄像头，请检查权限设置')
+      setError('Unable to access camera, please check permissions')
       console.error('摄像头访问错误:', err)
     }
   }
@@ -72,7 +72,7 @@ export default function QRScannerPage() {
       setScannedCode(code.data)
       verifyTicketFromQR(code.data)
     } else {
-      setError('未检测到二维码，请确保二维码清晰可见')
+      setError('No QR code detected, please ensure QR code is clearly visible')
     }
   }
 
@@ -108,10 +108,10 @@ export default function QRScannerPage() {
 
             if (now < validityStartTime) {
               status = 'invalid'
-              errorMessage = '票券尚未生效，请在有效期内验票'
+              errorMessage = 'Ticket not yet valid, please verify within validity period'
             } else if (now > validityEndTime) {
               status = 'invalid'
-              errorMessage = '票券已过期，无法使用'
+              errorMessage = 'Ticket has expired and cannot be used'
             }
 
             setScanResult({
@@ -131,14 +131,14 @@ export default function QRScannerPage() {
             setError('')
             stopScanning()
           } catch (err) {
-            setError('二维码格式无效，请扫描正确的票券二维码')
+            setError('Invalid QR code format, please scan a valid ticket QR code')
             console.error('验证错误:', err)
           }
         }
 
         const verifyTicket = async () => {
           if (!scannedCode) {
-            setError('请输入或扫描票务代码')
+            setError('Please enter or scan a ticket code')
             return
           }
 
@@ -169,10 +169,10 @@ export default function QRScannerPage() {
 
             if (now < validityStartTime) {
               status = 'invalid'
-              errorMessage = '票券尚未生效，请在有效期内验票'
+              errorMessage = 'Ticket not yet valid, please verify within validity period'
             } else if (now > validityEndTime) {
               status = 'invalid'
-              errorMessage = '票券已过期，无法使用'
+              errorMessage = 'Ticket has expired and cannot be used'
             }
 
             setScanResult({
@@ -190,7 +190,7 @@ export default function QRScannerPage() {
             })
             setError('')
           } catch (err) {
-            setError('票务验证失败，请重试')
+            setError('Ticket verification failed, please try again')
             console.error('验证错误:', err)
           }
         }
@@ -236,11 +236,11 @@ export default function QRScannerPage() {
               color: 'white',
               margin: 0
             }}>
-              扫码验票
+              QR Ticket Scanner
             </h1>
           </div>
           <p style={{ color: '#94a3b8', fontSize: '1rem' }}>
-            扫描二维码或手动输入票务代码进行验证
+            Scan QR code or manually enter ticket code for verification
           </p>
         </div>
 
@@ -258,7 +258,7 @@ export default function QRScannerPage() {
             color: 'white',
             marginBottom: '1.5rem'
           }}>
-            扫描二维码
+            Scan QR Code
           </h2>
 
           {/* 摄像头预览 */}
@@ -294,7 +294,7 @@ export default function QRScannerPage() {
                 color: '#6b7280',
                 fontSize: '1rem'
               }}>
-                点击开始扫描
+                Click to start scanning
               </div>
             )}
           </div>
@@ -331,7 +331,7 @@ export default function QRScannerPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
-                开始扫描
+                Start Scanning
               </button>
             ) : (
               <>
@@ -357,7 +357,7 @@ export default function QRScannerPage() {
                     e.target.style.boxShadow = 'none'
                   }}
                 >
-                  扫描当前画面
+                  Scan Current Frame
                 </button>
                 <button
                   onClick={stopScanning}
@@ -381,7 +381,7 @@ export default function QRScannerPage() {
                     e.target.style.transform = 'scale(1)'
                   }}
                 >
-                  停止扫描
+                  Stop Scanning
                 </button>
               </>
             )}
@@ -402,7 +402,7 @@ export default function QRScannerPage() {
             color: 'white',
             marginBottom: '1.5rem'
           }}>
-            手动输入
+            Manual Input
           </h2>
 
           <div style={{ display: 'flex', gap: '1rem' }}>
@@ -410,7 +410,7 @@ export default function QRScannerPage() {
               type="text"
               value={scannedCode}
               onChange={handleManualInput}
-              placeholder="输入票务代码"
+              placeholder="Enter ticket code"
               style={{
                 flex: 1,
                 padding: '0.75rem 1rem',
@@ -452,7 +452,7 @@ export default function QRScannerPage() {
                 e.target.style.boxShadow = 'none'
               }}
             >
-              验证
+              Verify
             </button>
           </div>
         </div>
@@ -487,7 +487,7 @@ export default function QRScannerPage() {
                 color: 'white',
                 margin: 0
               }}>
-                验证结果
+                Verification Result
               </h2>
               <button
                 onClick={resetScanner}
@@ -504,7 +504,7 @@ export default function QRScannerPage() {
                 onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(55, 65, 81, 0.7)'}
                 onMouseLeave={(e) => e.target.style.backgroundColor = 'rgba(55, 65, 81, 0.5)'}
               >
-                重新扫描
+                Scan Again
               </button>
             </div>
 
@@ -527,7 +527,7 @@ export default function QRScannerPage() {
                   fontWeight: '600',
                   fontSize: '0.875rem'
                 }}>
-                  {scanResult.status === 'valid' ? '票务有效' : '票务无效'}
+                  {scanResult.status === 'valid' ? 'Ticket Valid' : 'Ticket Invalid'}
                 </span>
               </div>
               {scanResult.errorMessage && (
@@ -543,49 +543,49 @@ export default function QRScannerPage() {
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
               <div>
-                <div style={{ color: '#94a3b8', fontSize: '0.875rem', marginBottom: '0.25rem' }}>票务代码</div>
+                <div style={{ color: '#94a3b8', fontSize: '0.875rem', marginBottom: '0.25rem' }}>Ticket Code</div>
                 <div style={{ color: 'white', fontWeight: '500' }}>{scanResult.ticketId}</div>
               </div>
               <div>
-                <div style={{ color: '#94a3b8', fontSize: '0.875rem', marginBottom: '0.25rem' }}>活动名称</div>
+                <div style={{ color: '#94a3b8', fontSize: '0.875rem', marginBottom: '0.25rem' }}>Event Name</div>
                 <div style={{ color: 'white', fontWeight: '500' }}>{scanResult.eventName}</div>
               </div>
               <div>
-                <div style={{ color: '#94a3b8', fontSize: '0.875rem', marginBottom: '0.25rem' }}>持票人</div>
+                <div style={{ color: '#94a3b8', fontSize: '0.875rem', marginBottom: '0.25rem' }}>Attendee</div>
                 <div style={{ color: 'white', fontWeight: '500' }}>{scanResult.attendeeName}</div>
               </div>
               <div>
-                <div style={{ color: '#94a3b8', fontSize: '0.875rem', marginBottom: '0.25rem' }}>票种</div>
+                <div style={{ color: '#94a3b8', fontSize: '0.875rem', marginBottom: '0.25rem' }}>Ticket Type</div>
                 <div style={{ color: 'white', fontWeight: '500' }}>{scanResult.ticketType}</div>
               </div>
                <div>
-                 <div style={{ color: '#94a3b8', fontSize: '0.875rem', marginBottom: '0.25rem' }}>票券日期</div>
+                 <div style={{ color: '#94a3b8', fontSize: '0.875rem', marginBottom: '0.25rem' }}>Ticket Date</div>
                  <div style={{ color: 'white', fontWeight: '500' }}>
-                   {scanResult.ticketValidityDate ? new Date(scanResult.ticketValidityDate).toLocaleDateString('zh-CN') : 'N/A'}
+                   {scanResult.ticketValidityDate ? new Date(scanResult.ticketValidityDate).toLocaleDateString('en-US') : 'N/A'}
                  </div>
                </div>
                <div>
-                 <div style={{ color: '#94a3b8', fontSize: '0.875rem', marginBottom: '0.25rem' }}>有效期开始</div>
+                 <div style={{ color: '#94a3b8', fontSize: '0.875rem', marginBottom: '0.25rem' }}>Validity Start</div>
                  <div style={{ color: 'white', fontWeight: '500' }}>
-                   {scanResult.validityStartTime ? new Date(scanResult.validityStartTime).toLocaleString('zh-CN') : 'N/A'}
+                   {scanResult.validityStartTime ? new Date(scanResult.validityStartTime).toLocaleString('en-US') : 'N/A'}
                  </div>
                </div>
                <div>
-                 <div style={{ color: '#94a3b8', fontSize: '0.875rem', marginBottom: '0.25rem' }}>有效期结束</div>
+                 <div style={{ color: '#94a3b8', fontSize: '0.875rem', marginBottom: '0.25rem' }}>Validity End</div>
                  <div style={{ color: 'white', fontWeight: '500' }}>
-                   {scanResult.validityEndTime ? new Date(scanResult.validityEndTime).toLocaleString('zh-CN') : 'N/A'}
+                   {scanResult.validityEndTime ? new Date(scanResult.validityEndTime).toLocaleString('en-US') : 'N/A'}
                  </div>
                </div>
               <div>
-                <div style={{ color: '#94a3b8', fontSize: '0.875rem', marginBottom: '0.25rem' }}>当前时间</div>
+                <div style={{ color: '#94a3b8', fontSize: '0.875rem', marginBottom: '0.25rem' }}>Current Time</div>
                 <div style={{ color: 'white', fontWeight: '500' }}>
-                  {scanResult.currentTime ? new Date(scanResult.currentTime).toLocaleString('zh-CN') : 'N/A'}
+                  {scanResult.currentTime ? new Date(scanResult.currentTime).toLocaleString('en-US') : 'N/A'}
                 </div>
               </div>
               <div>
-                <div style={{ color: '#94a3b8', fontSize: '0.875rem', marginBottom: '0.25rem' }}>扫描时间</div>
+                <div style={{ color: '#94a3b8', fontSize: '0.875rem', marginBottom: '0.25rem' }}>Scanned At</div>
                 <div style={{ color: 'white', fontWeight: '500' }}>
-                  {new Date(scanResult.scannedAt).toLocaleString('zh-CN')}
+                  {new Date(scanResult.scannedAt).toLocaleString('en-US')}
                 </div>
               </div>
             </div>

@@ -66,7 +66,7 @@ export default function MerchantLoginPage() {
 
       const data = await response.json()
 
-      if (response.ok) {
+      if (response.ok && data.success) {
         // Login successful, save user info to localStorage
         localStorage.setItem('merchantUser', JSON.stringify(data.user))
         localStorage.setItem('merchantToken', 'merchant-logged-in')

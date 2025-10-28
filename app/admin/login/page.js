@@ -26,13 +26,13 @@ export default function AdminLoginPage() {
 
       const data = await response.json()
 
-      if (response.ok) {
+      if (response.ok && data.success) {
         // Save admin session
-        localStorage.setItem('adminToken', data.token)
-        localStorage.setItem('adminUser', JSON.stringify(data.admin))
+        localStorage.setItem('adminToken', 'admin-logged-in')
+        localStorage.setItem('adminUser', JSON.stringify(data.user))
         router.push('/admin/dashboard')
       } else {
-        setError(data.error || 'Login failed')
+        setError(data.message || 'Login failed')
       }
     } catch (err) {
       setError('Network error. Please try again.')

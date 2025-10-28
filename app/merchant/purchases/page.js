@@ -24,41 +24,67 @@ export default function MerchantPurchasesPage() {
       }
       
       setMerchantUser(JSON.parse(user))
-      loadPurchases()
     }
     
     checkMerchantAuth()
   }, [router])
 
-  const loadPurchases = () => {
+  useEffect(() => {
+    if (merchantUser) {
+      loadPurchases()
+    }
+  }, [merchantUser])
+
+  const loadPurchases = async () => {
     try {
       setLoading(true)
       
-      // 从本地存储加载购买记录
-      const allPurchases = JSON.parse(localStorage.getItem('purchaseRecords') || '[]')
+      if (!merchantUser) {
+        setPurchases([])
+        return
+      }
       
-      console.log('📊 所有购买记录:', allPurchases.length);
-      console.log('📊 当前商家用户:', merchantUser);
+      // 从 API 加载票据数据
+      const response = await fetch('/api/admin/tickets')
+      const result = await response.json()
       
-      // 只显示当前商家的购买记录
-      // 支持多种商家ID匹配方式
-      const merchantPurchases = allPurchases.filter(purchase => {
-        const matches = (
-          purchase.merchantId === merchantUser?.id ||
-          purchase.merchantId === merchantUser?.businessName ||
-          purchase.merchantId === 'merchant_123' || // 默认商家ID
-          purchase.merchantId === localStorage.getItem('currentMerchantId')
-        );
+      if (result && Array.isArray(result)) {
+        // 筛选当前商家的票据
+        const merchantTickets = result.filter(ticket => {
+          // 通过订单关联找到商家的票据
+          // 这里需要根据实际的数据结构来调整
+          return ticket.orders && ticket.orders.customer_email
+        })
         
-        if (matches) {
-          console.log('✅ 匹配的购买记录:', purchase);
-        }
+        // 转换为购买记录格式
+        const purchases = merchantTickets.map(ticket => {
+          const eventName = ticket.event_id || 'Unknown Event'
+          const quantity = 1
+          const amount = ticket.orders?.total_amount_cents || 0
+          const customerEmail = ticket.holder_email || ticket.orders?.customer_email || ''
+          const purchaseDate = ticket.created_at || new Date().toISOString()
+          
+          return {
+            id: ticket.id,
+            eventName: eventName,
+            ticketType: ticket.tier || 'General',
+            quantity: quantity,
+            amount: amount,
+            totalAmount: amount,
+            customerName: customerEmail.split('@')[0],
+            customerEmail: customerEmail,
+            purchaseDate: purchaseDate,
+            status: ticket.status === 'unused' ? 'completed' : ticket.status,
+            orderId: ticket.short_id,
+            ticketId: ticket.id
+          }
+        })
         
-        return matches;
-      })
-      
-      console.log('📊 匹配的购买记录数量:', merchantPurchases.length);
-      setPurchases(merchantPurchases)
+        console.log('📊 加载的购买记录数量:', purchases.length)
+        setPurchases(purchases)
+      } else {
+        setPurchases([])
+      }
     } catch (err) {
       console.error('加载购买记录错误:', err)
       setPurchases([])

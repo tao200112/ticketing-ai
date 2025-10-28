@@ -1,3 +1,5 @@
+'use client'
+
 import Link from 'next/link'
 
 export default function EventCard({ event }) {
@@ -21,23 +23,17 @@ export default function EventCard({ event }) {
 
   return (
     <Link href={`/events/${eventId}`} style={{ display: 'block' }}>
-      <div style={{
-        background: 'rgba(15, 23, 42, 0.6)',
-        border: '1px solid rgba(255, 255, 255, 0.1)',
-        borderRadius: '12px',
-        overflow: 'hidden',
-        boxShadow: '0 10px 25px rgba(0, 0, 0, 0.2)',
-        transition: 'all 0.3s ease',
-        cursor: 'pointer'
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.transform = 'scale(1.02)'
-        e.currentTarget.style.boxShadow = '0 20px 40px rgba(0, 0, 0, 0.3)'
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.transform = 'scale(1)'
-        e.currentTarget.style.boxShadow = '0 10px 25px rgba(0, 0, 0, 0.2)'
-      }}>
+      <div 
+        className="hover:scale-[1.02] hover:shadow-[0_20px_40px_rgba(0,0,0,0.3)] transition-all duration-300"
+        style={{
+          background: 'rgba(15, 23, 42, 0.6)',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          borderRadius: '12px',
+          overflow: 'hidden',
+          boxShadow: '0 10px 25px rgba(0, 0, 0, 0.2)',
+          cursor: 'pointer'
+        }}
+      >
         <div style={{
           position: 'relative',
           height: '192px',
@@ -77,7 +73,7 @@ export default function EventCard({ event }) {
             color: 'white', 
             marginBottom: '8px' 
           }}>
-            {event.name}
+            {event.title || event.name}
           </h3>
           <p style={{ 
             color: '#94a3b8', 

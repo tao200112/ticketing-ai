@@ -40,22 +40,35 @@ export default function MerchantOverviewPage() {
     try {
       setLoading(true)
       
-      // 从本地存储获取真实数据
-      const merchantEvents = JSON.parse(localStorage.getItem('merchantEvents') || '[]')
-      const orders = JSON.parse(localStorage.getItem('orders') || '[]')
-      const tickets = JSON.parse(localStorage.getItem('tickets') || '[]')
-      
-      // 获取当前商户的用户信息
+      // 从 API 获取真实数据
       const currentMerchant = JSON.parse(localStorage.getItem('merchantUser') || '{}')
+      const merchantId = currentMerchant.merchant_id || currentMerchant.merchant?.id
+      
+      // 获取订单数据
+      const ordersResponse = await fetch('/api/admin/tickets')
+      const ordersData = await ordersResponse.json()
+      
+      // 获取活动数据
+      const eventsResponse = await fetch('/api/events')
+      const eventsData = await eventsResponse.json()
+      
+      const allEvents = eventsData.success ? eventsData.data : []
+      
+      // 筛选当前商户的活动
+      const merchantEvents = allEvents.filter(event => event.merchant_id === merchantId)
+      
+      // 筛选当前商户的票据
+      const merchantTickets = ordersData.tickets?.filter(ticket => {
+        return ticket.event_id && merchantEvents.some(e => e.id === ticket.event_id)
+      }) || []
+      
+      // 获取当前商户的订单
+      const merchantOrders = ordersData.orders?.filter(order => {
+        return merchantTickets.some(t => t.order_id === order.id)
+      }) || []
       
       // 计算今日日期
       const today = new Date().toISOString().split('T')[0]
-      
-      // 筛选当前商户的订单
-      const merchantOrders = orders.filter(order => 
-        order.merchant_id === currentMerchant.id || 
-        order.merchantEmail === currentMerchant.email
-      )
       
       // 筛选今日的订单
       const todayOrders = merchantOrders.filter(order => 
@@ -64,37 +77,31 @@ export default function MerchantOverviewPage() {
       
       // 计算今日售出的票数
       const todaySold = todayOrders.reduce((total, order) => {
-        return total + (order.quantity || 0)
+        return total + (merchantTickets.filter(t => t.order_id === order.id).length || 0)
       }, 0)
       
-      // 计算今日收入
+      // 计算今日收入（从 cents 转换为美元）
       const totalRevenue = todayOrders.reduce((total, order) => {
-        return total + (order.total_amount || 0)
-      }, 0)
-      
-      // 筛选当前商户的票务
-      const merchantTickets = tickets.filter(ticket => 
-        ticket.merchant_id === currentMerchant.id ||
-        ticket.merchantEmail === currentMerchant.email
-      )
+        return total + (order.total_amount_cents || 0)
+      }, 0) / 100
       
       // 筛选今日验证的票务
       const todayVerified = merchantTickets.filter(ticket => 
-        ticket.verified_at && ticket.verified_at.startsWith(today)
+        ticket.used_at && ticket.used_at.startsWith(today)
       ).length
       
       // 检查低库存警告
       const lowStockAlerts = merchantEvents.filter(event => {
-        if (!event.prices || event.prices.length === 0) return false
-        return event.prices.some(price => price.inventory < 10)
+        const eventTickets = merchantTickets.filter(t => t.event_id === event.id)
+        return eventTickets.length < 10
       }).length
       
       setStats({
         todaySold,
         todayVerified,
-        totalRevenue: Math.round(totalRevenue / 100), // 转换为元
+        totalRevenue: Math.round(totalRevenue * 100) / 100, // 保留两位小数
         lowStockAlerts,
-        source: 'local'
+        source: 'supabase'
       })
       
     } catch (err) {
@@ -230,7 +237,7 @@ export default function MerchantOverviewPage() {
     },
     {
       title: 'Total Revenue',
-      value: `¥${(stats?.totalRevenue || 0).toLocaleString()}`,
+      value: `$${(stats?.totalRevenue || 0).toLocaleString()}`,
       subtitle: 'today',
       icon: '💰',
       color: '#eab308'
@@ -379,8 +386,7 @@ export default function MerchantOverviewPage() {
             gap: '24px'
           }}>
             {/* Manage Events Card */}
-            <Link 
-              href="/merchant/events"
+            <div 
               style={{
                 display: 'block',
                 background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(147, 51, 234, 0.1) 100%)',
@@ -390,7 +396,8 @@ export default function MerchantOverviewPage() {
                 textDecoration: 'none',
                 transition: 'all 0.3s ease',
                 position: 'relative',
-                overflow: 'hidden'
+                overflow: 'hidden',
+                cursor: 'pointer'
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.transform = 'translateY(-4px)'
@@ -402,6 +409,7 @@ export default function MerchantOverviewPage() {
                 e.currentTarget.style.boxShadow = 'none'
                 e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.2)'
               }}
+              onClick={() => router.push('/merchant/events')}
             >
               <div style={{
                 position: 'absolute',
@@ -459,11 +467,10 @@ export default function MerchantOverviewPage() {
               }}>
                 <span>Access Events →</span>
               </div>
-            </Link>
+            </div>
             
             {/* Create Event Card */}
-            <Link 
-              href="/merchant/events/new"
+            <div 
               style={{
                 display: 'block',
                 background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, rgba(16, 185, 129, 0.1) 100%)',
@@ -473,7 +480,8 @@ export default function MerchantOverviewPage() {
                 textDecoration: 'none',
                 transition: 'all 0.3s ease',
                 position: 'relative',
-                overflow: 'hidden'
+                overflow: 'hidden',
+                cursor: 'pointer'
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.transform = 'translateY(-4px)'
@@ -485,6 +493,7 @@ export default function MerchantOverviewPage() {
                 e.currentTarget.style.boxShadow = 'none'
                 e.currentTarget.style.borderColor = 'rgba(34, 197, 94, 0.2)'
               }}
+              onClick={() => router.push('/merchant/events/new')}
             >
               <div style={{
                 position: 'absolute',
@@ -542,11 +551,10 @@ export default function MerchantOverviewPage() {
               }}>
                 <span>Start Creating →</span>
               </div>
-            </Link>
+            </div>
             
             {/* Purchase Records Card */}
-            <Link 
-              href="/merchant/purchases"
+            <div 
               style={{
                 display: 'block',
                 background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%)',
@@ -556,7 +564,8 @@ export default function MerchantOverviewPage() {
                 textDecoration: 'none',
                 transition: 'all 0.3s ease',
                 position: 'relative',
-                overflow: 'hidden'
+                overflow: 'hidden',
+                cursor: 'pointer'
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.transform = 'translateY(-4px)'
@@ -568,6 +577,7 @@ export default function MerchantOverviewPage() {
                 e.currentTarget.style.boxShadow = 'none'
                 e.currentTarget.style.borderColor = 'rgba(168, 85, 247, 0.2)'
               }}
+              onClick={() => router.push('/merchant/purchases')}
             >
               <div style={{
                 position: 'absolute',
@@ -625,7 +635,7 @@ export default function MerchantOverviewPage() {
               }}>
                 <span>View Records →</span>
               </div>
-            </Link>
+            </div>
           </div>
         </div>
       </div>

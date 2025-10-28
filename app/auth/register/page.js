@@ -104,27 +104,19 @@ export default function RegisterPage() {
       
       const result = await response.json()
       
-        if (response.ok && result.ok) {
-          setMessage(`Registration successful! ${result.source === 'supabase' ? 'Data saved to database' : 'Data saved locally'}`)
-          
-          // Save user info to localStorage (excluding password)
-          const userData = {
-            email: formData.email,
-            name: formData.name,
-            age: formData.age,
-            registeredAt: new Date().toISOString(),
-            source: result.source,
-            isLoggedIn: true
-          }
-          localStorage.setItem('userData', JSON.stringify(userData))
-          
-          // Navigate to account page after delay
-          setTimeout(() => {
-            router.push('/account')
-          }, 1500)
-        } else {
-          setMessage(result.message || 'Registration failed, please try again')
-        }
+      if (response.ok && result.success) {
+        setMessage('注册成功，正在跳转...')
+        
+        // 保存用户会话（简化实现）
+        localStorage.setItem('userSession', JSON.stringify(result.data))
+        
+        // Navigate directly to account page after a brief delay
+        setTimeout(() => {
+          router.push('/account')
+        }, 1500)
+      } else {
+        setMessage(result.message || '注册失败，请重试')
+      }
     } catch (error) {
       console.error('Registration error:', error)
       setMessage('Network error, please check connection and try again')
@@ -370,10 +362,10 @@ export default function RegisterPage() {
             <div style={{
               marginTop: '16px',
               padding: '12px',
-              backgroundColor: message.includes('successful') ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-              border: `1px solid ${message.includes('successful') ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
+              backgroundColor: message.includes('成功') || message.includes('successful') ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+              border: `1px solid ${message.includes('成功') || message.includes('successful') ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
               borderRadius: '8px',
-              color: message.includes('successful') ? '#22c55e' : '#ef4444',
+              color: message.includes('成功') || message.includes('successful') ? '#22c55e' : '#ef4444',
               fontSize: '0.875rem',
               textAlign: 'center'
             }}>

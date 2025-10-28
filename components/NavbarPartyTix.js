@@ -77,8 +77,6 @@ export default function NavbarPartyTix() {
                 textDecoration: 'none',
                 transition: 'color 0.3s ease'
               }}
-              onMouseEnter={(e) => e.target.style.color = '#22D3EE'}
-              onMouseLeave={(e) => e.target.style.color = 'white'}
             >
               Events
             </Link>
@@ -92,13 +90,11 @@ export default function NavbarPartyTix() {
                 alignItems: 'center',
                 gap: '0.5rem'
               }}
-              onMouseEnter={(e) => e.target.style.color = '#22D3EE'}
-              onMouseLeave={(e) => e.target.style.color = 'white'}
             >
               <svg style={{ width: '1rem', height: '1rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0 0v-4m0 0h4m-4 0H6m12 0h-2M7 7h10a2 2 0 012 2v10a2 2 0 01-2 2H7a2 2 0 01-2-2V9a2 2 0 012-2z" />
               </svg>
-              扫码验票
+              QR Scanner
             </Link>
             <Link 
               href="/merchant" 
@@ -107,8 +103,6 @@ export default function NavbarPartyTix() {
                 textDecoration: 'none',
                 transition: 'color 0.3s ease'
               }}
-              onMouseEnter={(e) => e.target.style.color = '#22D3EE'}
-              onMouseLeave={(e) => e.target.style.color = 'white'}
             >
               Merchant Console
             </Link>
@@ -119,8 +113,6 @@ export default function NavbarPartyTix() {
                 textDecoration: 'none',
                 transition: 'color 0.3s ease'
               }}
-              onMouseEnter={(e) => e.target.style.color = '#22D3EE'}
-              onMouseLeave={(e) => e.target.style.color = 'white'}
             >
               Contact Us
             </Link>
@@ -132,44 +124,20 @@ export default function NavbarPartyTix() {
                 transition: 'color 0.3s ease',
                 fontWeight: '500'
               }}
-              onMouseEnter={(e) => e.target.style.color = '#f59e0b'}
-              onMouseLeave={(e) => e.target.style.color = '#fbbf24'}
             >
               Admin
-            </Link>
-            <Link 
-              href="/auth/login" 
-              style={{ 
-                color: 'white', 
-                textDecoration: 'none',
-                transition: 'color 0.3s ease'
-              }}
-              onMouseEnter={(e) => e.target.style.color = '#22D3EE'}
-              onMouseLeave={(e) => e.target.style.color = 'white'}
-            >
-              Login
-            </Link>
-            <Link 
-              href="/auth/register" 
-              style={{ 
-                color: 'white', 
-                textDecoration: 'none',
-                transition: 'color 0.3s ease'
-              }}
-              onMouseEnter={(e) => e.target.style.color = '#22D3EE'}
-              onMouseLeave={(e) => e.target.style.color = 'white'}
-            >
-              Register
             </Link>
             <Link 
               href="/account" 
               style={{ 
                 color: 'white', 
                 textDecoration: 'none',
-                transition: 'color 0.3s ease'
+                transition: 'color 0.3s ease',
+                background: 'linear-gradient(135deg, #7C3AED 0%, #22D3EE 100%)',
+                padding: '8px 16px',
+                borderRadius: '8px',
+                fontWeight: '500'
               }}
-              onMouseEnter={(e) => e.target.style.color = '#22D3EE'}
-              onMouseLeave={(e) => e.target.style.color = 'white'}
             >
               Account
             </Link>
@@ -269,39 +237,17 @@ export default function NavbarPartyTix() {
             Admin
           </Link>
           <Link 
-            href="/auth/login" 
-            style={{ 
-              color: 'white', 
-              textDecoration: 'none',
-              fontSize: '16px',
-              padding: '8px 0',
-              transition: 'color 0.3s ease'
-            }}
-            onClick={() => setIsMobileMenuOpen(false)}
-          >
-            Login
-          </Link>
-          <Link 
-            href="/auth/register" 
-            style={{ 
-              color: 'white', 
-              textDecoration: 'none',
-              fontSize: '16px',
-              padding: '8px 0',
-              transition: 'color 0.3s ease'
-            }}
-            onClick={() => setIsMobileMenuOpen(false)}
-          >
-            Register
-          </Link>
-          <Link 
             href="/account" 
             style={{ 
               color: 'white', 
               textDecoration: 'none',
               fontSize: '16px',
-              padding: '8px 0',
-              transition: 'color 0.3s ease'
+              padding: '12px 16px',
+              transition: 'color 0.3s ease',
+              background: 'linear-gradient(135deg, #7C3AED 0%, #22D3EE 100%)',
+              borderRadius: '8px',
+              fontWeight: '500',
+              textAlign: 'center'
             }}
             onClick={() => setIsMobileMenuOpen(false)}
           >

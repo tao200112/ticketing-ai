@@ -3,27 +3,23 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { createClient } from '@supabase/supabase-js'
 
 export default function MerchantRegisterPage() {
   const router = useRouter()
   const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+    name: '',
+    age: '',
     businessName: '',
     phone: '',
     inviteCode: ''
   })
   const [errors, setErrors] = useState({})
   const [isLoading, setIsLoading] = useState(false)
-  const [user, setUser] = useState(null)
   const [isCheckingAuth, setIsCheckingAuth] = useState(false)
-  const [showLoginForm, setShowLoginForm] = useState(false)
-  const [loginData, setLoginData] = useState({
-    email: '',
-    password: ''
-  })
 
   useEffect(() => {
-    // 不再强制检查登录状态
     setIsCheckingAuth(false)
   }, [])
 
@@ -43,58 +39,41 @@ export default function MerchantRegisterPage() {
     }
   }
 
-  const handleLoginChange = (e) => {
-    const { name, value } = e.target
-    setLoginData(prev => ({
-      ...prev,
-      [name]: value
-    }))
-  }
-
-  const handleLogin = async (e) => {
-    e.preventDefault()
-    setIsLoading(true)
-    setErrors({})
-
-    try {
-      const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-      )
-
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: loginData.email,
-        password: loginData.password
-      })
-
-      if (error) {
-        setErrors({ general: 'Invalid email or password' })
-      } else {
-        setUser(data.user)
-        setShowLoginForm(false)
-        setLoginData({ email: '', password: '' })
-      }
-    } catch (error) {
-      console.error('Login error:', error)
-      setErrors({ general: 'Login failed, please try again' })
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
   const validateForm = () => {
     const newErrors = {}
 
+    if (!formData.email) {
+      newErrors.email = 'Please enter your email address'
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      newErrors.email = 'Please enter a valid email address'
+    }
+
+    if (!formData.password) {
+      newErrors.password = 'Please enter your password'
+    } else if (formData.password.length < 6) {
+      newErrors.password = 'Password must be at least 6 characters'
+    }
+
+    if (!formData.name) {
+      newErrors.name = 'Please enter your full name'
+    }
+
+    if (!formData.age) {
+      newErrors.age = 'Please enter your age'
+    } else if (isNaN(formData.age) || parseInt(formData.age) < 18) {
+      newErrors.age = 'You must be at least 18 years old'
+    }
+
     if (!formData.businessName) {
-      newErrors.businessName = 'Please enter business name'
+      newErrors.businessName = 'Please enter your business name'
     }
 
     if (!formData.phone) {
-      newErrors.phone = 'Please enter contact phone'
+      newErrors.phone = 'Please enter your contact phone'
     }
 
     if (!formData.inviteCode) {
-      newErrors.inviteCode = 'Please enter invite code'
+      newErrors.inviteCode = 'Please enter your invite code'
     }
 
     setErrors(newErrors)
@@ -109,81 +88,43 @@ export default function MerchantRegisterPage() {
     }
 
     setIsLoading(true)
+    setErrors({})
 
     try {
-      // 如果用户已登录，直接创建商家账户
-      if (user) {
-        const response = await fetch('/api/merchant/create', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            ...formData,
-            userId: user.id
-          }),
-        })
+      const response = await fetch('/api/merchant/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+      })
 
-        const data = await response.json()
+      const data = await response.json()
 
-        if (data.ok) {
+      if (data.ok) {
+        // 注册成功，保存登录信息并跳转到商家页面
+        if (data.user && data.merchant) {
+          const merchantUser = {
+            id: data.user.id,
+            email: data.user.email,
+            name: data.user.name,
+            merchant: data.merchant,
+            merchant_id: data.merchant.id
+          }
+          localStorage.setItem('merchantUser', JSON.stringify(merchantUser))
           router.push('/merchant')
         } else {
-          if (data.reason === 'invalid_invite') {
-            setErrors({ inviteCode: 'Invalid or expired invite code' })
-          } else if (data.reason === 'merchant_exists') {
-            setErrors({ general: 'You already have a merchant account' })
-          } else {
-            setErrors({ general: data.reason || 'Failed to create merchant account' })
-          }
+          router.push('/merchant/auth/login?success=registered')
         }
       } else {
-        // 如果用户未登录，先注册用户，然后创建商家账户
-        const supabase = createClient(
-          process.env.NEXT_PUBLIC_SUPABASE_URL,
-          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-        )
-
-        // 生成随机邮箱和密码
-        const tempEmail = `merchant_${Date.now()}@temp.com`
-        const tempPassword = Math.random().toString(36).slice(-8)
-
-        // 注册临时用户
-        const { data: authData, error: authError } = await supabase.auth.signUp({
-          email: tempEmail,
-          password: tempPassword
-        })
-
-        if (authError) {
-          setErrors({ general: 'Failed to create account: ' + authError.message })
-          return
-        }
-
-        if (authData.user) {
-          // 创建商家账户
-          const response = await fetch('/api/merchant/create', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              ...formData,
-              userId: authData.user.id
-            }),
-          })
-
-          const data = await response.json()
-
-          if (data.ok) {
-            // 显示成功信息，包含临时登录凭据
-            setErrors({ 
-              success: `Merchant account created successfully! 
-              Temporary login: ${tempEmail} / ${tempPassword}
-              Please save these credentials and login to access your merchant dashboard.` 
-            })
-          } else {
-            setErrors({ general: data.reason || 'Failed to create merchant account' })
-          }
+        if (data.reason === 'invalid_invite') {
+          setErrors({ inviteCode: 'Invalid or expired invite code' })
+        } else if (data.reason === 'merchant_exists') {
+          setErrors({ general: 'You already have a merchant account' })
+        } else if (data.reason === 'EMAIL_EXISTS') {
+          setErrors({ email: 'Email already exists' })
+        } else {
+          setErrors({ general: data.reason || 'Failed to create merchant account' })
         }
       }
     } catch (error) {
@@ -220,106 +161,236 @@ export default function MerchantRegisterPage() {
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      padding: '20px'
+      padding: '1.5rem'
     }}>
       <div style={{
-        background: 'rgba(255, 255, 255, 0.1)',
-        backdropFilter: 'blur(10px)',
-        borderRadius: '20px',
-        padding: '40px',
         width: '100%',
         maxWidth: '500px',
-        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)'
+        background: 'rgba(30, 41, 59, 0.8)',
+        backdropFilter: 'blur(10px)',
+        borderRadius: '1.5rem',
+        padding: '2rem',
+        boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
+        border: '1px solid rgba(255, 255, 255, 0.1)'
       }}>
-        <div style={{ textAlign: 'center', marginBottom: '30px' }}>
+        {/* Header */}
+        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
           <div style={{
-            width: '60px',
-            height: '60px',
+            width: '64px',
+            height: '64px',
             background: 'linear-gradient(135deg, #7C3AED 0%, #22D3EE 100%)',
             borderRadius: '50%',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            margin: '0 auto 20px',
-            fontSize: '24px',
-            color: 'white',
-            fontWeight: 'bold'
+            margin: '0 auto 1rem',
+            fontSize: '28px'
           }}>
             🏢
           </div>
-          <h1 style={{ 
-            fontSize: '28px', 
-            fontWeight: 'bold', 
-            color: 'white', 
-            marginBottom: '8px' 
+          <h1 style={{
+            fontSize: '1.875rem',
+            fontWeight: 'bold',
+            color: 'white',
+            marginBottom: '0.5rem'
           }}>
-            {user ? 'Upgrade to Merchant' : 'Register as Merchant'}
+            Merchant Registration
           </h1>
-          {user ? (
-            <p style={{ 
-              color: 'rgba(255, 255, 255, 0.8)', 
-              fontSize: '16px',
-              marginBottom: '10px'
-            }}>
-              Welcome, {user.email}
-            </p>
-          ) : (
-            <p style={{ 
-              color: 'rgba(255, 255, 255, 0.8)', 
-              fontSize: '16px',
-              marginBottom: '10px'
-            }}>
-              Create your merchant account
-            </p>
-          )}
-          <p style={{ 
-            color: 'rgba(255, 255, 255, 0.7)', 
-            fontSize: '14px' 
-          }}>
-            Complete your merchant profile to start selling tickets
+          <p style={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: '0.875rem' }}>
+            Create your merchant account to start selling tickets
           </p>
         </div>
 
-        {errors.general && (
-          <div style={{
-            background: 'rgba(239, 68, 68, 0.1)',
-            border: '1px solid rgba(239, 68, 68, 0.3)',
-            borderRadius: '8px',
-            padding: '12px',
-            marginBottom: '20px',
-            color: '#fca5a5',
-            fontSize: '14px'
-          }}>
-            {errors.general}
+        {/* Form */}
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {/* Email */}
+          <div>
+            <label style={{
+              display: 'block',
+              fontSize: '0.875rem',
+              fontWeight: '500',
+              color: 'white',
+              marginBottom: '0.5rem'
+            }}>
+              Email Address *
+            </label>
+            <input
+              type="email"
+              name="email"
+              value={formData.email}
+              onChange={handleChange}
+              placeholder="Enter your email address"
+              style={{
+                width: '100%',
+                padding: '0.75rem 1rem',
+                backgroundColor: 'rgba(55, 65, 81, 0.5)',
+                border: errors.email ? '1px solid #ef4444' : '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '0.5rem',
+                color: 'white',
+                fontSize: '1rem',
+                outline: 'none',
+                transition: 'all 0.3s'
+              }}
+              onFocus={(e) => {
+                e.target.style.borderColor = '#7c3aed'
+                e.target.style.boxShadow = '0 0 0 3px rgba(124, 58, 237, 0.1)'
+              }}
+              onBlur={(e) => {
+                e.target.style.borderColor = errors.email ? '#ef4444' : 'rgba(255, 255, 255, 0.1)'
+                e.target.style.boxShadow = 'none'
+              }}
+            />
+            {errors.email && (
+              <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>
+                {errors.email}
+              </p>
+            )}
           </div>
-        )}
 
-        {errors.success && (
-          <div style={{
-            background: 'rgba(34, 197, 94, 0.1)',
-            border: '1px solid rgba(34, 197, 94, 0.3)',
-            borderRadius: '8px',
-            padding: '12px',
-            marginBottom: '20px',
-            color: '#86efac',
-            fontSize: '14px',
-            whiteSpace: 'pre-line'
-          }}>
-            {errors.success}
+          {/* Password */}
+          <div>
+            <label style={{
+              display: 'block',
+              fontSize: '0.875rem',
+              fontWeight: '500',
+              color: 'white',
+              marginBottom: '0.5rem'
+            }}>
+              Password *
+            </label>
+            <input
+              type="password"
+              name="password"
+              value={formData.password}
+              onChange={handleChange}
+              placeholder="Enter your password (min 6 characters)"
+              style={{
+                width: '100%',
+                padding: '0.75rem 1rem',
+                backgroundColor: 'rgba(55, 65, 81, 0.5)',
+                border: errors.password ? '1px solid #ef4444' : '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '0.5rem',
+                color: 'white',
+                fontSize: '1rem',
+                outline: 'none',
+                transition: 'all 0.3s'
+              }}
+              onFocus={(e) => {
+                e.target.style.borderColor = '#7c3aed'
+                e.target.style.boxShadow = '0 0 0 3px rgba(124, 58, 237, 0.1)'
+              }}
+              onBlur={(e) => {
+                e.target.style.borderColor = errors.password ? '#ef4444' : 'rgba(255, 255, 255, 0.1)'
+                e.target.style.boxShadow = 'none'
+              }}
+            />
+            {errors.password && (
+              <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>
+                {errors.password}
+              </p>
+            )}
           </div>
-        )}
 
-        <form onSubmit={handleSubmit}>
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{ 
-              display: 'block', 
-              color: 'white', 
-              marginBottom: '8px', 
-              fontWeight: '500' 
+          {/* Name */}
+          <div>
+            <label style={{
+              display: 'block',
+              fontSize: '0.875rem',
+              fontWeight: '500',
+              color: 'white',
+              marginBottom: '0.5rem'
+            }}>
+              Full Name *
+            </label>
+            <input
+              type="text"
+              name="name"
+              value={formData.name}
+              onChange={handleChange}
+              placeholder="Enter your full name"
+              style={{
+                width: '100%',
+                padding: '0.75rem 1rem',
+                backgroundColor: 'rgba(55, 65, 81, 0.5)',
+                border: errors.name ? '1px solid #ef4444' : '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '0.5rem',
+                color: 'white',
+                fontSize: '1rem',
+                outline: 'none',
+                transition: 'all 0.3s'
+              }}
+              onFocus={(e) => {
+                e.target.style.borderColor = '#7c3aed'
+                e.target.style.boxShadow = '0 0 0 3px rgba(124, 58, 237, 0.1)'
+              }}
+              onBlur={(e) => {
+                e.target.style.borderColor = errors.name ? '#ef4444' : 'rgba(255, 255, 255, 0.1)'
+                e.target.style.boxShadow = 'none'
+              }}
+            />
+            {errors.name && (
+              <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>
+                {errors.name}
+              </p>
+            )}
+          </div>
+
+          {/* Age */}
+          <div>
+            <label style={{
+              display: 'block',
+              fontSize: '0.875rem',
+              fontWeight: '500',
+              color: 'white',
+              marginBottom: '0.5rem'
+            }}>
+              Age *
+            </label>
+            <input
+              type="number"
+              name="age"
+              value={formData.age}
+              onChange={handleChange}
+              placeholder="Enter your age (must be 18+)"
+              style={{
+                width: '100%',
+                padding: '0.75rem 1rem',
+                backgroundColor: 'rgba(55, 65, 81, 0.5)',
+                border: errors.age ? '1px solid #ef4444' : '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '0.5rem',
+                color: 'white',
+                fontSize: '1rem',
+                outline: 'none',
+                transition: 'all 0.3s'
+              }}
+              onFocus={(e) => {
+                e.target.style.borderColor = '#7c3aed'
+                e.target.style.boxShadow = '0 0 0 3px rgba(124, 58, 237, 0.1)'
+              }}
+              onBlur={(e) => {
+                e.target.style.borderColor = errors.age ? '#ef4444' : 'rgba(255, 255, 255, 0.1)'
+                e.target.style.boxShadow = 'none'
+              }}
+            />
+            {errors.age && (
+              <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>
+                {errors.age}
+              </p>
+            )}
+          </div>
+
+          {/* Business Name */}
+          <div>
+            <label style={{
+              display: 'block',
+              fontSize: '0.875rem',
+              fontWeight: '500',
+              color: 'white',
+              marginBottom: '0.5rem'
             }}>
               Business Name *
             </label>
@@ -328,32 +399,42 @@ export default function MerchantRegisterPage() {
               name="businessName"
               value={formData.businessName}
               onChange={handleChange}
+              placeholder="Enter your business name"
               style={{
                 width: '100%',
-                padding: '12px 16px',
-                borderRadius: '8px',
-                border: '1px solid rgba(255, 255, 255, 0.2)',
-                background: 'rgba(255, 255, 255, 0.1)',
+                padding: '0.75rem 1rem',
+                backgroundColor: 'rgba(55, 65, 81, 0.5)',
+                border: errors.businessName ? '1px solid #ef4444' : '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '0.5rem',
                 color: 'white',
-                fontSize: '16px',
+                fontSize: '1rem',
                 outline: 'none',
-                transition: 'border-color 0.3s ease'
+                transition: 'all 0.3s'
               }}
-              placeholder="Enter your business name"
+              onFocus={(e) => {
+                e.target.style.borderColor = '#7c3aed'
+                e.target.style.boxShadow = '0 0 0 3px rgba(124, 58, 237, 0.1)'
+              }}
+              onBlur={(e) => {
+                e.target.style.borderColor = errors.businessName ? '#ef4444' : 'rgba(255, 255, 255, 0.1)'
+                e.target.style.boxShadow = 'none'
+              }}
             />
             {errors.businessName && (
-              <div style={{ color: '#fca5a5', fontSize: '14px', marginTop: '4px' }}>
+              <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>
                 {errors.businessName}
-              </div>
+              </p>
             )}
           </div>
 
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{ 
-              display: 'block', 
-              color: 'white', 
-              marginBottom: '8px', 
-              fontWeight: '500' 
+          {/* Phone */}
+          <div>
+            <label style={{
+              display: 'block',
+              fontSize: '0.875rem',
+              fontWeight: '500',
+              color: 'white',
+              marginBottom: '0.5rem'
             }}>
               Contact Phone *
             </label>
@@ -362,32 +443,42 @@ export default function MerchantRegisterPage() {
               name="phone"
               value={formData.phone}
               onChange={handleChange}
+              placeholder="Enter your contact phone"
               style={{
                 width: '100%',
-                padding: '12px 16px',
-                borderRadius: '8px',
-                border: '1px solid rgba(255, 255, 255, 0.2)',
-                background: 'rgba(255, 255, 255, 0.1)',
+                padding: '0.75rem 1rem',
+                backgroundColor: 'rgba(55, 65, 81, 0.5)',
+                border: errors.phone ? '1px solid #ef4444' : '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '0.5rem',
                 color: 'white',
-                fontSize: '16px',
+                fontSize: '1rem',
                 outline: 'none',
-                transition: 'border-color 0.3s ease'
+                transition: 'all 0.3s'
               }}
-              placeholder="Enter your contact phone"
+              onFocus={(e) => {
+                e.target.style.borderColor = '#7c3aed'
+                e.target.style.boxShadow = '0 0 0 3px rgba(124, 58, 237, 0.1)'
+              }}
+              onBlur={(e) => {
+                e.target.style.borderColor = errors.phone ? '#ef4444' : 'rgba(255, 255, 255, 0.1)'
+                e.target.style.boxShadow = 'none'
+              }}
             />
             {errors.phone && (
-              <div style={{ color: '#fca5a5', fontSize: '14px', marginTop: '4px' }}>
+              <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>
                 {errors.phone}
-              </div>
+              </p>
             )}
           </div>
 
-          <div style={{ marginBottom: '30px' }}>
-            <label style={{ 
-              display: 'block', 
-              color: 'white', 
-              marginBottom: '8px', 
-              fontWeight: '500' 
+          {/* Invite Code */}
+          <div>
+            <label style={{
+              display: 'block',
+              fontSize: '0.875rem',
+              fontWeight: '500',
+              color: 'white',
+              marginBottom: '0.5rem'
             }}>
               Invite Code *
             </label>
@@ -396,152 +487,88 @@ export default function MerchantRegisterPage() {
               name="inviteCode"
               value={formData.inviteCode}
               onChange={handleChange}
+              placeholder="Enter your invite code"
               style={{
                 width: '100%',
-                padding: '12px 16px',
-                borderRadius: '8px',
-                border: '1px solid rgba(255, 255, 255, 0.2)',
-                background: 'rgba(255, 255, 255, 0.1)',
+                padding: '0.75rem 1rem',
+                backgroundColor: 'rgba(55, 65, 81, 0.5)',
+                border: errors.inviteCode ? '1px solid #ef4444' : '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '0.5rem',
                 color: 'white',
-                fontSize: '16px',
+                fontSize: '1rem',
                 outline: 'none',
-                transition: 'border-color 0.3s ease'
+                transition: 'all 0.3s'
               }}
-              placeholder="Enter your invite code"
+              onFocus={(e) => {
+                e.target.style.borderColor = '#7c3aed'
+                e.target.style.boxShadow = '0 0 0 3px rgba(124, 58, 237, 0.1)'
+              }}
+              onBlur={(e) => {
+                e.target.style.borderColor = errors.inviteCode ? '#ef4444' : 'rgba(255, 255, 255, 0.1)'
+                e.target.style.boxShadow = 'none'
+              }}
             />
             {errors.inviteCode && (
-              <div style={{ color: '#fca5a5', fontSize: '14px', marginTop: '4px' }}>
+              <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>
                 {errors.inviteCode}
-              </div>
+              </p>
             )}
           </div>
 
+          {/* Error Message */}
+          {errors.general && (
+            <div style={{
+              backgroundColor: 'rgba(239, 68, 68, 0.1)',
+              border: '1px solid #ef4444',
+              borderRadius: '0.5rem',
+              padding: '0.75rem',
+              color: '#fca5a5',
+              fontSize: '0.875rem'
+            }}>
+              {errors.general}
+            </div>
+          )}
+
+          {/* Submit Button */}
           <button
             type="submit"
             disabled={isLoading}
             style={{
               width: '100%',
-              padding: '14px',
+              padding: '0.75rem 1rem',
               background: isLoading 
-                ? 'rgba(255, 255, 255, 0.3)' 
+                ? 'rgba(55, 65, 81, 0.5)' 
                 : 'linear-gradient(135deg, #7C3AED 0%, #22D3EE 100%)',
               color: 'white',
               border: 'none',
-              borderRadius: '8px',
-              fontSize: '16px',
+              borderRadius: '0.5rem',
+              fontSize: '1rem',
               fontWeight: '600',
               cursor: isLoading ? 'not-allowed' : 'pointer',
-              transition: 'all 0.3s ease',
-              opacity: isLoading ? 0.7 : 1
+              transition: 'all 0.3s',
+              marginTop: '0.5rem'
             }}
           >
-            {isLoading ? 'Creating Merchant Account...' : 'Upgrade to Merchant'}
+            {isLoading ? 'Creating Account...' : 'Register as Merchant'}
           </button>
         </form>
 
-        <div style={{ 
-          textAlign: 'center', 
-          marginTop: '20px',
-          color: 'rgba(255, 255, 255, 0.7)',
-          fontSize: '14px'
+        {/* Links */}
+        <div style={{
+          textAlign: 'center',
+          marginTop: '1.5rem',
+          fontSize: '0.875rem',
+          color: 'rgba(255, 255, 255, 0.6)'
         }}>
-          {!user && (
-            <button
-              type="button"
-              onClick={() => setShowLoginForm(!showLoginForm)}
-              style={{
-                background: 'rgba(255, 255, 255, 0.1)',
-                border: '1px solid rgba(255, 255, 255, 0.2)',
-                color: 'white',
-                padding: '8px 16px',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontSize: '14px',
-                marginBottom: '10px'
-              }}
-            >
-              {showLoginForm ? 'Hide Login' : 'Already have an account? Login'}
-            </button>
-          )}
-          <br />
-          <Link 
-            href="/merchant/auth/login" 
-            style={{ 
-              color: 'rgba(255, 255, 255, 0.8)', 
-              textDecoration: 'none' 
-            }}
-          >
-            Already have a merchant account? Login here
+          Already have a merchant account?{' '}
+          <Link href="/merchant/auth/login" style={{
+            color: '#22D3EE',
+            textDecoration: 'none',
+            fontWeight: '500'
+          }}>
+            Login here
           </Link>
         </div>
-
-        {showLoginForm && !user && (
-          <div style={{
-            background: 'rgba(255, 255, 255, 0.05)',
-            borderRadius: '8px',
-            padding: '20px',
-            marginTop: '20px',
-            border: '1px solid rgba(255, 255, 255, 0.1)'
-          }}>
-            <h3 style={{ color: 'white', marginBottom: '16px', fontSize: '16px' }}>Login to Existing Account</h3>
-            <form onSubmit={handleLogin}>
-              <div style={{ marginBottom: '16px' }}>
-                <input
-                  type="email"
-                  name="email"
-                  value={loginData.email}
-                  onChange={handleLoginChange}
-                  placeholder="Email"
-                  required
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    borderRadius: '6px',
-                    border: '1px solid rgba(255, 255, 255, 0.2)',
-                    background: 'rgba(255, 255, 255, 0.1)',
-                    color: 'white',
-                    fontSize: '14px'
-                  }}
-                />
-              </div>
-              <div style={{ marginBottom: '16px' }}>
-                <input
-                  type="password"
-                  name="password"
-                  value={loginData.password}
-                  onChange={handleLoginChange}
-                  placeholder="Password"
-                  required
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    borderRadius: '6px',
-                    border: '1px solid rgba(255, 255, 255, 0.2)',
-                    background: 'rgba(255, 255, 255, 0.1)',
-                    color: 'white',
-                    fontSize: '14px'
-                  }}
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={isLoading}
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  background: isLoading ? 'rgba(255, 255, 255, 0.3)' : 'linear-gradient(135deg, #7C3AED 0%, #22D3EE 100%)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: isLoading ? 'not-allowed' : 'pointer',
-                  fontSize: '14px'
-                }}
-              >
-                {isLoading ? 'Logging in...' : 'Login'}
-              </button>
-            </form>
-          </div>
-        )}
       </div>
     </div>
   )

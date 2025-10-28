@@ -1,7 +1,12 @@
 {
   "build": {
     "rootDirectory": "backend",
-    "buildCommand": "npm install",
+    "buildCommand": "npm ci --only=production",
     "startCommand": "npm start"
+  },
+  "deploy": {
+    "startCommand": "npm start",
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 10
   }
 }

@@ -121,38 +121,38 @@ export default function NewEventWizardPage() {
         return
       }
 
-      // 创建事件对象
-      const newEvent = {
-        id: Date.now().toString(),
-        merchantId: merchantUser.id, // 添加商家ID
-        title: eventData.title,
-        description: eventData.description,
-        startTime: eventData.startTime,
-        endTime: eventData.endTime,
-        location: eventData.location,
-        poster: eventData.posterPreview,
-        prices: validPrices.map(price => ({
-          name: price.name,
-          amount_cents: Math.round(parseFloat(price.amount_cents) * 100), // 将美元转换为分
-          inventory: parseInt(price.inventory),
-          limit_per_user: price.limit_per_user ? parseInt(price.limit_per_user) : null
-        })),
-        ticketsSold: 0,
-        totalTickets: validPrices.reduce((sum, price) => sum + parseInt(price.inventory), 0),
-        revenue: 0,
-        createdAt: new Date().toISOString()
+      // 调用 API 创建活动
+      const response = await fetch('/api/events', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: eventData.title,
+          description: eventData.description,
+          startTime: eventData.startTime,
+          endTime: eventData.endTime,
+          location: eventData.location,
+          poster_url: eventData.posterPreview,
+          merchant_id: merchantUser.merchant_id || null,
+          prices: validPrices.map(price => ({
+            name: price.name,
+            amount_cents: Math.round(parseFloat(price.amount_cents) * 100), // 将美元转换为分
+            inventory: parseInt(price.inventory),
+            limit_per_user: price.limit_per_user ? parseInt(price.limit_per_user) : null
+          })),
+          status: 'published'
+        }),
+      })
+
+      const result = await response.json()
+
+      if (!result.success) {
+        setError(result.message || '创建活动失败')
+        return
       }
 
-      // 保存到本地存储
-      const existingEvents = JSON.parse(localStorage.getItem('merchantEvents') || '[]')
-      existingEvents.push(newEvent)
-      localStorage.setItem('merchantEvents', JSON.stringify(existingEvents))
-      
-      // 触发localStorage事件，通知其他页面更新
-      window.dispatchEvent(new Event('storage'))
-
-      // 模拟网络延迟
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      console.log('✅ 活动创建成功:', result.data)
       
       router.push('/merchant/events')
     } catch (err) {

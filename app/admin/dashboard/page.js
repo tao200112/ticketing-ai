@@ -146,7 +146,14 @@ export default function AdminDashboard() {
       if (ticketsResponse.ok) {
         const ticketsData = await ticketsResponse.json()
         console.log('Tickets data:', ticketsData)
-        setTickets(ticketsData)
+        // Handle both array and object response formats
+        if (Array.isArray(ticketsData)) {
+          setTickets(ticketsData)
+        } else if (ticketsData.tickets) {
+          setTickets(ticketsData.tickets)
+        } else {
+          setTickets([])
+        }
       } else {
         console.error('Tickets fetch failed:', ticketsResponse.status)
         setTickets([])

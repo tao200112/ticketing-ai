@@ -32,10 +32,14 @@ export default function AdminData() {
         console.error('Failed to load orders:', ordersData.error);
       }
 
-      if (ticketsData.success) {
+      // Handle both array and object response formats
+      if (Array.isArray(ticketsData)) {
+        setTickets(ticketsData);
+      } else if (ticketsData.tickets) {
         setTickets(ticketsData.tickets || []);
       } else {
         console.error('Failed to load tickets:', ticketsData.error);
+        setTickets([]);
       }
 
     } catch (error) {

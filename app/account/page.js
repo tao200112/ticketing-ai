@@ -117,7 +117,6 @@ export default function AccountPage() {
           orders (
             id,
             customer_email,
-            customer_name,
             total_amount_cents,
             currency,
             status,

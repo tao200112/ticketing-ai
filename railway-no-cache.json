@@ -1,0 +1,12 @@
+{
+  "build": {
+    "rootDirectory": "backend",
+    "buildCommand": "npm install --omit=dev --no-audit --no-fund",
+    "startCommand": "npm start"
+  },
+  "deploy": {
+    "startCommand": "npm start",
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 10
+  }
+}

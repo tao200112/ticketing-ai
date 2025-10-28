@@ -1,0 +1,15 @@
+[build]
+rootDirectory = "backend"
+buildCommand = "npm install --omit=dev --no-audit --no-fund"
+startCommand = "npm start"
+
+[deploy]
+startCommand = "npm start"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10
+
+[healthcheck]
+path = "/health"
+port = 8080
+interval = 30
+timeout = 10

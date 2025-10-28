@@ -94,11 +94,27 @@ export async function POST(request) {
       for (let i = 0; i < quantity; i++) {
         const shortId = generateShortTicketId()
         
+        // 获取或创建默认活动ID
+        let eventId = session.metadata?.event_id
+        
+        // 如果event_id不是有效的UUID，使用默认活动
+        if (!eventId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(eventId)) {
+          console.log('⚠️ 使用默认活动ID，因为event_id无效:', eventId)
+          // 获取第一个活动作为默认
+          const { data: defaultEvent } = await supabase
+            .from('events')
+            .select('id')
+            .limit(1)
+            .single()
+          
+          eventId = defaultEvent?.id || '45091d37-7252-43c7-93c8-a7033d28af31'
+        }
+        
         const { data: ticket, error: ticketError } = await supabase
           .from('tickets')
           .insert({
             order_id: order.id,
-            event_id: session.metadata?.event_id,
+            event_id: eventId,
             tier: session.metadata?.price_name || 'general',
             holder_email: session.customer_email,
             status: 'unused',

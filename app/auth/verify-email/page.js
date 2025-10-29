@@ -18,7 +18,7 @@ function VerifyEmailContent() {
       verifyEmail(token);
     } else {
       setStatus('error');
-      setMessage('缺少验证令牌');
+      setMessage('Missing verification token');
     }
   }, [token]);
 
@@ -40,12 +40,12 @@ function VerifyEmailContent() {
         setUser(data.data);
       } else {
         setStatus('error');
-        setMessage(data.message || '验证失败');
+        setMessage(data.message || 'Verification failed');
       }
     } catch (error) {
-      console.error('验证邮箱失败:', error);
+      console.error('Email verification failed:', error);
       setStatus('error');
-      setMessage('网络错误，请稍后重试');
+      setMessage('Network error, please try again later');
     }
   };
 
@@ -65,13 +65,13 @@ function VerifyEmailContent() {
       const data = await response.json();
 
       if (data.success) {
-        setMessage('验证邮件已重新发送，请检查您的邮箱');
+        setMessage('Verification email has been resent, please check your inbox');
       } else {
-        setMessage(data.message || '发送失败');
+        setMessage(data.message || 'Send failed');
       }
     } catch (error) {
-      console.error('重新发送验证邮件失败:', error);
-      setMessage('网络错误，请稍后重试');
+      console.error('Resend verification email failed:', error);
+      setMessage('Network error, please try again later');
     } finally {
       setIsResending(false);
     }
@@ -104,12 +104,12 @@ function VerifyEmailContent() {
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="text-center">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            {getStatusIcon()} 邮箱验证
+            {getStatusIcon()} Email Verification
           </h1>
           <p className="text-gray-600">
-            {status === 'loading' && '正在验证您的邮箱...'}
-            {status === 'success' && '验证成功！'}
-            {status === 'error' && '验证失败'}
+            {status === 'loading' && 'Verifying your email...'}
+            {status === 'success' && 'Verification successful!'}
+            {status === 'error' && 'Verification failed'}
           </p>
         </div>
       </div>
@@ -125,7 +125,7 @@ function VerifyEmailContent() {
               <div className="space-y-4">
                 <div className="bg-green-50 border border-green-200 rounded-md p-4">
                   <p className="text-sm text-green-800">
-                    <strong>{user.name}</strong>，您的邮箱 <strong>{user.email}</strong> 已验证成功！
+                    <strong>{user.name}</strong>, your email <strong>{user.email}</strong> has been successfully verified!
                   </p>
                 </div>
                 <div className="space-y-2">
@@ -133,13 +133,13 @@ function VerifyEmailContent() {
                     href="/auth/login"
                     className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                   >
-                    立即登录
+                    Login Now
                   </Link>
                   <Link
                     href="/"
                     className="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                   >
-                    返回首页
+                    Return to Homepage
                   </Link>
                 </div>
               </div>
@@ -149,12 +149,12 @@ function VerifyEmailContent() {
               <div className="space-y-4">
                 <div className="bg-red-50 border border-red-200 rounded-md p-4">
                   <p className="text-sm text-red-800">
-                    验证失败，可能的原因：
+                    Verification failed, possible reasons:
                   </p>
                   <ul className="text-sm text-red-700 mt-2 list-disc list-inside">
-                    <li>验证链接已过期</li>
-                    <li>验证链接已被使用</li>
-                    <li>验证链接无效</li>
+                    <li>Verification link has expired</li>
+                    <li>Verification link has been used</li>
+                    <li>Verification link is invalid</li>
                   </ul>
                 </div>
                 <div className="space-y-2">
@@ -163,13 +163,13 @@ function VerifyEmailContent() {
                     disabled={isResending || !user?.email}
                     className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {isResending ? '发送中...' : '重新发送验证邮件'}
+                    {isResending ? 'Sending...' : 'Resend Verification Email'}
                   </button>
                   <Link
                     href="/auth/login"
                     className="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                   >
-                    返回登录
+                    Return to Login
                   </Link>
                 </div>
               </div>
@@ -181,7 +181,7 @@ function VerifyEmailContent() {
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
                 </div>
                 <p className="text-sm text-gray-600">
-                  请稍候，我们正在验证您的邮箱...
+                  Please wait, we are verifying your email...
                 </p>
               </div>
             )}
@@ -199,7 +199,7 @@ export default function VerifyEmailPage() {
         <div className="sm:mx-auto sm:w-full sm:max-w-md">
           <div className="text-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600">加载中...</p>
+            <p className="mt-4 text-gray-600">Loading...</p>
           </div>
         </div>
       </div>

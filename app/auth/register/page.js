@@ -105,7 +105,7 @@ export default function RegisterPage() {
       const result = await response.json()
       
       if (response.ok && result.success) {
-        setMessage('注册成功！请检查邮箱并点击验证链接完成注册。')
+        setMessage('Registration successful! Please check your email and click the verification link to complete registration.')
         
         // 保存用户会话（简化实现）
         localStorage.setItem('userSession', JSON.stringify(result.data))
@@ -123,13 +123,13 @@ export default function RegisterPage() {
           })
           
           if (emailResponse.ok) {
-            setMessage('注册成功！验证邮件已发送，请检查邮箱并点击验证链接完成注册。')
+            setMessage('Registration successful! Verification email has been sent, please check your inbox and click the verification link to complete registration.')
           } else {
-            setMessage('注册成功！但验证邮件发送失败，请稍后手动发送。')
+            setMessage('Registration successful! But verification email sending failed, please try again later.')
           }
         } catch (emailError) {
           console.error('Email verification error:', emailError)
-          setMessage('注册成功！但验证邮件发送失败，请稍后手动发送。')
+          setMessage('Registration successful! But verification email sending failed, please try again later.')
         }
         
         // Navigate to account page after a brief delay
@@ -137,7 +137,7 @@ export default function RegisterPage() {
           router.push('/account')
         }, 3000)
       } else {
-        setMessage(result.message || '注册失败，请重试')
+        setMessage(result.message || 'Registration failed, please try again')
       }
     } catch (error) {
       console.error('Registration error:', error)

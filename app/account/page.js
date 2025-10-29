@@ -106,6 +106,15 @@ export default function AccountPage() {
 
       if (userData) {
         delete userData.password_hash
+        
+        // 检查邮箱是否已验证
+        if (!userData.email_verified_at) {
+          console.log('❌ Email not verified, redirecting to verification page')
+          setLoading(false)
+          router.push('/auth/verify-email?message=Please verify your email to access your account')
+          return
+        }
+        
         setUser(userData)
       }
 

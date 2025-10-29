@@ -27,10 +27,23 @@ export default function Home() {
       }
     }
     
+    // 添加页面可见性变化监听，当页面重新可见时刷新数据
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        console.log('🔄 页面重新可见，刷新活动数据')
+        // 触发useEvents重新获取数据
+        if (window.refreshEvents) {
+          window.refreshEvents()
+        }
+      }
+    }
+    
     window.addEventListener('storage', handleStorageChange)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
     
     return () => {
       window.removeEventListener('storage', handleStorageChange)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
   }, [])
 
@@ -67,7 +80,7 @@ export default function Home() {
     console.log(`📊 活动统计 - API: ${apiEvents?.length || 0}, Default: ${defaultEvents.length}, 最终: ${filteredEvents.length}`)
     
     return filteredEvents
-  }, [apiEvents])
+  }, [apiEvents, apiLoading, apiError]) // 添加更多依赖项确保数据更新
 
   // 更新加载状态 - 改进loading逻辑
   useEffect(() => {

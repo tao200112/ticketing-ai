@@ -107,7 +107,7 @@ export default function EventsPage() {
     console.log(`📊 活动统计 - API: ${apiEvents?.length || 0}, Default: ${defaultEvents.length}, 最终: ${filteredEvents.length}`)
     
     return filteredEvents
-  }, [apiEvents])
+  }, [apiEvents, apiLoading, apiError]) // 添加更多依赖项确保数据更新
 
   // 更新加载状态 - 改进loading逻辑
   useEffect(() => {

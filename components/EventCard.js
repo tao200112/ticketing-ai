@@ -98,15 +98,14 @@ export default function EventCard({ event }) {
             <span>📍 {event.location || 'Location TBD'}</span>
           </div>
           
-          {/* 售票统计 */}
+          {/* 活动时间 */}
           <div style={{
             display: 'flex',
-            justifyContent: 'space-between',
+            justifyContent: 'flex-end',
             alignItems: 'center',
             fontSize: '0.75rem',
             color: '#6b7280'
           }}>
-            <span>🎫 {event.ticketsSold || event.current_attendees || 0} sold</span>
             <span>📅 {event.formatted_start_at || (event.start_date ? new Date(event.start_date).toLocaleDateString() : 'TBD')}</span>
           </div>
         </div>

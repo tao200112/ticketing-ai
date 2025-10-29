@@ -61,5 +61,12 @@
       "source": "/api/backend/(.*)",
       "destination": "https://your-backend-domain.railway.app/v1/$1"
     }
+  ],
+  "redirects": [
+    {
+      "source": "/test-email",
+      "destination": "/email-test",
+      "permanent": false
+    }
   ]
 }

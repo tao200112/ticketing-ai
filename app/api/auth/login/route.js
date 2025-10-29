@@ -69,6 +69,23 @@ export async function POST(request) {
       )
     }
 
+    // 检查邮箱是否已验证
+    if (!user.email_verified_at) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'EMAIL_NOT_VERIFIED',
+          message: '请先验证您的邮箱才能登录',
+          data: {
+            email: user.email,
+            needsVerification: true,
+            requiresEmailVerification: true
+          }
+        },
+        { status: 403 }
+      )
+    }
+
     // 移除密码字段
     delete user.password_hash
 

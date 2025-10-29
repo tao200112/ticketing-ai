@@ -84,7 +84,7 @@ export async function POST(request) {
     // 加密密码
     const hashedPassword = await bcrypt.hash(password, 10)
 
-    // 创建用户
+    // 创建用户（未验证状态）
     const { data: newUser, error } = await supabase
       .from('users')
       .insert([
@@ -93,7 +93,8 @@ export async function POST(request) {
           password_hash: hashedPassword,
           name,
           age: age || null,
-          role: 'user'
+          role: 'user',
+          email_verified_at: null  // 明确设置为未验证
         }
       ])
       .select()
@@ -111,13 +112,43 @@ export async function POST(request) {
       )
     }
 
+    // 生成邮箱验证令牌
+    const verificationToken = await supabase.rpc('send_verification_email', {
+      p_user_id: newUser.id,
+      p_email: newUser.email
+    });
+
+    if (verificationToken.error) {
+      console.error('❌ 生成验证令牌失败:', verificationToken.error);
+      // 不阻止注册，但记录错误
+    }
+
+    // 发送验证邮件
+    try {
+      const emailService = (await import('../../../../lib/email-service.js')).default;
+      await emailService.sendVerificationEmail(
+        newUser.email, 
+        newUser.name, 
+        verificationToken.data
+      );
+    } catch (emailError) {
+      console.error('❌ 发送验证邮件失败:', emailError);
+      // 不阻止注册，但记录错误
+    }
+
     // 移除密码字段
     delete newUser.password_hash
 
     return NextResponse.json({
       success: true,
-      message: '注册成功',
-      data: newUser
+      message: '注册成功！请检查您的邮箱并验证账户才能正常使用',
+      data: {
+        ...newUser,
+        emailVerified: false,
+        needsVerification: true,
+        requiresEmailVerification: true
+      },
+      requiresEmailVerification: true
     })
 
   } catch (error) {

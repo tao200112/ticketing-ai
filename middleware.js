@@ -45,6 +45,8 @@ export const config = {
   matcher: [
     '/event/:path*',
     '/events/:path*',
-    '/api/:path*'
+    '/api/:path*',
+    // 排除邮箱验证相关路由，避免中间件干扰
+    '/((?!auth|email-test|test-email).*)'
   ]
 }

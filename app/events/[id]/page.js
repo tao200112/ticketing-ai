@@ -534,6 +534,42 @@ export default function EventDetailPage() {
                       />
                     </div>
                   </div>
+                  
+                  {/* 客户信息备注 */}
+                  <div style={{
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    border: '1px solid rgba(59, 130, 246, 0.3)',
+                    borderRadius: '8px',
+                    padding: '12px 16px',
+                    marginTop: '12px'
+                  }}>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: '8px'
+                    }}>
+                      <div style={{
+                        color: '#60a5fa',
+                        fontSize: '1rem',
+                        marginTop: '2px'
+                      }}>
+                        ℹ️
+                      </div>
+                      <div style={{
+                        color: '#e0e7ff',
+                        fontSize: '0.875rem',
+                        lineHeight: '1.4'
+                      }}>
+                        <div style={{ fontWeight: '500', marginBottom: '4px' }}>
+                          Please provide accurate information
+                        </div>
+                        <div>
+                          Your name and ID will be verified at the entrance. 
+                          Please ensure all information is correct and matches your official identification.
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 {/* 数量选择 */}

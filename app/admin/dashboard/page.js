@@ -632,7 +632,8 @@ export default function AdminDashboard() {
                         description: 'Enjoy delicious chicken and an amazing night at Virginia Tech\'s most popular event. We provide the freshest ingredients, the most unique cooking methods, and the warmest service.',
                         start_date: '2025-10-25T20:00:00Z',
                         end_date: '2025-10-25T23:00:00Z',
-                        location: 'Shanghai Concert Hall',
+                        location: '201 N Main St SUITE A, Blacksburg, VA 24060',
+                        address: '201 N Main St SUITE A, Blacksburg, VA 24060',
                         max_attendees: 150,
                         merchant_id: 'default-merchant',
                         ticket_types: [

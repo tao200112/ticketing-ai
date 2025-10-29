@@ -36,7 +36,7 @@ export default function RidiculousChickenEvent() {
     name: "Ridiculous Chicken Night Event",
     description: "Enjoy delicious chicken and an amazing night at Virginia Tech's most popular event. We provide the freshest ingredients, the most unique cooking methods, and the warmest service.",
     time: "October 25, 2025 8:00 PM",
-    venue: "Shanghai Concert Hall",
+    venue: "201 N Main St SUITE A, Blacksburg, VA 24060",
     duration: "3 hours",
     ageRestriction: "18+"
   }

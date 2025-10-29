@@ -36,6 +36,7 @@
 | `SENTRY_DSN` | `https://o1336925.ingest.sentry.io/6606312` | Production, Preview, Development |
 | `NEXT_PUBLIC_SENTRY_DSN` | `https://o1336925.ingest.sentry.io/6606312` | Production, Preview, Development |
 | `MERCHANT_ID` | `default-merchant-id` | Production, Preview, Development |
+| `NEXT_PUBLIC_MERCHANT_ID` | `default-merchant-id` | Production, Preview, Development |
 
 ### 5. 重新部署
 设置完环境变量后：

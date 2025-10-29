@@ -34,9 +34,20 @@
     "health:check": "node scripts/health-check.js",
     "deploy:frontend": "powershell -ExecutionPolicy Bypass -File scripts/deploy.ps1 frontend",
     "deploy:backend": "powershell -ExecutionPolicy Bypass -File scripts/deploy.ps1 backend",
-    "deploy:all": "powershell -ExecutionPolicy Bypass -File scripts/deploy.ps1 all"
+    "deploy:all": "powershell -ExecutionPolicy Bypass -File scripts/deploy.ps1 all",
+    "env:local": "node scripts/setup-env.js local",
+    "env:preview": "node scripts/setup-env.js preview",
+    "env:production": "node scripts/setup-env.js production",
+    "db:export": "node scripts/export-db-snapshot.js",
+    "db:import": "node scripts/import-db-snapshot.js",
+    "db:rollback:create": "node scripts/create-rollback.js",
+    "db:rollback:execute": "node scripts/execute-rollback.js",
+    "db:rollback:quick": "bash scripts/quick-rollback.sh",
+    "validation:test": "node scripts/validation-test.js"
   },
   "dependencies": {
+    "@sentry/nextjs": "^10.22.0",
+    "@sentry/node": "^10.22.0",
     "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "^2.39.0",
     "@tailwindcss/postcss": "^4.1.16",
@@ -49,6 +60,7 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "stripe": "^19.1.0",
+    "uuid": "^13.0.0",
     "zod": "^4.1.12"
   },
   "devDependencies": {

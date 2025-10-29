@@ -34,6 +34,7 @@
 | `UPSTASH_REDIS_URL` | `https://teaching-piglet-24936.upstash.io` | Production, Preview, Development |
 | `UPSTASH_REDIS_TOKEN` | `AWFoAAIncDI1NTFhNzhmODljZTY0ZDk0YmU0YzNiY2EwZDMyYjY3ZHAyMjQ5MzY` | Production, Preview, Development |
 | `SENTRY_DSN` | `https://o1336925.ingest.sentry.io/6606312` | Production, Preview, Development |
+| `NEXT_PUBLIC_SENTRY_DSN` | `https://o1336925.ingest.sentry.io/6606312` | Production, Preview, Development |
 | `MERCHANT_ID` | `default-merchant-id` | Production, Preview, Development |
 
 ### 5. 重新部署

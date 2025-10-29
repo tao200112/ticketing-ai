@@ -99,18 +99,16 @@ export default function EventCard({ event }) {
           </div>
           
           {/* 售票统计 */}
-          {event.ticketsSold !== undefined && (
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              fontSize: '0.75rem',
-              color: '#6b7280'
-            }}>
-              <span>🎫 {event.ticketsSold || 0} sold</span>
-              <span>📅 {new Date(event.start_date).toLocaleDateString()}</span>
-            </div>
-          )}
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            fontSize: '0.75rem',
+            color: '#6b7280'
+          }}>
+            <span>🎫 {event.ticketsSold || event.current_attendees || 0} sold</span>
+            <span>📅 {event.formatted_start_at || (event.start_date ? new Date(event.start_date).toLocaleDateString() : 'TBD')}</span>
+          </div>
         </div>
       </div>
     </Link>

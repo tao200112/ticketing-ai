@@ -69,9 +69,17 @@ export default function Home() {
     return filteredEvents
   }, [apiEvents])
 
-  // 更新加载状态
+  // 更新加载状态 - 改进loading逻辑
   useEffect(() => {
-    setLoading(apiLoading)
+    if (apiLoading) {
+      setLoading(true)
+    } else {
+      // 延迟一点时间确保数据完全加载
+      const timer = setTimeout(() => {
+        setLoading(false)
+      }, 100)
+      return () => clearTimeout(timer)
+    }
   }, [apiLoading])
 
   return (

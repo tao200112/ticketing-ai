@@ -81,12 +81,17 @@ export default function EventsPage() {
 
   // 合并 API 数据和本地数据
   const events = React.useMemo(() => {
+    console.log('🔍 开始合并活动数据:', { apiEvents, apiLoading, apiError })
+    
     // 使用 API 返回的活动数据和默认活动
     let allEvents = []
     
     // 添加 API 活动
-    if (apiEvents && apiEvents.length > 0) {
+    if (apiEvents && Array.isArray(apiEvents) && apiEvents.length > 0) {
+      console.log('✅ 添加 API 活动:', apiEvents.length)
       allEvents = [...apiEvents]
+    } else {
+      console.log('⚠️ API 活动为空或无效:', apiEvents)
     }
     
     // 添加默认的 ridiculous-chicken 活动
@@ -104,9 +109,17 @@ export default function EventsPage() {
     return filteredEvents
   }, [apiEvents])
 
-  // 更新加载状态
+  // 更新加载状态 - 改进loading逻辑
   useEffect(() => {
-    setLoading(apiLoading)
+    if (apiLoading) {
+      setLoading(true)
+    } else {
+      // 延迟一点时间确保数据完全加载
+      const timer = setTimeout(() => {
+        setLoading(false)
+      }, 100)
+      return () => clearTimeout(timer)
+    }
   }, [apiLoading])
 
   return (

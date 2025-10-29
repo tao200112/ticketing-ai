@@ -10,7 +10,7 @@ const envConfig = `# ===========================================
 # 基础配置
 # ===========================================
 NODE_ENV=development
-NEXT_PUBLIC_SITE_URL=https://ticketing-ai-six.vercel.app/
+NEXT_PUBLIC_SITE_URL=https://ticketing-ai-six.vercel.app
 
 # ===========================================
 # Supabase 配置

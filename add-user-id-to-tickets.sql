@@ -14,3 +14,5 @@ WHERE tickets.holder_email = users.email;
 COMMENT ON COLUMN tickets.user_id IS '票据持有者的用户ID，优先于holder_email使用';
 COMMENT ON COLUMN tickets.holder_email IS '票据持有者的邮箱，用于兼容性和备用查询';
 
+
+

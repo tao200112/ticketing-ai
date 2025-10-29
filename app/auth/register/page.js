@@ -105,15 +105,37 @@ export default function RegisterPage() {
       const result = await response.json()
       
       if (response.ok && result.success) {
-        setMessage('注册成功，正在跳转...')
+        setMessage('注册成功！请检查邮箱并点击验证链接完成注册。')
         
         // 保存用户会话（简化实现）
         localStorage.setItem('userSession', JSON.stringify(result.data))
         
-        // Navigate directly to account page after a brief delay
+        // 发送邮箱验证邮件
+        try {
+          const emailResponse = await fetch('/api/auth/send-verification', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              email: formData.email
+            })
+          })
+          
+          if (emailResponse.ok) {
+            setMessage('注册成功！验证邮件已发送，请检查邮箱并点击验证链接完成注册。')
+          } else {
+            setMessage('注册成功！但验证邮件发送失败，请稍后手动发送。')
+          }
+        } catch (emailError) {
+          console.error('Email verification error:', emailError)
+          setMessage('注册成功！但验证邮件发送失败，请稍后手动发送。')
+        }
+        
+        // Navigate to account page after a brief delay
         setTimeout(() => {
           router.push('/account')
-        }, 1500)
+        }, 3000)
       } else {
         setMessage(result.message || '注册失败，请重试')
       }

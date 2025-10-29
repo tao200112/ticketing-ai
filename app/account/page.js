@@ -72,7 +72,7 @@ export default function AccountPage() {
     setShowLogin(false)
     setShowRegister(false)
     // 重新加载用户数据
-    if (supabaseUrl && supabaseKey) {
+    if (supabaseUrl && supabaseKey && userData && userData.id) {
       const client = createClient(supabaseUrl, supabaseKey)
       loadUserData(client, userData.id)
     }

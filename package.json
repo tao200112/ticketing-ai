@@ -43,7 +43,13 @@
     "db:rollback:create": "node scripts/create-rollback.js",
     "db:rollback:execute": "node scripts/execute-rollback.js",
     "db:rollback:quick": "bash scripts/quick-rollback.sh",
-    "validation:test": "node scripts/validation-test.js"
+    "validation:test": "node scripts/validation-test.js",
+    "test:email-verification": "node scripts/test-email-verification.js",
+    "test:email-verification-simple": "node scripts/test-email-verification-simple.js",
+    "setup:env": "node scripts/setup-env-config.js",
+    "test:env": "node scripts/test-env-config.js",
+    "migrate:email-verification": "node scripts/run-database-migration.js",
+    "test:final": "node scripts/test-email-verification-final.js"
   },
   "dependencies": {
     "@sentry/nextjs": "^10.22.0",
@@ -51,10 +57,13 @@
     "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "^2.39.0",
     "@tailwindcss/postcss": "^4.1.16",
+    "@types/nodemailer": "^7.0.3",
+    "@upstash/redis": "^1.35.6",
     "bcryptjs": "^3.0.2",
     "dotenv": "^17.2.3",
     "jsqr": "^1.4.0",
     "next": "15.5.6",
+    "nodemailer": "^7.0.10",
     "qrcode": "^1.5.4",
     "qrcode.react": "^4.2.0",
     "react": "^18.3.1",

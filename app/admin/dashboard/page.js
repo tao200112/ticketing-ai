@@ -260,11 +260,11 @@ export default function AdminDashboard() {
     setEventForm({
       title: event.title || '',
       description: event.description || '',
-      startDate: event.start_date ? event.start_date.split('T')[0] : '',
-      endDate: event.end_date ? event.end_date.split('T')[0] : '',
-      location: event.location || '',
+      startDate: event.start_at ? event.start_at.split('T')[0] : '',
+      endDate: event.end_at ? event.end_at.split('T')[0] : '',
+      location: event.location || event.address || '',
       maxAttendees: event.max_attendees || '',
-      ticketTypes: event.ticket_types || [],
+      ticketTypes: event.prices || [],
       merchantId: event.merchant_id || ''
     })
     setShowEventModal(true)

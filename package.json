@@ -49,7 +49,8 @@
     "setup:env": "node scripts/setup-env-config.js",
     "test:env": "node scripts/test-env-config.js",
     "migrate:email-verification": "node scripts/run-database-migration.js",
-    "test:final": "node scripts/test-email-verification-final.js"
+    "test:final": "node scripts/test-email-verification-final.js",
+    "test:email-sending": "node scripts/test-email-sending.js"
   },
   "dependencies": {
     "@sentry/nextjs": "^10.22.0",

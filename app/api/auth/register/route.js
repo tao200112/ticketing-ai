@@ -84,7 +84,7 @@ export async function POST(request) {
     // 加密密码
     const hashedPassword = await bcrypt.hash(password, 10)
 
-    // 创建用户
+    // 创建用户（未验证状态）
     const { data: newUser, error } = await supabase
       .from('users')
       .insert([
@@ -93,7 +93,8 @@ export async function POST(request) {
           password_hash: hashedPassword,
           name,
           age: age || null,
-          role: 'user'
+          role: 'user',
+          email_verified_at: null  // 明确设置为未验证
         }
       ])
       .select()
@@ -140,12 +141,14 @@ export async function POST(request) {
 
     return NextResponse.json({
       success: true,
-      message: '注册成功！请检查您的邮箱并验证账户',
+      message: '注册成功！请检查您的邮箱并验证账户才能正常使用',
       data: {
         ...newUser,
         emailVerified: false,
-        needsVerification: true
-      }
+        needsVerification: true,
+        requiresEmailVerification: true
+      },
+      requiresEmailVerification: true
     })
 
   } catch (error) {

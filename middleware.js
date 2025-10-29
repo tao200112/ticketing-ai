@@ -43,10 +43,8 @@ export function middleware(request) {
 
 export const config = {
   matcher: [
+    // 只匹配特定路由，避免干扰其他页面
     '/event/:path*',
-    '/events/:path*',
-    '/api/:path*',
-    // 排除邮箱验证相关路由，避免中间件干扰
-    '/((?!auth|email-test|test-email).*)'
+    '/events/:path*'
   ]
 }

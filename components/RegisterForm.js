@@ -28,24 +28,24 @@ export default function RegisterForm({ onSuccess, onSwitchToLogin }) {
     setLoading(true)
     setError('')
 
-    // 客户端验证
+    // Client-side validation
     if (!formData.email || !formData.password || !formData.name) {
-      setError('请填写所有必需字段（邮箱、密码、姓名）')
+      setError('Please fill in all required fields (email, password, name)')
       setLoading(false)
       return
     }
 
-    // 验证密码匹配
+    // Validate password match
     if (formData.password !== formData.confirmPassword) {
-      setError('两次输入的密码不一致')
+      setError('Passwords do not match')
       setLoading(false)
       return
     }
 
-    // 验证年龄
+    // Validate age
     const age = parseInt(formData.age)
     if (formData.age && (isNaN(age) || age < 16)) {
-      setError('年龄必须年满16岁')
+      setError('Age must be 16 or older')
       setLoading(false)
       return
     }
@@ -66,21 +66,21 @@ export default function RegisterForm({ onSuccess, onSwitchToLogin }) {
 
       const result = await response.json()
 
-      // 处理响应
+      // Handle response
       if (response.ok && result.success) {
-        // 保存用户会话
+        // Save user session
         if (result.data) {
           localStorage.setItem('userSession', JSON.stringify(result.data))
           onSuccess && onSuccess(result.data)
           router.push('/account')
         }
       } else {
-        // 显示具体的错误信息
-        // 优先使用后端返回的错误消息
-        const errorMessage = result.message || result.error || '注册失败，请稍后重试'
+        // Display specific error message
+        // Prioritize backend error message
+        const errorMessage = result.message || result.error || 'Registration failed, please try again'
         setError(errorMessage)
         
-        // 在控制台记录详细错误（开发环境）
+        // Log detailed error in console (development only)
         if (process.env.NODE_ENV === 'development') {
           console.error('Registration error:', {
             status: response.status,
@@ -92,7 +92,7 @@ export default function RegisterForm({ onSuccess, onSwitchToLogin }) {
       }
     } catch (error) {
       console.error('Registration error:', error)
-      setError('网络错误，请检查您的网络连接后重试')
+      setError('Network error, please check your connection and try again')
     } finally {
       setLoading(false)
     }
@@ -116,7 +116,7 @@ export default function RegisterForm({ onSuccess, onSwitchToLogin }) {
         fontWeight: 'bold',
         textAlign: 'center'
       }}>
-        注册账号
+        Register Account
       </h2>
 
       {error && (
@@ -141,7 +141,7 @@ export default function RegisterForm({ onSuccess, onSwitchToLogin }) {
             marginBottom: '0.5rem',
             fontSize: '0.875rem'
           }}>
-            姓名 *
+            Name *
           </label>
           <input
             type="text"
@@ -169,7 +169,7 @@ export default function RegisterForm({ onSuccess, onSwitchToLogin }) {
             marginBottom: '0.5rem',
             fontSize: '0.875rem'
           }}>
-            邮箱 *
+            Email *
           </label>
           <input
             type="email"
@@ -197,7 +197,7 @@ export default function RegisterForm({ onSuccess, onSwitchToLogin }) {
             marginBottom: '0.5rem',
             fontSize: '0.875rem'
           }}>
-            年龄
+            Age
           </label>
           <input
             type="number"
@@ -225,7 +225,7 @@ export default function RegisterForm({ onSuccess, onSwitchToLogin }) {
             marginBottom: '0.5rem',
             fontSize: '0.875rem'
           }}>
-            密码 * (至少8个字符)
+            Password * (at least 8 characters)
           </label>
           <input
             type="password"
@@ -254,7 +254,7 @@ export default function RegisterForm({ onSuccess, onSwitchToLogin }) {
             marginBottom: '0.5rem',
             fontSize: '0.875rem'
           }}>
-            确认密码 *
+            Confirm Password *
           </label>
           <input
             type="password"
@@ -291,7 +291,7 @@ export default function RegisterForm({ onSuccess, onSwitchToLogin }) {
             transition: 'all 0.3s ease'
           }}
         >
-          {loading ? '注册中...' : '注册'}
+          {loading ? 'Registering...' : 'Register'}
         </button>
       </form>
 
@@ -301,7 +301,7 @@ export default function RegisterForm({ onSuccess, onSwitchToLogin }) {
         color: '#94a3b8',
         fontSize: '0.875rem'
       }}>
-        已有账号？{' '}
+        Already have an account?{' '}
         <button
           onClick={onSwitchToLogin}
           style={{
@@ -312,7 +312,7 @@ export default function RegisterForm({ onSuccess, onSwitchToLogin }) {
             textDecoration: 'underline'
           }}
         >
-          立即登录
+          Sign in now
         </button>
       </div>
     </div>

@@ -42,11 +42,11 @@ export default function LoginForm({ onSuccess, onSwitchToRegister }) {
         onSuccess && onSuccess(result.user)
         router.push('/account')
       } else {
-        setError(result.message || '登录失败')
+        setError(result.message || 'Login failed')
       }
     } catch (error) {
-      console.error('登录错误:', error)
-      setError('网络错误，请重试')
+      console.error('Login error:', error)
+      setError('Network error, please try again')
     } finally {
       setLoading(false)
     }

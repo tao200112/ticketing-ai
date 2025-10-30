@@ -19,7 +19,7 @@ export async function POST(request) {
     if (!email || !password || !name) {
       throw ErrorHandler.validationError(
         'MISSING_FIELDS',
-        '请填写所有必需字段（邮箱、密码、姓名）'
+        'Please fill in all required fields (email, password, name)'
       )
     }
 
@@ -35,7 +35,7 @@ export async function POST(request) {
     }
 
     if (password.length > 128) {
-      throw ErrorHandler.validationError('PASSWORD_TOO_LONG', '密码长度过长，最多128个字符')
+      throw ErrorHandler.validationError('PASSWORD_TOO_LONG')
     }
 
     // 验证年龄（如果提供）
@@ -46,9 +46,9 @@ export async function POST(request) {
       }
     }
 
-    // 如果没有配置 Supabase，返回配置错误
+    // If Supabase is not configured, return configuration error
     if (!supabaseUrl || !supabaseKey) {
-      throw ErrorHandler.configurationError('CONFIG_ERROR', '系统未配置 Supabase，无法注册')
+      throw ErrorHandler.configurationError('CONFIG_ERROR', 'Supabase is not configured, registration is not available')
     }
 
     // 使用 Supabase 注册
@@ -78,8 +78,8 @@ export async function POST(request) {
     try {
       hashedPassword = await bcrypt.hash(password, 12)
     } catch (hashError) {
-      logger.error('密码加密失败', hashError)
-      throw ErrorHandler.internalError(hashError, '密码加密失败，请稍后重试')
+      logger.error('Password hashing failed', hashError)
+      throw ErrorHandler.internalError(hashError, 'Password hashing failed, please try again later')
     }
 
     // 创建用户（未验证状态）

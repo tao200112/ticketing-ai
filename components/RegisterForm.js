@@ -28,17 +28,24 @@ export default function RegisterForm({ onSuccess, onSwitchToLogin }) {
     setLoading(true)
     setError('')
 
+    // 客户端验证
+    if (!formData.email || !formData.password || !formData.name) {
+      setError('请填写所有必需字段（邮箱、密码、姓名）')
+      setLoading(false)
+      return
+    }
+
     // 验证密码匹配
     if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match')
+      setError('两次输入的密码不一致')
       setLoading(false)
       return
     }
 
     // 验证年龄
     const age = parseInt(formData.age)
-    if (isNaN(age) || age < 16) {
-      setError('Age must be 16 or older')
+    if (formData.age && (isNaN(age) || age < 16)) {
+      setError('年龄必须年满16岁')
       setLoading(false)
       return
     }
@@ -52,24 +59,40 @@ export default function RegisterForm({ onSuccess, onSwitchToLogin }) {
         body: JSON.stringify({
           name: formData.name,
           email: formData.email,
-          age: age,
+          age: age || null,
           password: formData.password
         }),
       })
 
       const result = await response.json()
 
-      if (result.success) {
+      // 处理响应
+      if (response.ok && result.success) {
         // 保存用户会话
-        localStorage.setItem('userSession', JSON.stringify(result.user))
-        onSuccess && onSuccess(result.user)
-        router.push('/account')
+        if (result.data) {
+          localStorage.setItem('userSession', JSON.stringify(result.data))
+          onSuccess && onSuccess(result.data)
+          router.push('/account')
+        }
       } else {
-        setError(result.message || 'Registration failed')
+        // 显示具体的错误信息
+        // 优先使用后端返回的错误消息
+        const errorMessage = result.message || result.error || '注册失败，请稍后重试'
+        setError(errorMessage)
+        
+        // 在控制台记录详细错误（开发环境）
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Registration error:', {
+            status: response.status,
+            error: result.error,
+            message: result.message,
+            details: result.details
+          })
+        }
       }
     } catch (error) {
       console.error('Registration error:', error)
-      setError('Network error, please try again')
+      setError('网络错误，请检查您的网络连接后重试')
     } finally {
       setLoading(false)
     }
@@ -78,40 +101,47 @@ export default function RegisterForm({ onSuccess, onSwitchToLogin }) {
   return (
     <div style={{
       background: 'rgba(15, 23, 42, 0.8)',
-      border: '1px solid rgba(255, 255, 255, 0.1)',
+      backdropFilter: 'blur(10px)',
       borderRadius: '16px',
-      padding: '32px',
+      padding: '2rem',
       maxWidth: '400px',
       width: '100%',
-      boxShadow: '0 20px 40px rgba(0, 0, 0, 0.3)'
+      boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)',
+      border: '1px solid rgba(255, 255, 255, 0.18)'
     }}>
-      <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-        <h2 style={{
-          color: 'white',
-          fontSize: '28px',
-          fontWeight: 'bold',
-          marginBottom: '8px'
-        }}>
-          Create Account
-        </h2>
-        <p style={{
-          color: '#94a3b8',
-          fontSize: '16px'
-        }}>
-          Join PartyTix and start your ticketing journey
-        </p>
-      </div>
+      <h2 style={{
+        color: '#fff',
+        marginBottom: '1.5rem',
+        fontSize: '1.5rem',
+        fontWeight: 'bold',
+        textAlign: 'center'
+      }}>
+        注册账号
+      </h2>
 
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-        <div>
+      {error && (
+        <div style={{
+          background: 'rgba(239, 68, 68, 0.1)',
+          border: '1px solid rgba(239, 68, 68, 0.3)',
+          borderRadius: '8px',
+          padding: '0.75rem',
+          marginBottom: '1rem',
+          color: '#fca5a5',
+          fontSize: '0.875rem'
+        }}>
+          {error}
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit}>
+        <div style={{ marginBottom: '1rem' }}>
           <label style={{
             display: 'block',
-            color: 'white',
-            fontSize: '14px',
-            fontWeight: '500',
-            marginBottom: '8px'
+            color: '#e2e8f0',
+            marginBottom: '0.5rem',
+            fontSize: '0.875rem'
           }}>
-            Full Name
+            姓名 *
           </label>
           <input
             type="text"
@@ -119,30 +149,27 @@ export default function RegisterForm({ onSuccess, onSwitchToLogin }) {
             value={formData.name}
             onChange={handleChange}
             required
+            disabled={loading}
             style={{
               width: '100%',
-              padding: '12px 16px',
-              background: 'rgba(30, 41, 59, 0.8)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
+              padding: '0.75rem',
               borderRadius: '8px',
-              color: 'white',
-              fontSize: '16px',
-              outline: 'none',
-              transition: 'border-color 0.3s ease'
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              background: 'rgba(255, 255, 255, 0.1)',
+              color: '#fff',
+              fontSize: '1rem'
             }}
-            placeholder="Enter your full name"
           />
         </div>
 
-        <div>
+        <div style={{ marginBottom: '1rem' }}>
           <label style={{
             display: 'block',
-            color: 'white',
-            fontSize: '14px',
-            fontWeight: '500',
-            marginBottom: '8px'
+            color: '#e2e8f0',
+            marginBottom: '0.5rem',
+            fontSize: '0.875rem'
           }}>
-            Email Address
+            邮箱 *
           </label>
           <input
             type="email"
@@ -150,62 +177,55 @@ export default function RegisterForm({ onSuccess, onSwitchToLogin }) {
             value={formData.email}
             onChange={handleChange}
             required
+            disabled={loading}
             style={{
               width: '100%',
-              padding: '12px 16px',
-              background: 'rgba(30, 41, 59, 0.8)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
+              padding: '0.75rem',
               borderRadius: '8px',
-              color: 'white',
-              fontSize: '16px',
-              outline: 'none',
-              transition: 'border-color 0.3s ease'
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              background: 'rgba(255, 255, 255, 0.1)',
+              color: '#fff',
+              fontSize: '1rem'
             }}
-            placeholder="Enter your email address"
           />
         </div>
 
-        <div>
+        <div style={{ marginBottom: '1rem' }}>
           <label style={{
             display: 'block',
-            color: 'white',
-            fontSize: '14px',
-            fontWeight: '500',
-            marginBottom: '8px'
+            color: '#e2e8f0',
+            marginBottom: '0.5rem',
+            fontSize: '0.875rem'
           }}>
-            Age
+            年龄
           </label>
           <input
             type="number"
             name="age"
             value={formData.age}
             onChange={handleChange}
-            required
             min="16"
+            disabled={loading}
             style={{
               width: '100%',
-              padding: '12px 16px',
-              background: 'rgba(30, 41, 59, 0.8)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
+              padding: '0.75rem',
               borderRadius: '8px',
-              color: 'white',
-              fontSize: '16px',
-              outline: 'none',
-              transition: 'border-color 0.3s ease'
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              background: 'rgba(255, 255, 255, 0.1)',
+              color: '#fff',
+              fontSize: '1rem'
             }}
-            placeholder="Enter your age (16+ years old)"
           />
         </div>
 
-        <div>
+        <div style={{ marginBottom: '1rem' }}>
           <label style={{
             display: 'block',
-            color: 'white',
-            fontSize: '14px',
-            fontWeight: '500',
-            marginBottom: '8px'
+            color: '#e2e8f0',
+            marginBottom: '0.5rem',
+            fontSize: '0.875rem'
           }}>
-            Password
+            密码 * (至少8个字符)
           </label>
           <input
             type="password"
@@ -213,31 +233,28 @@ export default function RegisterForm({ onSuccess, onSwitchToLogin }) {
             value={formData.password}
             onChange={handleChange}
             required
-            minLength="6"
+            minLength={8}
+            disabled={loading}
             style={{
               width: '100%',
-              padding: '12px 16px',
-              background: 'rgba(30, 41, 59, 0.8)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
+              padding: '0.75rem',
               borderRadius: '8px',
-              color: 'white',
-              fontSize: '16px',
-              outline: 'none',
-              transition: 'border-color 0.3s ease'
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              background: 'rgba(255, 255, 255, 0.1)',
+              color: '#fff',
+              fontSize: '1rem'
             }}
-            placeholder="Enter password (at least 6 characters)"
           />
         </div>
 
-        <div>
+        <div style={{ marginBottom: '1.5rem' }}>
           <label style={{
             display: 'block',
-            color: 'white',
-            fontSize: '14px',
-            fontWeight: '500',
-            marginBottom: '8px'
+            color: '#e2e8f0',
+            marginBottom: '0.5rem',
+            fontSize: '0.875rem'
           }}>
-            Confirm Password
+            确认密码 *
           </label>
           <input
             type="password"
@@ -245,77 +262,57 @@ export default function RegisterForm({ onSuccess, onSwitchToLogin }) {
             value={formData.confirmPassword}
             onChange={handleChange}
             required
+            disabled={loading}
             style={{
               width: '100%',
-              padding: '12px 16px',
-              background: 'rgba(30, 41, 59, 0.8)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
+              padding: '0.75rem',
               borderRadius: '8px',
-              color: 'white',
-              fontSize: '16px',
-              outline: 'none',
-              transition: 'border-color 0.3s ease'
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              background: 'rgba(255, 255, 255, 0.1)',
+              color: '#fff',
+              fontSize: '1rem'
             }}
-            placeholder="Confirm your password"
           />
         </div>
-
-        {error && (
-          <div style={{
-            background: 'rgba(239, 68, 68, 0.1)',
-            border: '1px solid rgba(239, 68, 68, 0.3)',
-            borderRadius: '8px',
-            padding: '12px',
-            color: '#fca5a5',
-            fontSize: '14px'
-          }}>
-            {error}
-          </div>
-        )}
 
         <button
           type="submit"
           disabled={loading}
           style={{
-            background: 'linear-gradient(135deg, #7C3AED 0%, #22D3EE 100%)',
-            color: 'white',
-            border: 'none',
+            width: '100%',
+            padding: '0.75rem',
             borderRadius: '8px',
-            padding: '14px 24px',
-            fontSize: '16px',
-            fontWeight: '600',
+            border: 'none',
+            background: loading ? 'rgba(100, 116, 139, 0.5)' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            color: '#fff',
+            fontSize: '1rem',
+            fontWeight: 'bold',
             cursor: loading ? 'not-allowed' : 'pointer',
-            opacity: loading ? 0.7 : 1,
             transition: 'all 0.3s ease'
           }}
         >
-          {loading ? 'Creating Account...' : 'Create Account'}
+          {loading ? '注册中...' : '注册'}
         </button>
       </form>
 
       <div style={{
+        marginTop: '1rem',
         textAlign: 'center',
-        marginTop: '24px',
-        paddingTop: '24px',
-        borderTop: '1px solid rgba(255, 255, 255, 0.1)'
+        color: '#94a3b8',
+        fontSize: '0.875rem'
       }}>
-        <p style={{ color: '#94a3b8', fontSize: '14px', marginBottom: '16px' }}>
-          Already have an account?
-        </p>
+        已有账号？{' '}
         <button
           onClick={onSwitchToLogin}
           style={{
             background: 'none',
-            border: '1px solid rgba(255, 255, 255, 0.2)',
-            color: 'white',
-            borderRadius: '8px',
-            padding: '12px 24px',
-            fontSize: '14px',
+            border: 'none',
+            color: '#667eea',
             cursor: 'pointer',
-            transition: 'all 0.3s ease'
+            textDecoration: 'underline'
           }}
         >
-          Sign In Now
+          立即登录
         </button>
       </div>
     </div>

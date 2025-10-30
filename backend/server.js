@@ -13,15 +13,27 @@ const Stripe = require('stripe');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// 环境变量
+// 环境变量（验证必需变量）
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const JWT_SECRET = process.env.JWT_SECRET || 'your-jwt-secret';
+const JWT_SECRET = process.env.JWT_SECRET;
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
+
+// 验证必需的环境变量
+if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !JWT_SECRET) {
+  console.error('❌ 缺少必需的环境变量！');
+  console.error('必需的变量: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, JWT_SECRET');
+  process.exit(1);
+}
 
 // 初始化服务
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-const stripe = Stripe(STRIPE_SECRET_KEY);
+const stripe = STRIPE_SECRET_KEY ? Stripe(STRIPE_SECRET_KEY) : null;
+
+// 警告：如果Stripe未配置
+if (!STRIPE_SECRET_KEY) {
+  console.warn('⚠️  STRIPE_SECRET_KEY 未配置，支付功能将不可用');
+}
 
 // 中间件
 app.use(helmet());

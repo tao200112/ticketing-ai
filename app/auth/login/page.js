@@ -15,12 +15,14 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
 
-  // 如果已经登录，重定向到账户页面
+  // If already logged in, redirect to account page
   useEffect(() => {
-    if (isAuthenticated()) {
+    if (authLoading) return // Wait for auth check to complete
+    
+    if (isAuthenticated && isAuthenticated()) {
       router.push('/account')
     }
-  }, [isAuthenticated, router])
+  }, [isAuthenticated, authLoading, router])
 
   const handleInputChange = (e) => {
     const { name, value } = e.target

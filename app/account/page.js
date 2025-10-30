@@ -22,46 +22,53 @@ export default function AccountPage() {
   const [showRegister, setShowRegister] = useState(false)
 
   useEffect(() => {
-    // 检查是否有用户会话
+    // Check if user session exists
     const userSession = localStorage.getItem('userSession')
     
     if (!userSession) {
+      console.log('No user session found')
       setLoading(false)
       setShowLogin(true)
       return
     }
 
-    // 初始化 Supabase 客户端
+    // Initialize Supabase client
     if (supabaseUrl && supabaseKey) {
       try {
+        console.log('Parsing user session:', userSession)
         const sessionData = JSON.parse(userSession)
+        console.log('Parsed session data:', sessionData)
+        
         const client = createClient(supabaseUrl, supabaseKey)
         setSupabase(client)
         
-        // 使用会话中的用户ID加载数据
-        if (sessionData.id) {
+        // Use user ID from session to load data
+        if (sessionData && sessionData.id) {
           loadUserData(client, sessionData.id)
         } else {
+          console.error('❌ No user ID in session data')
           setLoading(false)
           router.push('/auth/login')
         }
       } catch (error) {
-        console.error('❌ 解析会话失败:', error)
+        console.error('❌ Failed to parse session:', error, 'Session data:', userSession)
         setLoading(false)
         router.push('/auth/login')
       }
     } else {
+      console.error('❌ Supabase not configured')
       setLoading(false)
       router.push('/auth/login')
     }
   }, [router])
 
   const handleLoginSuccess = (userData) => {
+    console.log('✅ handleLoginSuccess called with:', userData)
     setUser(userData)
     setShowLogin(false)
     setShowRegister(false)
-    // 重新加载用户数据
-    if (supabaseUrl && supabaseKey) {
+    // Reload user data
+    if (supabaseUrl && supabaseKey && userData && userData.id) {
       const client = createClient(supabaseUrl, supabaseKey)
       loadUserData(client, userData.id)
     }

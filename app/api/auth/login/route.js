@@ -1,109 +1,119 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import bcrypt from 'bcryptjs'
+import { getPortalFromHostname, getRoleFromPortal } from '@/lib/domain-detector'
+import { ErrorHandler, handleApiError } from '@/lib/error-handler'
+import { createLogger } from '@/lib/logger'
 
-// 从环境变量获取 Supabase 配置
+// Get Supabase configuration from environment variables
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+const logger = createLogger('login-api')
 
 export async function POST(request) {
   try {
     const body = await request.json()
-    const { email, password } = body
+    const { email, password, role: explicitRole } = body
 
-    // 验证必需字段
+    // Validate required fields
     if (!email || !password) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'MISSING_FIELDS',
-          message: '缺少必需字段'
-        },
-        { status: 400 }
+      throw ErrorHandler.validationError(
+        'MISSING_FIELDS',
+        'Email and password are required'
       )
     }
 
-    // 如果没有配置 Supabase，返回配置错误
+    // If Supabase is not configured, return configuration error
     if (!supabaseUrl || !supabaseKey) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'CONFIG_ERROR',
-          message: '系统未配置 Supabase，无法登录'
-        },
-        { status: 500 }
+      throw ErrorHandler.configurationError(
+        'CONFIG_ERROR',
+        'Supabase is not configured, login is not available'
       )
     }
 
-    // 使用 Supabase 登录
+    // Detect role from domain/path if not explicitly provided
+    const portal = getPortalFromHostname(request)
+    const roleBasedOnPortal = explicitRole || getRoleFromPortal(portal)
+
+    // Use Supabase for login
     const supabase = createClient(supabaseUrl, supabaseKey)
 
-    // 查找用户
+    // Find user with matching email AND role (for multi-role support)
     const { data: user, error } = await supabase
       .from('users')
       .select('*')
       .eq('email', email)
+      .eq('role', roleBasedOnPortal)
       .single()
 
-    if (error || !user) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'INVALID_CREDENTIALS',
-          message: '邮箱或密码错误'
-        },
-        { status: 401 }
+    // Handle database errors
+    if (error) {
+      if (error.code === 'PGRST116') {
+        // No user found with this email and role
+        throw ErrorHandler.authenticationError(
+          'INVALID_CREDENTIALS',
+          'Invalid email or password'
+        )
+      }
+      throw ErrorHandler.fromSupabaseError(error, 'DATABASE_QUERY_ERROR')
+    }
+
+    if (!user) {
+      throw ErrorHandler.authenticationError(
+        'INVALID_CREDENTIALS',
+        'Invalid email or password'
       )
     }
 
-    // 验证密码
+    // Validate password
     const isValidPassword = await bcrypt.compare(password, user.password_hash)
     if (!isValidPassword) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'INVALID_CREDENTIALS',
-          message: '邮箱或密码错误'
-        },
-        { status: 401 }
+      throw ErrorHandler.authenticationError(
+        'INVALID_CREDENTIALS',
+        'Invalid email or password'
       )
     }
 
-    // 检查邮箱是否已验证
-    if (!user.email_verified_at) {
-      return NextResponse.json(
+    // Check email verification (optional, can be disabled)
+    // Only block if email verification is strictly required
+    if (!user.email_verified_at && process.env.REQUIRE_EMAIL_VERIFICATION === 'true') {
+      throw ErrorHandler.authenticationError(
+        'EMAIL_NOT_VERIFIED',
+        'Please verify your email before logging in',
         {
-          success: false,
-          error: 'EMAIL_NOT_VERIFIED',
-          message: '请先验证您的邮箱才能登录',
-          data: {
-            email: user.email,
-            needsVerification: true,
-            requiresEmailVerification: true
-          }
-        },
-        { status: 403 }
+          email: user.email,
+          needsVerification: true,
+          requiresEmailVerification: true
+        }
       )
     }
 
-    // 移除密码字段
+    // Update last login domain
+    const hostname = request.headers.get('host') || ''
+    const loginDomain = hostname.split(':')[0]
+    try {
+      await supabase
+        .from('users')
+        .update({ last_login_domain: loginDomain })
+        .eq('id', user.id)
+    } catch (updateError) {
+      logger.warn('Failed to update last_login_domain', { error: updateError })
+      // Don't block login if this fails
+    }
+
+    // Remove sensitive data
     delete user.password_hash
 
+    // Return consistent data format
     return NextResponse.json({
       success: true,
-      message: '登录成功',
-      data: user
+      message: 'Login successful',
+      data: user,
+      user: user // Also include 'user' field for compatibility
     })
 
   } catch (error) {
-    console.error('❌ API 错误:', error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'INTERNAL_ERROR',
-        message: '服务器内部错误'
-      },
-      { status: 500 }
-    )
+    return handleApiError(error, request, logger)
   }
 }

@@ -79,25 +79,35 @@ export default function LoginPage() {
       const result = await response.json()
 
       if (response.ok && result.success) {
-        console.log('✅ Login successful')
+        console.log('✅ Login successful', result)
+        
+        // Get user data from result (support both result.data and result.user)
+        const userData = result.data || result.user
+        if (!userData) {
+          console.error('❌ Login successful but no user data returned')
+          setMessage('Login successful but user data not found. Please try again.')
+          setLoading(false)
+          return
+        }
+        
+        // Save user session immediately
+        try {
+          localStorage.setItem('userSession', JSON.stringify(userData))
+          console.log('✅ User session saved to localStorage')
+        } catch (storageError) {
+          console.error('❌ Failed to save session:', storageError)
+          setMessage('Failed to save session. Please try again.')
+          setLoading(false)
+          return
+        }
+        
         setMessage('Login successful! Redirecting...')
         
-        // 使用 Supabase 创建会话
-        const { createClient } = await import('@supabase/supabase-js')
-        const supabase = createClient(
-          process.env.NEXT_PUBLIC_SUPABASE_URL,
-          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-        )
-        
-        // 创建一个自定义会话（因为我们在自己的users表中管理用户）
-        // 注意：这是简化的实现，实际应该使用 Supabase Auth
-        localStorage.setItem('userSession', JSON.stringify(result.data))
-        
-        setTimeout(() => {
-          router.push('/account')
-        }, 1000)
+        // Use replace instead of push to avoid back button issues
+        // Remove setTimeout for immediate redirect
+        router.replace('/account')
       } else {
-        console.error('❌ Login failed:', result.error)
+        console.error('❌ Login failed:', result.error || result)
         setMessage(result.message || 'Login failed, please check email and password')
       }
     } catch (error) {

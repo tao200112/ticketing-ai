@@ -37,10 +37,16 @@ export default function LoginForm({ onSuccess, onSwitchToRegister }) {
       const result = await response.json()
 
       if (result.success) {
-        // 保存用户会话
-        localStorage.setItem('userSession', JSON.stringify(result.user))
-        onSuccess && onSuccess(result.user)
-        router.push('/account')
+        // 保存用户会话 - API返回的数据可能在result.data或result.user中
+        const userData = result.data || result.user || result
+        if (userData) {
+          localStorage.setItem('userSession', JSON.stringify(userData))
+          onSuccess && onSuccess(userData)
+          // 使用router.replace避免返回按钮问题
+          router.replace('/account')
+        } else {
+          setError('Login successful but user data not found')
+        }
       } else {
         setError(result.message || 'Login failed')
       }

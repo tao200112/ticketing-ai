@@ -44,13 +44,15 @@ jobs:
       continue-on-error: true
       
     - name: Build frontend
-      run: npm run build
+      run: |
+        export NEXT_PUBLIC_SUPABASE_URL="${NEXT_PUBLIC_SUPABASE_URL:-https://placeholder.supabase.co}"
+        export NEXT_PUBLIC_SUPABASE_ANON_KEY="${NEXT_PUBLIC_SUPABASE_ANON_KEY:-placeholder-key}"
+        export NEXT_PUBLIC_APP_VERSION="${{ github.sha }}"
+        export SKIP_ENV_VALIDATION="true"
+        npm run build
       env:
-        # 如果缺少环境变量，使用占位符值以避免构建失败
-        NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
-        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key' }}
-        NEXT_PUBLIC_APP_VERSION: ${{ github.sha }}
-        SKIP_ENV_VALIDATION: 'true'
+        NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
       
     - name: Build backend
       run: |

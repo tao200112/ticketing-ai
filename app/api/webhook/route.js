@@ -110,6 +110,43 @@ export async function POST(request) {
           eventId = defaultEvent?.id || '45091d37-7252-43c7-93c8-a7033d28af31'
         }
         
+        // Get event to determine validity window
+        let validityStartTime = null
+        let validityEndTime = null
+        
+        if (eventId) {
+          const { data: eventData } = await supabase
+            .from('events')
+            .select('start_at, end_at')
+            .eq('id', eventId)
+            .single()
+          
+          if (eventData) {
+            // Set validity window based on event times
+            validityStartTime = eventData.start_at
+            validityEndTime = eventData.end_at
+          }
+        }
+
+        // Get user information if available
+        let holderName = session.customer_email
+        let holderAge = null
+        
+        if (session.metadata?.user_id) {
+          const { data: userData } = await supabase
+            .from('users')
+            .select('name, age')
+            .eq('id', session.metadata.user_id)
+            .single()
+          
+          if (userData) {
+            holderName = userData.name || session.metadata?.customer_name || session.customer_email
+            holderAge = userData.age
+          }
+        } else if (session.metadata?.customer_name) {
+          holderName = session.metadata.customer_name
+        }
+
         const { data: ticket, error: ticketError } = await supabase
           .from('tickets')
           .insert({
@@ -117,9 +154,13 @@ export async function POST(request) {
             event_id: eventId,
             tier: session.metadata?.price_name || 'general',
             holder_email: session.customer_email,
+            holder_name: holderName,
+            holder_age: holderAge,
             user_id: session.metadata?.user_id || null,
             status: 'unused',
-            short_id: shortId
+            short_id: shortId,
+            validity_start_time: validityStartTime,
+            validity_end_time: validityEndTime
           })
           .select()
           .single()

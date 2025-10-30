@@ -12,6 +12,7 @@ export default function QRScannerPage() {
   const [scannedCode, setScannedCode] = useState('')
   const [scanResult, setScanResult] = useState(null)
   const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
   const [stream, setStream] = useState(null)
 
   useEffect(() => {
@@ -38,7 +39,7 @@ export default function QRScannerPage() {
       setIsScanning(true)
     } catch (err) {
       setError('Unable to access camera, please check permissions')
-      console.error('摄像头访问错误:', err)
+      console.error('Camera access error:', err)
     }
   }
 
@@ -64,7 +65,7 @@ export default function QRScannerPage() {
     canvas.height = video.videoHeight
     context.drawImage(video, 0, 0, canvas.width, canvas.height)
 
-    // 使用jsQR扫描二维码
+    // Use jsQR to scan QR code
     const imageData = context.getImageData(0, 0, canvas.width, canvas.height)
     const code = jsQR(imageData.data, imageData.width, imageData.height)
 
@@ -80,120 +81,61 @@ export default function QRScannerPage() {
     setScannedCode(e.target.value)
   }
 
-        const verifyTicketFromQR = async (qrData) => {
-          try {
-            // 解析二维码数据
-            const ticketData = JSON.parse(qrData)
-            
-            // 验证票券有效期
-            const now = new Date()
-            let validityStartTime, validityEndTime
-            
-            if (ticketData.ticketValidityStart && ticketData.ticketValidityEnd) {
-              // 使用票券中的具体有效期时间
-              validityStartTime = new Date(ticketData.ticketValidityStart)
-              validityEndTime = new Date(ticketData.ticketValidityEnd)
-            } else {
-              // 使用默认时间（16:00-次日2:00）
-              const validityDate = new Date(ticketData.ticketValidityDate || ticketData.purchaseDate)
-              validityStartTime = new Date(validityDate)
-              validityStartTime.setHours(16, 0, 0, 0) // 16:00
-              validityEndTime = new Date(validityDate)
-              validityEndTime.setDate(validityEndTime.getDate() + 1)
-              validityEndTime.setHours(2, 0, 0, 0) // 次日 2:00
-            }
+  const verifyTicketFromQR = async (qrData) => {
+    try {
+      setLoading(true)
+      setError('')
+      
+      const response = await fetch('/api/tickets/verify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ qr_payload: qrData }),
+      })
 
-            let status = 'valid'
-            let errorMessage = ''
+      const result = await response.json()
 
-            if (now < validityStartTime) {
-              status = 'invalid'
-              errorMessage = 'Ticket not yet valid, please verify within validity period'
-            } else if (now > validityEndTime) {
-              status = 'invalid'
-              errorMessage = 'Ticket has expired and cannot be used'
-            }
+      if (response.ok && result.success) {
+        const { ticket, event, validity } = result.data
+        
+        setScanResult({
+          ticket_id: ticket.short_id || ticket.id,
+          ticket_tier: ticket.tier,
+          holder_name: ticket.holder_name || 'Unknown',
+          holder_age: ticket.holder_age,
+          event_name: event?.title || 'Unknown Event',
+          event_venue: event?.venue_name || 'N/A',
+          validity_status: validity.valid ? 'valid' : 'invalid',
+          validity_message: validity.message,
+          valid_from: validity.validFrom || event?.start_at,
+          valid_until: validity.validUntil || event?.end_at,
+          verification_count: ticket.verification_count || 1,
+          scanned_at: new Date().toISOString()
+        })
+        
+        setError('')
+        stopScanning()
+      } else {
+        setError(result.message || 'Ticket verification failed')
+        setScanResult(null)
+      }
+    } catch (err) {
+      setError('Ticket verification error, please try again')
+      console.error('Verification error:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
 
-            setScanResult({
-              ticketId: ticketData.ticketId,
-              eventName: ticketData.eventName,
-              attendeeName: ticketData.customerName || 'Unknown',
-              ticketType: ticketData.ticketType,
-              ticketValidityDate: ticketData.ticketValidityDate || ticketData.purchaseDate,
-              validityStartTime: validityStartTime.toISOString(),
-              validityEndTime: validityEndTime.toISOString(),
-              currentTime: now.toISOString(),
-              status: status,
-              errorMessage: errorMessage,
-              scannedAt: new Date().toISOString()
-            })
-            
-            setError('')
-            stopScanning()
-          } catch (err) {
-            setError('Invalid QR code format, please scan a valid ticket QR code')
-            console.error('验证错误:', err)
-          }
-        }
+  const verifyTicket = async () => {
+    if (!scannedCode) {
+      setError('Please enter or scan a ticket code')
+      return
+    }
 
-        const verifyTicket = async () => {
-          if (!scannedCode) {
-            setError('Please enter or scan a ticket code')
-            return
-          }
-
-          try {
-            // 尝试解析JSON格式的二维码数据
-            const ticketData = JSON.parse(scannedCode)
-            
-            // 验证票券有效期
-            const now = new Date()
-            let validityStartTime, validityEndTime
-            
-            if (ticketData.ticketValidityStart && ticketData.ticketValidityEnd) {
-              // 使用票券中的具体有效期时间
-              validityStartTime = new Date(ticketData.ticketValidityStart)
-              validityEndTime = new Date(ticketData.ticketValidityEnd)
-            } else {
-              // 使用默认时间（16:00-次日2:00）
-              const validityDate = new Date(ticketData.ticketValidityDate || ticketData.purchaseDate)
-              validityStartTime = new Date(validityDate)
-              validityStartTime.setHours(16, 0, 0, 0) // 16:00
-              validityEndTime = new Date(validityDate)
-              validityEndTime.setDate(validityEndTime.getDate() + 1)
-              validityEndTime.setHours(2, 0, 0, 0) // 次日 2:00
-            }
-
-            let status = 'valid'
-            let errorMessage = ''
-
-            if (now < validityStartTime) {
-              status = 'invalid'
-              errorMessage = 'Ticket not yet valid, please verify within validity period'
-            } else if (now > validityEndTime) {
-              status = 'invalid'
-              errorMessage = 'Ticket has expired and cannot be used'
-            }
-
-            setScanResult({
-              ticketId: ticketData.ticketId,
-              eventName: ticketData.eventName,
-              attendeeName: ticketData.customerName || 'Unknown',
-              ticketType: ticketData.ticketType,
-              ticketValidityDate: ticketData.ticketValidityDate || ticketData.purchaseDate,
-              validityStartTime: validityStartTime.toISOString(),
-              validityEndTime: validityEndTime.toISOString(),
-              currentTime: now.toISOString(),
-              status: status,
-              errorMessage: errorMessage,
-              scannedAt: new Date().toISOString()
-            })
-            setError('')
-          } catch (err) {
-            setError('Ticket verification failed, please try again')
-            console.error('验证错误:', err)
-          }
-        }
+    await verifyTicketFromQR(scannedCode)
+  }
 
   const resetScanner = () => {
     setScannedCode('')
@@ -209,7 +151,7 @@ export default function QRScannerPage() {
       padding: '2rem'
     }}>
       <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-        {/* 头部 */}
+        {/* Header */}
         <div style={{ marginBottom: '2rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
             <button
@@ -244,151 +186,182 @@ export default function QRScannerPage() {
           </p>
         </div>
 
-        {/* 扫描区域 */}
-        <div style={{
-          background: 'rgba(15, 23, 42, 0.6)',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
-          borderRadius: '16px',
-          padding: '2rem',
-          marginBottom: '2rem'
-        }}>
-          <h2 style={{
-            fontSize: '1.25rem',
-            fontWeight: 'bold',
-            color: 'white',
-            marginBottom: '1.5rem'
-          }}>
-            Scan QR Code
-          </h2>
-
-          {/* 摄像头预览 */}
+        {/* Loading indicator */}
+        {loading && (
           <div style={{
-            position: 'relative',
-            width: '100%',
-            maxWidth: '400px',
-            margin: '0 auto 1.5rem auto',
-            borderRadius: '12px',
-            overflow: 'hidden',
-            backgroundColor: '#1f2937'
+            background: 'rgba(15, 23, 42, 0.6)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            borderRadius: '16px',
+            padding: '2rem',
+            marginBottom: '2rem',
+            textAlign: 'center'
           }}>
-            <video
-              ref={videoRef}
-              style={{
-                width: '100%',
-                height: '300px',
-                objectFit: 'cover',
-                display: isScanning ? 'block' : 'none'
-              }}
-            />
-            <canvas
-              ref={canvasRef}
-              style={{ display: 'none' }}
-            />
-            {!isScanning && (
-              <div style={{
-                width: '100%',
-                height: '300px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#6b7280',
-                fontSize: '1rem'
-              }}>
-                Click to start scanning
-              </div>
-            )}
+            <div style={{
+              width: '40px',
+              height: '40px',
+              border: '3px solid rgba(255, 255, 255, 0.3)',
+              borderTop: '3px solid white',
+              borderRadius: '50%',
+              animation: 'spin 1s linear infinite',
+              margin: '0 auto 1rem auto'
+            }}></div>
+            <p style={{ color: 'white' }}>Verifying ticket...</p>
+            <style jsx>{`
+              @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+              }
+            `}</style>
           </div>
+        )}
 
-          {/* 扫描控制按钮 */}
-          <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
-            {!isScanning ? (
-              <button
-                onClick={startScanning}
+        {/* Scanning area */}
+        {!scanResult && (
+          <div style={{
+            background: 'rgba(15, 23, 42, 0.6)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            borderRadius: '16px',
+            padding: '2rem',
+            marginBottom: '2rem'
+          }}>
+            <h2 style={{
+              fontSize: '1.25rem',
+              fontWeight: 'bold',
+              color: 'white',
+              marginBottom: '1.5rem'
+            }}>
+              Scan QR Code
+            </h2>
+
+            {/* Camera preview */}
+            <div style={{
+              position: 'relative',
+              width: '100%',
+              maxWidth: '400px',
+              margin: '0 auto 1.5rem auto',
+              borderRadius: '12px',
+              overflow: 'hidden',
+              backgroundColor: '#1f2937'
+            }}>
+              <video
+                ref={videoRef}
                 style={{
-                  padding: '0.75rem 1.5rem',
-                  background: 'linear-gradient(135deg, #7C3AED 0%, #22D3EE 100%)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '0.5rem',
-                  fontSize: '1rem',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s',
+                  width: '100%',
+                  height: '300px',
+                  objectFit: 'cover',
+                  display: isScanning ? 'block' : 'none'
+                }}
+              />
+              <canvas
+                ref={canvasRef}
+                style={{ display: 'none' }}
+              />
+              {!isScanning && (
+                <div style={{
+                  width: '100%',
+                  height: '300px',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '0.5rem'
-                }}
-                onMouseEnter={(e) => {
-                  e.target.style.transform = 'scale(1.02)'
-                  e.target.style.boxShadow = '0 10px 25px rgba(124, 58, 237, 0.3)'
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.transform = 'scale(1)'
-                  e.target.style.boxShadow = 'none'
-                }}
-              >
-                <svg style={{ width: '1.25rem', height: '1.25rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-                Start Scanning
-              </button>
-            ) : (
-              <>
+                  justifyContent: 'center',
+                  color: '#6b7280',
+                  fontSize: '1rem'
+                }}>
+                  Click to start scanning
+                </div>
+              )}
+            </div>
+
+            {/* Scanning control buttons */}
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+              {!isScanning ? (
                 <button
-                  onClick={captureFrame}
+                  onClick={startScanning}
                   style={{
                     padding: '0.75rem 1.5rem',
-                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    background: 'linear-gradient(135deg, #7C3AED 0%, #22D3EE 100%)',
                     color: 'white',
                     border: 'none',
                     borderRadius: '0.5rem',
                     fontSize: '1rem',
                     fontWeight: '600',
                     cursor: 'pointer',
-                    transition: 'all 0.3s'
+                    transition: 'all 0.3s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
                   }}
                   onMouseEnter={(e) => {
                     e.target.style.transform = 'scale(1.02)'
-                    e.target.style.boxShadow = '0 10px 25px rgba(16, 185, 129, 0.3)'
+                    e.target.style.boxShadow = '0 10px 25px rgba(124, 58, 237, 0.3)'
                   }}
                   onMouseLeave={(e) => {
                     e.target.style.transform = 'scale(1)'
                     e.target.style.boxShadow = 'none'
                   }}
                 >
-                  Scan Current Frame
+                  <svg style={{ width: '1.25rem', height: '1.25rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  Start Scanning
                 </button>
-                <button
-                  onClick={stopScanning}
-                  style={{
-                    padding: '0.75rem 1.5rem',
-                    background: 'rgba(239, 68, 68, 0.8)',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '0.5rem',
-                    fontSize: '1rem',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                    transition: 'all 0.3s'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.target.style.backgroundColor = 'rgba(239, 68, 68, 1)'
-                    e.target.style.transform = 'scale(1.02)'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.backgroundColor = 'rgba(239, 68, 68, 0.8)'
-                    e.target.style.transform = 'scale(1)'
-                  }}
-                >
-                  Stop Scanning
-                </button>
-              </>
-            )}
+              ) : (
+                <>
+                  <button
+                    onClick={captureFrame}
+                    style={{
+                      padding: '0.75rem 1.5rem',
+                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '0.5rem',
+                      fontSize: '1rem',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      transition: 'all 0.3s'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.transform = 'scale(1.02)'
+                      e.target.style.boxShadow = '0 10px 25px rgba(16, 185, 129, 0.3)'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.transform = 'scale(1)'
+                      e.target.style.boxShadow = 'none'
+                    }}
+                  >
+                    Scan Current Frame
+                  </button>
+                  <button
+                    onClick={stopScanning}
+                    style={{
+                      padding: '0.75rem 1.5rem',
+                      background: 'rgba(239, 68, 68, 0.8)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '0.5rem',
+                      fontSize: '1rem',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      transition: 'all 0.3s'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = 'rgba(239, 68, 68, 1)'
+                      e.target.style.transform = 'scale(1.02)'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = 'rgba(239, 68, 68, 0.8)'
+                      e.target.style.transform = 'scale(1)'
+                    }}
+                  >
+                    Stop Scanning
+                  </button>
+                </>
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
-        {/* 手动输入区域 */}
+        {/* Manual input area */}
         <div style={{
           background: 'rgba(15, 23, 42, 0.6)',
           border: '1px solid rgba(255, 255, 255, 0.1)',
@@ -410,7 +383,7 @@ export default function QRScannerPage() {
               type="text"
               value={scannedCode}
               onChange={handleManualInput}
-              placeholder="Enter ticket code"
+              placeholder="Enter ticket code or scan QR code"
               style={{
                 flex: 1,
                 padding: '0.75rem 1rem',
@@ -432,6 +405,7 @@ export default function QRScannerPage() {
             />
             <button
               onClick={verifyTicket}
+              disabled={loading}
               style={{
                 padding: '0.75rem 1.5rem',
                 background: 'linear-gradient(135deg, #7C3AED 0%, #22D3EE 100%)',
@@ -440,12 +414,15 @@ export default function QRScannerPage() {
                 borderRadius: '0.5rem',
                 fontSize: '1rem',
                 fontWeight: '600',
-                cursor: 'pointer',
-                transition: 'all 0.3s'
+                cursor: loading ? 'not-allowed' : 'pointer',
+                transition: 'all 0.3s',
+                opacity: loading ? 0.5 : 1
               }}
               onMouseEnter={(e) => {
-                e.target.style.transform = 'scale(1.02)'
-                e.target.style.boxShadow = '0 10px 25px rgba(124, 58, 237, 0.3)'
+                if (!loading) {
+                  e.target.style.transform = 'scale(1.02)'
+                  e.target.style.boxShadow = '0 10px 25px rgba(124, 58, 237, 0.3)'
+                }
               }}
               onMouseLeave={(e) => {
                 e.target.style.transform = 'scale(1)'
@@ -457,7 +434,7 @@ export default function QRScannerPage() {
           </div>
         </div>
 
-        {/* 错误信息 */}
+        {/* Error message */}
         {error && (
           <div style={{
             backgroundColor: 'rgba(239, 68, 68, 0.1)',
@@ -472,7 +449,7 @@ export default function QRScannerPage() {
           </div>
         )}
 
-        {/* 扫描结果 */}
+        {/* Scan result */}
         {scanResult && (
           <div style={{
             background: 'rgba(15, 23, 42, 0.6)',
@@ -508,9 +485,10 @@ export default function QRScannerPage() {
               </button>
             </div>
 
+            {/* Validity status */}
             <div style={{
-              backgroundColor: scanResult.status === 'valid' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-              border: `1px solid ${scanResult.status === 'valid' ? '#10b981' : '#ef4444'}`,
+              backgroundColor: scanResult.validity_status === 'valid' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+              border: `1px solid ${scanResult.validity_status === 'valid' ? '#10b981' : '#ef4444'}`,
               borderRadius: '0.5rem',
               padding: '1rem',
               marginBottom: '1.5rem'
@@ -520,72 +498,77 @@ export default function QRScannerPage() {
                   width: '0.5rem',
                   height: '0.5rem',
                   borderRadius: '50%',
-                  backgroundColor: scanResult.status === 'valid' ? '#10b981' : '#ef4444'
+                  backgroundColor: scanResult.validity_status === 'valid' ? '#10b981' : '#ef4444'
                 }}></div>
                 <span style={{
-                  color: scanResult.status === 'valid' ? '#10b981' : '#ef4444',
+                  color: scanResult.validity_status === 'valid' ? '#10b981' : '#ef4444',
                   fontWeight: '600',
                   fontSize: '0.875rem'
                 }}>
-                  {scanResult.status === 'valid' ? 'Ticket Valid' : 'Ticket Invalid'}
+                  {scanResult.validity_status === 'valid' ? 'Ticket Valid' : 'Ticket Invalid'}
                 </span>
               </div>
-              {scanResult.errorMessage && (
+              {scanResult.validity_message && (
                 <div style={{
-                  color: '#ef4444',
+                  color: scanResult.validity_status === 'valid' ? '#10b981' : '#ef4444',
                   fontSize: '0.875rem',
                   marginTop: '0.5rem'
                 }}>
-                  {scanResult.errorMessage}
+                  {scanResult.validity_message}
                 </div>
               )}
             </div>
 
+            {/* Ticket details */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
               <div>
-                <div style={{ color: '#94a3b8', fontSize: '0.875rem', marginBottom: '0.25rem' }}>Ticket Code</div>
-                <div style={{ color: 'white', fontWeight: '500' }}>{scanResult.ticketId}</div>
+                <div style={{ color: '#94a3b8', fontSize: '0.875rem', marginBottom: '0.25rem' }}>Ticket ID</div>
+                <div style={{ color: 'white', fontWeight: '500' }}>{scanResult.ticket_id}</div>
               </div>
               <div>
                 <div style={{ color: '#94a3b8', fontSize: '0.875rem', marginBottom: '0.25rem' }}>Event Name</div>
-                <div style={{ color: 'white', fontWeight: '500' }}>{scanResult.eventName}</div>
+                <div style={{ color: 'white', fontWeight: '500' }}>{scanResult.event_name}</div>
               </div>
               <div>
-                <div style={{ color: '#94a3b8', fontSize: '0.875rem', marginBottom: '0.25rem' }}>Attendee</div>
-                <div style={{ color: 'white', fontWeight: '500' }}>{scanResult.attendeeName}</div>
+                <div style={{ color: '#94a3b8', fontSize: '0.875rem', marginBottom: '0.25rem' }}>Holder Name</div>
+                <div style={{ color: 'white', fontWeight: '500' }}>{scanResult.holder_name}</div>
               </div>
               <div>
-                <div style={{ color: '#94a3b8', fontSize: '0.875rem', marginBottom: '0.25rem' }}>Ticket Type</div>
-                <div style={{ color: 'white', fontWeight: '500' }}>{scanResult.ticketType}</div>
+                <div style={{ color: '#94a3b8', fontSize: '0.875rem', marginBottom: '0.25rem' }}>Holder Age</div>
+                <div style={{ color: 'white', fontWeight: '500' }}>{scanResult.holder_age || 'N/A'}</div>
               </div>
-               <div>
-                 <div style={{ color: '#94a3b8', fontSize: '0.875rem', marginBottom: '0.25rem' }}>Ticket Date</div>
-                 <div style={{ color: 'white', fontWeight: '500' }}>
-                   {scanResult.ticketValidityDate ? new Date(scanResult.ticketValidityDate).toLocaleDateString('en-US') : 'N/A'}
-                 </div>
-               </div>
-               <div>
-                 <div style={{ color: '#94a3b8', fontSize: '0.875rem', marginBottom: '0.25rem' }}>Validity Start</div>
-                 <div style={{ color: 'white', fontWeight: '500' }}>
-                   {scanResult.validityStartTime ? new Date(scanResult.validityStartTime).toLocaleString('en-US') : 'N/A'}
-                 </div>
-               </div>
-               <div>
-                 <div style={{ color: '#94a3b8', fontSize: '0.875rem', marginBottom: '0.25rem' }}>Validity End</div>
-                 <div style={{ color: 'white', fontWeight: '500' }}>
-                   {scanResult.validityEndTime ? new Date(scanResult.validityEndTime).toLocaleString('en-US') : 'N/A'}
-                 </div>
-               </div>
               <div>
-                <div style={{ color: '#94a3b8', fontSize: '0.875rem', marginBottom: '0.25rem' }}>Current Time</div>
-                <div style={{ color: 'white', fontWeight: '500' }}>
-                  {scanResult.currentTime ? new Date(scanResult.currentTime).toLocaleString('en-US') : 'N/A'}
+                <div style={{ color: '#94a3b8', fontSize: '0.875rem', marginBottom: '0.25rem' }}>Ticket Tier</div>
+                <div style={{ color: 'white', fontWeight: '500' }}>{scanResult.ticket_tier}</div>
+              </div>
+              <div>
+                <div style={{ color: '#94a3b8', fontSize: '0.875rem', marginBottom: '0.25rem' }}>Venue</div>
+                <div style={{ color: 'white', fontWeight: '500' }}>{scanResult.event_venue}</div>
+              </div>
+              {scanResult.valid_from && (
+                <div>
+                  <div style={{ color: '#94a3b8', fontSize: '0.875rem', marginBottom: '0.25rem' }}>Valid From</div>
+                  <div style={{ color: 'white', fontWeight: '500' }}>
+                    {new Date(scanResult.valid_from).toLocaleString('en-US')}
+                  </div>
                 </div>
+              )}
+              {scanResult.valid_until && (
+                <div>
+                  <div style={{ color: '#94a3b8', fontSize: '0.875rem', marginBottom: '0.25rem' }}>Valid Until</div>
+                  <div style={{ color: 'white', fontWeight: '500' }}>
+                    {new Date(scanResult.valid_until).toLocaleString('en-US')}
+                  </div>
+                </div>
+              )}
+              <div>
+                <div style={{ color: '#94a3b8', fontSize: '0.875rem', marginBottom: '0.25rem' }}>Verification Count</div>
+                <div style={{ color: 'white', fontWeight: '500' }}>{scanResult.verification_count}</div>
               </div>
               <div>
                 <div style={{ color: '#94a3b8', fontSize: '0.875rem', marginBottom: '0.25rem' }}>Scanned At</div>
                 <div style={{ color: 'white', fontWeight: '500' }}>
-                  {new Date(scanResult.scannedAt).toLocaleString('en-US')}
+                  {new Date(scanResult.scanned_at).toLocaleString('en-US')}
                 </div>
               </div>
             </div>
@@ -595,4 +578,3 @@ export default function QRScannerPage() {
     </div>
   )
 }
-

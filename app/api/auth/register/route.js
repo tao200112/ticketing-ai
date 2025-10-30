@@ -3,8 +3,9 @@ import { createClient } from '@supabase/supabase-js'
 import bcrypt from 'bcryptjs'
 import { ErrorHandler, handleApiError } from '@/lib/error-handler'
 import { createLogger } from '@/lib/logger'
+import { getPortalFromHostname, getRoleFromPortal } from '@/lib/domain-detector'
 
-// 从工厂变量获取 Supabase 配置
+// Get Supabase configuration from environment variables
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
@@ -13,9 +14,13 @@ const logger = createLogger('register-api')
 export async function POST(request) {
   try {
     const body = await request.json()
-    const { email, password, name, age } = body
+    const { email, password, name, age, role: explicitRole } = body
 
-    // 验证必需字段
+    // Detect role from domain if not explicitly provided
+    const portal = getPortalFromHostname(request)
+    const roleBasedOnPortal = explicitRole || getRoleFromPortal(portal)
+
+    // Validate required fields
     if (!email || !password || !name) {
       throw ErrorHandler.validationError(
         'MISSING_FIELDS',
@@ -23,13 +28,21 @@ export async function POST(request) {
       )
     }
 
-    // 验证邮箱格式
+    // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
       throw ErrorHandler.validationError('INVALID_EMAIL')
     }
 
-    // 验证密码长度
+    // Validate role
+    if (!['user', 'merchant', 'admin'].includes(roleBasedOnPortal)) {
+      throw ErrorHandler.validationError(
+        'INVALID_ROLE',
+        'Invalid role. Must be user, merchant, or admin'
+      )
+    }
+
+    // Validate password length
     if (password.length < 8) {
       throw ErrorHandler.validationError('PASSWORD_TOO_SHORT')
     }
@@ -38,7 +51,7 @@ export async function POST(request) {
       throw ErrorHandler.validationError('PASSWORD_TOO_LONG')
     }
 
-    // 验证年龄（如果提供）
+    // Validate age (if provided)
     if (age !== undefined && age !== null) {
       const ageNum = parseInt(age)
       if (isNaN(ageNum) || ageNum < 16 || ageNum > 150) {
@@ -51,29 +64,34 @@ export async function POST(request) {
       throw ErrorHandler.configurationError('CONFIG_ERROR', 'Supabase is not configured, registration is not available')
     }
 
-    // 使用 Supabase 注册
+    // Use Supabase for registration
     const supabase = createClient(supabaseUrl, supabaseKey)
 
-    // 检查用户是否已存在
+    // Check if user with this email AND role already exists
+    // This allows same email with different roles
     const { data: existingUser, error: checkError } = await supabase
       .from('users')
       .select('id')
       .eq('email', email)
+      .eq('role', roleBasedOnPortal)
       .single()
 
-    // 处理检查错误
+    // Handle check errors
     if (checkError && checkError.code !== 'PGRST116') {
-      // PGRST116 表示未找到记录，这是正常的（用户不存在）
-      // 其他错误需要处理
+      // PGRST116 means no rows found, which is normal (user doesn't exist)
+      // Other errors need to be handled
       throw ErrorHandler.fromSupabaseError(checkError, 'DATABASE_QUERY_ERROR')
     }
 
-    // 如果用户已存在，返回冲突错误
+    // If user with this email AND role already exists, return conflict error
     if (existingUser) {
-      throw ErrorHandler.conflictError('EMAIL_EXISTS')
+      throw ErrorHandler.conflictError(
+        'EMAIL_ROLE_EXISTS',
+        `An account with email ${email} and role ${roleBasedOnPortal} already exists`
+      )
     }
 
-    // 加密密码
+    // Hash password
     let hashedPassword
     try {
       hashedPassword = await bcrypt.hash(password, 12)
@@ -82,7 +100,11 @@ export async function POST(request) {
       throw ErrorHandler.internalError(hashError, 'Password hashing failed, please try again later')
     }
 
-    // 创建用户（未验证状态）
+    // Get registration domain for tracking
+    const hostname = request.headers.get('host') || ''
+    const registrationDomain = hostname.split(':')[0]
+
+    // Create user (unverified status)
     const { data: newUser, error: insertError } = await supabase
       .from('users')
       .insert([
@@ -91,24 +113,28 @@ export async function POST(request) {
           password_hash: hashedPassword,
           name,
           age: age ? parseInt(age) : null,
-          role: 'user',
-          email_verified_at: null  // 明确设置为未验证
+          role: roleBasedOnPortal,
+          email_verified_at: null,  // Explicitly set as unverified
+          registration_domain: registrationDomain
         }
       ])
       .select()
       .single()
 
-    // 处理插入错误
+    // Handle insert errors
     if (insertError) {
-      // 如果是唯一约束违反（邮箱已存在），返回冲突错误
+      // If unique constraint violation (email + role already exists)
       if (insertError.code === '23505') {
-        throw ErrorHandler.conflictError('EMAIL_EXISTS')
+        throw ErrorHandler.conflictError(
+          'EMAIL_ROLE_EXISTS',
+          `An account with email ${email} and role ${roleBasedOnPortal} already exists`
+        )
       }
-      // 其他数据库错误
+      // Other database errors
       throw ErrorHandler.fromSupabaseError(insertError, 'REGISTRATION_FAILED')
     }
 
-    // 生成邮箱验证令牌（可选，不阻止注册）
+    // Generate email verification token (optional, doesn't block registration)
     try {
       const verificationToken = await supabase.rpc('send_verification_email', {
         p_user_id: newUser.id,
@@ -116,11 +142,11 @@ export async function POST(request) {
       })
 
       if (verificationToken.error) {
-        logger.warn('生成验证令牌失败', { error: verificationToken.error })
-        // 不阻止注册，但记录警告
+        logger.warn('Failed to generate verification token', { error: verificationToken.error })
+        // Don't block registration, but log warning
       }
 
-      // 发送验证邮件（可选，不阻止注册）
+      // Send verification email (optional, doesn't block registration)
       try {
         const emailService = (await import('../../../../lib/email-service.js')).default
         await emailService.sendVerificationEmail(
@@ -129,24 +155,22 @@ export async function POST(request) {
           verificationToken.data
         )
       } catch (emailError) {
-        logger.warn('发送验证邮件失败', { error: emailError })
-        // 不阻止注册，但记录警告
+        logger.warn('Failed to send verification email', { error: emailError })
+        // Don't block registration, but log warning
       }
-    } catch (verificationError) {
-      logger.warn('验证流程失败', { error: verificationError })
-      // 不阻止注册
+    } catch (tokenError) {
+      logger.warn('Email verification setup failed', { error: tokenError })
+      // Don't block registration
     }
 
-    // 移除敏感信息
-    const { password_hash, ...safeUser } = newUser
-
-    logger.success('用户注册成功', { userId: newUser.id, email: newUser.email })
+    // Remove sensitive data before returning
+    delete newUser.password_hash
 
     return NextResponse.json({
       success: true,
-      message: '注册成功！请检查您的邮箱并验证账户才能正常使用',
+      message: 'Registration successful! Please check your email and click the verification link to complete registration.',
       data: {
-        ...safeUser,
+        ...newUser,
         emailVerified: false,
         needsVerification: true,
         requiresEmailVerification: true
@@ -155,7 +179,6 @@ export async function POST(request) {
     })
 
   } catch (error) {
-    // 使用统一的错误处理
-    return await handleApiError(error, request, logger)
+    return handleApiError(error, request, logger)
   }
 }

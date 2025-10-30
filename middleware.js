@@ -1,16 +1,49 @@
 import { NextResponse } from 'next/server'
 import { generateRequestId } from './lib/logger'
+import { getPortalFromHostname, DOMAINS } from './lib/domain-detector'
 
 /**
- * 中间件 - 处理路由重定向和请求ID
+ * Middleware - Handle domain-based routing, redirects, and request ID
  */
 export function middleware(request) {
   const { pathname } = request.nextUrl
 
-  // 生成或获取请求ID
+  // Generate or get request ID
   const requestId = request.headers.get('x-request-id') || generateRequestId()
 
-  // UUID 格式匹配：/events/<uuid> → /api/compat/uuid-to-slug?id=<uuid>
+  // Detect portal based on hostname
+  const portal = getPortalFromHostname(request)
+  
+  // Add portal info to headers for API routes
+  const response = NextResponse.next()
+  response.headers.set('x-request-id', requestId)
+  response.headers.set('x-portal', portal)
+  
+  // Set requestId in request headers for downstream use
+  request.headers.set('x-request-id', requestId)
+  request.headers.set('x-portal', portal)
+
+  // Domain-based routing protection (in production)
+  // In development, allow access via pathname
+  if (process.env.NODE_ENV === 'production') {
+    // Protect admin routes - only accessible from standard domain
+    if (pathname.startsWith('/admin') && portal !== DOMAINS.ADMIN) {
+      const adminDomain = process.env.NEXT_PUBLIC_ADMIN_DOMAIN || 'admin.partytix.com'
+      const url = new URL(request.url)
+      url.hostname = adminDomain
+      return NextResponse.redirect(url, 301)
+    }
+
+    // Protect merchant routes - only accessible from merchant domain
+    if (pathname.startsWith('/merchant') && portal !== DOMAINS.MERCHANT) {
+      const merchantDomain = process.env.NEXT_PUBLIC_MERCHANT_DOMAIN || 'merchant.partytix.com'
+      const url = new URL(request.url)
+      url.hostname = merchantDomain
+      return NextResponse.redirect(url, 301)
+    }
+  }
+
+  // UUID format matching: /events/<uuid> → /api/compat/uuid-to-slug?id=<uuid>
   const uuidMatch = pathname.match(/^\/events\/([0-9a-fA-F-]{8}-[0-9a-fA-F-]{4}-[0-9a-fA-F-]{4}-[0-9a-fA-F-]{4}-[0-9a-fA-F-]{12})$/)
   if (uuidMatch) {
     const uuid = uuidMatch[1]
@@ -19,32 +52,28 @@ export function middleware(request) {
     return NextResponse.redirect(url, 302)
   }
 
-  // 复数到单数重定向：/events/<slug> → /event/<slug>
+  // Plural to singular redirect: /events/<slug> → /event/<slug>
   const eventsMatch = pathname.match(/^\/events\/(.+)$/)
   if (eventsMatch) {
     const slug = eventsMatch[1]
     return NextResponse.redirect(new URL(`/event/${slug}`, request.url), 301)
   }
 
-  // 重定向旧的活动页面到新的 slug 路由
+  // Redirect old event page to new slug route
   if (pathname === '/event/ridiculous-chicken') {
     return NextResponse.redirect(new URL('/event/ridiculous-chicken', request.url))
   }
-
-  // 为所有请求添加 requestId 到响应头
-  const response = NextResponse.next()
-  response.headers.set('x-request-id', requestId)
-  
-  // 将 requestId 添加到请求头，供后续处理使用
-  request.headers.set('x-request-id', requestId)
 
   return response
 }
 
 export const config = {
   matcher: [
-    // 只匹配特定路由，避免干扰其他页面
+    // Match all routes to enable domain-based routing
+    '/((?!api|_next/static|_next/image|favicon.ico).*)',
     '/event/:path*',
-    '/events/:path*'
+    '/events/:path*',
+    '/merchant/:path*',
+    '/admin/:path*'
   ]
 }

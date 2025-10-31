@@ -14,6 +14,8 @@ export default function MerchantStaffPage() {
   const [loading, setLoading] = useState(false)
   const [stream, setStream] = useState(null)
   const [userRole, setUserRole] = useState(null)
+  const [debugInfo, setDebugInfo] = useState('')
+  const [scanAttempts, setScanAttempts] = useState(0)
   const scanIntervalRef = useRef(null)
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
@@ -82,6 +84,7 @@ export default function MerchantStaffPage() {
         }
         setStream(null)
         setIsScanning(false)
+        setDebugInfo('')
         setError('Video element not initialized. Please refresh the page and try again.')
         return
       }
@@ -126,6 +129,7 @@ export default function MerchantStaffPage() {
       
       // QR detection will start automatically via useEffect when isScanning is true
       console.log('Video started, QR detection should begin automatically')
+      setDebugInfo('Camera active. Waiting for QR code...')
     } catch (err) {
       console.error('Camera error:', err)
       
@@ -135,6 +139,7 @@ export default function MerchantStaffPage() {
       }
       setStream(null)
       setIsScanning(false)
+      setDebugInfo('')
       
       // Set specific error messages
       if (err.name === 'NotAllowedError') {
@@ -168,8 +173,12 @@ export default function MerchantStaffPage() {
   useEffect(() => {
     if (isScanning && videoRef.current && canvasRef.current) {
       console.log('Starting QR detection loop')
+      setDebugInfo('QR detection started. Scanning every 200ms...')
       
+      let frameCount = 0
       const scanLoop = () => {
+        frameCount++
+        
         if (!videoRef.current || !canvasRef.current || !isScanning) {
           return
         }
@@ -178,37 +187,52 @@ export default function MerchantStaffPage() {
           const video = videoRef.current
           const canvas = canvasRef.current
 
+          // Update debug info every 50 frames (10 seconds)
+          if (frameCount % 50 === 0) {
+            setDebugInfo(`Scanning... Frame ${frameCount}. Video ready: ${video.readyState === video.HAVE_ENOUGH_DATA ? 'Yes' : 'No'}`)
+          }
+
           // Check if video is ready
           if (video.readyState !== video.HAVE_ENOUGH_DATA) {
+            if (frameCount === 1) {
+              setDebugInfo('Waiting for video to be ready...')
+            }
             return
           }
 
           const context = canvas.getContext('2d')
           
           // Set canvas size to match video (only if dimensions changed)
-          if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
-            canvas.width = video.videoWidth
-            canvas.height = video.videoHeight
-          }
-          
-          context.drawImage(video, 0, 0, canvas.width, canvas.height)
-          const imageData = context.getImageData(0, 0, canvas.width, canvas.height)
-          const code = jsQR(imageData.data, imageData.width, imageData.height)
-
-          if (code && code.data) {
-            // Found a QR code, stop scanning and verify
-            console.log('QR code detected:', code.data.substring(0, 50) + '...')
-            if (scanIntervalRef.current) {
-              clearInterval(scanIntervalRef.current)
-              scanIntervalRef.current = null
+          if (video.videoWidth > 0 && video.videoHeight > 0) {
+            if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+              canvas.width = video.videoWidth
+              canvas.height = video.videoHeight
             }
-            setScannedCode(code.data)
-            stopScanning()
-            verifyTicket(code.data)
+            
+            context.drawImage(video, 0, 0, canvas.width, canvas.height)
+            const imageData = context.getImageData(0, 0, canvas.width, canvas.height)
+            const code = jsQR(imageData.data, imageData.width, imageData.height)
+
+            if (code && code.data) {
+              // Found a QR code, stop scanning and verify
+              console.log('QR code detected:', code.data.substring(0, 50) + '...')
+              setDebugInfo(`QR Code detected! Verifying...`)
+              setScanAttempts(prev => prev + 1)
+              if (scanIntervalRef.current) {
+                clearInterval(scanIntervalRef.current)
+                scanIntervalRef.current = null
+              }
+              setScannedCode(code.data)
+              stopScanning()
+              verifyTicket(code.data)
+            }
           }
         } catch (err) {
-          // Silently ignore frame capture errors during auto-scan
+          // Log errors but don't stop scanning
           console.debug('Frame capture error:', err)
+          if (frameCount % 50 === 0) {
+            setDebugInfo(`Error: ${err.message}`)
+          }
         }
       }
 
@@ -226,6 +250,9 @@ export default function MerchantStaffPage() {
       if (scanIntervalRef.current) {
         clearInterval(scanIntervalRef.current)
         scanIntervalRef.current = null
+      }
+      if (!isScanning) {
+        setDebugInfo('')
       }
     }
   }, [isScanning])
@@ -333,6 +360,8 @@ export default function MerchantStaffPage() {
     setScannedCode('')
     setScanResult(null)
     setError('')
+    setDebugInfo('')
+    setScanAttempts(0)
     stopScanning()
   }
 
@@ -439,6 +468,26 @@ export default function MerchantStaffPage() {
               color: '#ef4444'
             }}>
               {error}
+            </div>
+          )}
+          
+          {/* Debug Info - Visible on screen */}
+          {isScanning && debugInfo && (
+            <div style={{
+              marginTop: '16px',
+              padding: '12px',
+              background: 'rgba(59, 130, 246, 0.1)',
+              border: '1px solid #3b82f6',
+              borderRadius: '8px',
+              color: '#3b82f6',
+              fontSize: '0.875rem'
+            }}>
+              🔍 {debugInfo}
+              {scanAttempts > 0 && (
+                <div style={{ marginTop: '4px', fontSize: '0.75rem', opacity: 0.8 }}>
+                  Scan attempts: {scanAttempts}
+                </div>
+              )}
             </div>
           )}
         </div>

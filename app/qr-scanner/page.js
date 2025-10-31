@@ -286,7 +286,7 @@ export default function QRScannerPage() {
     setScannedCode(e.target.value)
   }
 
-  const verifyTicketFromQR = async (qrData) => {
+  const verifyTicketFromQR = async (qrData, redeem = false) => {
     try {
       setLoading(true)
       setError('')
@@ -296,7 +296,10 @@ export default function QRScannerPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ qr_payload: qrData }),
+        body: JSON.stringify({ 
+          qr_payload: qrData,
+          redeem: redeem 
+        }),
       })
 
       const result = await response.json()
@@ -311,12 +314,14 @@ export default function QRScannerPage() {
           holder_age: ticket.holder_age,
           event_name: event?.title || 'Unknown Event',
           event_venue: event?.venue_name || 'N/A',
-          validity_status: validity.valid ? 'valid' : 'invalid',
-          validity_message: validity.message,
+          validity_status: redeem ? 'redeemed' : (validity.valid ? 'valid' : 'invalid'),
+          validity_message: redeem ? '票券已核销' : validity.message,
           valid_from: validity.validFrom || event?.start_at,
           valid_until: validity.validUntil || event?.end_at,
           verification_count: ticket.verification_count || 1,
-          scanned_at: new Date().toISOString()
+          scanned_at: new Date().toISOString(),
+          redeemed: redeem,
+          ticket_status: ticket.status
         })
         
         setError('')
@@ -326,11 +331,21 @@ export default function QRScannerPage() {
         setScanResult(null)
       }
     } catch (err) {
-      setError('Ticket verification error, please try again')
+      setError(err.message || 'Ticket verification error, please try again')
       console.error('Verification error:', err)
+      setScanResult(null)
     } finally {
       setLoading(false)
     }
+  }
+
+  const redeemTicket = async () => {
+    if (!scannedCode) {
+      setError('Please scan a ticket first')
+      return
+    }
+    
+    await verifyTicketFromQR(scannedCode, true)
   }
 
   const verifyTicket = async () => {
@@ -753,8 +768,15 @@ export default function QRScannerPage() {
 
             {/* Validity status */}
             <div style={{
-              backgroundColor: scanResult.validity_status === 'valid' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-              border: `1px solid ${scanResult.validity_status === 'valid' ? '#10b981' : '#ef4444'}`,
+              backgroundColor: scanResult.validity_status === 'valid' || scanResult.validity_status === 'redeemed' 
+                ? 'rgba(16, 185, 129, 0.1)' 
+                : scanResult.validity_status === 'redeemed'
+                ? 'rgba(59, 130, 246, 0.1)'
+                : 'rgba(239, 68, 68, 0.1)',
+              border: `1px solid ${
+                scanResult.validity_status === 'redeemed' ? '#3b82f6' :
+                scanResult.validity_status === 'valid' ? '#10b981' : '#ef4444'
+              }`,
               borderRadius: '0.5rem',
               padding: '1rem',
               marginBottom: '1.5rem'
@@ -764,23 +786,74 @@ export default function QRScannerPage() {
                   width: '0.5rem',
                   height: '0.5rem',
                   borderRadius: '50%',
-                  backgroundColor: scanResult.validity_status === 'valid' ? '#10b981' : '#ef4444'
+                  backgroundColor: scanResult.validity_status === 'redeemed' ? '#3b82f6' :
+                    scanResult.validity_status === 'valid' ? '#10b981' : '#ef4444'
                 }}></div>
                 <span style={{
-                  color: scanResult.validity_status === 'valid' ? '#10b981' : '#ef4444',
+                  color: scanResult.validity_status === 'redeemed' ? '#3b82f6' :
+                    scanResult.validity_status === 'valid' ? '#10b981' : '#ef4444',
                   fontWeight: '600',
                   fontSize: '0.875rem'
                 }}>
-                  {scanResult.validity_status === 'valid' ? 'Ticket Valid' : 'Ticket Invalid'}
+                  {scanResult.validity_status === 'redeemed' ? '✅ 票券已核销' :
+                   scanResult.validity_status === 'valid' ? '✓ 票券有效' : 
+                   '✗ 票券无效'}
                 </span>
               </div>
               {scanResult.validity_message && (
                 <div style={{
-                  color: scanResult.validity_status === 'valid' ? '#10b981' : '#ef4444',
+                  color: scanResult.validity_status === 'redeemed' ? '#3b82f6' :
+                    scanResult.validity_status === 'valid' ? '#10b981' : '#ef4444',
                   fontSize: '0.875rem',
-                  marginTop: '0.5rem'
+                  marginTop: '0.5rem',
+                  marginBottom: scanResult.validity_status === 'valid' && !scanResult.redeemed ? '1rem' : '0.5rem'
                 }}>
                   {scanResult.validity_message}
+                </div>
+              )}
+              
+              {/* Redeem button - only show if ticket is valid and not redeemed */}
+              {scanResult.validity_status === 'valid' && !scanResult.redeemed && scanResult.ticket_status !== 'used' && (
+                <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                  <button
+                    onClick={redeemTicket}
+                    disabled={loading}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem 1.5rem',
+                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '0.5rem',
+                      fontSize: '1rem',
+                      fontWeight: '600',
+                      cursor: loading ? 'not-allowed' : 'pointer',
+                      transition: 'all 0.3s',
+                      opacity: loading ? 0.5 : 1,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.5rem'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!loading) {
+                        e.target.style.transform = 'scale(1.02)'
+                        e.target.style.boxShadow = '0 10px 25px rgba(16, 185, 129, 0.3)'
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.transform = 'scale(1)'
+                      e.target.style.boxShadow = 'none'
+                    }}
+                  >
+                    <svg style={{ width: '1.25rem', height: '1.25rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    {loading ? '核销中...' : '核销票券'}
+                  </button>
+                  <p style={{ color: '#94a3b8', fontSize: '0.75rem', marginTop: '0.5rem', textAlign: 'center' }}>
+                    点击核销后，票券将被标记为已使用，无法再次使用
+                  </p>
                 </div>
               )}
             </div>

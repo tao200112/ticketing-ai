@@ -1,18 +1,15 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase-api'
 import { ErrorHandler, handleApiError } from '@/lib/error-handler'
 import { createLogger } from '@/lib/logger'
 import { verifyTicketQRPayload } from '@/lib/qr-crypto'
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
 const logger = createLogger('ticket-verify-api')
 
 export async function POST(request) {
   try {
     const body = await request.json()
-    const { qr_payload } = body
+    const { qr_payload, redeem = false } = body // redeem: true 表示核销票券
 
     // Validate QR payload
     if (!qr_payload) {
@@ -23,14 +20,14 @@ export async function POST(request) {
     }
 
     // If Supabase is not configured
-    if (!supabaseUrl || !supabaseKey) {
+    if (!isSupabaseConfigured()) {
       throw ErrorHandler.configurationError(
         'CONFIG_ERROR',
         'Supabase is not configured, verification is not available'
       )
     }
 
-    const supabase = createClient(supabaseUrl, supabaseKey)
+    const supabase = createSupabaseClient()
 
     // Try to parse as new QR format: TKT.<id>.<exp>.<sig>
     let ticketId
@@ -173,8 +170,12 @@ export async function POST(request) {
       }
     }
 
-    // Check ticket status (cancelled tickets are always invalid)
-    if (ticket.status === 'refunded' || ticket.status === 'cancelled') {
+    // Check ticket status (used, cancelled or refunded tickets)
+    if (ticket.status === 'used') {
+      isValid = false
+      validityMessage = 'Ticket has already been used'
+      expiryInfo.status = 'used'
+    } else if (ticket.status === 'refunded' || ticket.status === 'cancelled') {
       isValid = false
       validityMessage = 'Ticket has been cancelled or refunded'
       expiryInfo.status = 'cancelled'
@@ -184,7 +185,7 @@ export async function POST(request) {
     const holderName = ticket.holder_name || ticket.orders?.customer_name || 'Unknown'
     const holderAge = ticket.holder_age || null
 
-    // Update verification tracking
+    // Update verification tracking or redeem ticket
     const updateData = {
       last_verified_at: now.toISOString()
     }
@@ -197,14 +198,53 @@ export async function POST(request) {
       updateData.verification_count = (ticket.verification_count || 0) + 1
     }
 
+    // If redeem is true and ticket is valid and not used, mark it as used
+    if (redeem && isValid && ticket.status !== 'used') {
+      if (ticket.status === 'refunded' || ticket.status === 'cancelled') {
+        throw ErrorHandler.validationError(
+          'TICKET_CANNOT_BE_REDEEMED',
+          'Cannot redeem a cancelled or refunded ticket'
+        )
+      }
+      
+      updateData.status = 'used'
+      updateData.used_at = now.toISOString()
+      
+      logger.info('Redeeming ticket', { ticketId, redeemedAt: now.toISOString() })
+    }
+
+    // Update ticket in database
     try {
-      await supabase
+      const { error: updateError } = await supabase
         .from('tickets')
         .update(updateData)
         .eq('id', ticketId)
+
+      if (updateError) {
+        logger.error('Failed to update ticket', { error: updateError, ticketId })
+        // If redeem failed, throw error
+        if (redeem) {
+          throw ErrorHandler.databaseError(updateError, 'REDEEM_FAILED')
+        }
+        // Otherwise just warn (verification can continue)
+        logger.warn('Failed to update verification tracking', { error: updateError })
+      } else if (redeem) {
+        // Update ticket status in response if redeemed
+        ticket.status = 'used'
+        ticket.used_at = now.toISOString()
+        isValid = false // After redemption, ticket is considered "used"
+        validityMessage = 'Ticket has been successfully redeemed (used)'
+      }
     } catch (updateError) {
+      // If it's a redeem error, re-throw it
+      if (redeem && updateError.code) {
+        throw updateError
+      }
       logger.warn('Failed to update verification tracking', { error: updateError })
-      // Don't block verification if tracking update fails
+      // Don't block verification if tracking update fails (unless it's a redeem)
+      if (redeem) {
+        throw ErrorHandler.databaseError(updateError, 'REDEEM_FAILED')
+      }
     }
 
     // Prepare response

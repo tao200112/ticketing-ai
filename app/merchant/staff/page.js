@@ -47,6 +47,7 @@ export default function MerchantStaffPage() {
   }, [router, stream])
 
   const startScanning = async () => {
+    let mediaStream = null
     try {
       setError('')
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -58,44 +59,49 @@ export default function MerchantStaffPage() {
       setIsScanning(true)
       
       // Wait a moment for React to render the video element
-      await new Promise(resolve => setTimeout(resolve, 50))
+      await new Promise(resolve => setTimeout(resolve, 100))
       
       // Now get camera stream
-      const stream = await navigator.mediaDevices.getUserMedia({
+      mediaStream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'environment' }
       })
       
-      setStream(stream)
+      setStream(mediaStream)
       
-      // Wait for video element to be available
+      // Wait for video element to be available (retry logic)
       let attempts = 0
-      const maxAttempts = 10
+      const maxAttempts = 20 // Increase attempts to 2 seconds
       while (!videoRef.current && attempts < maxAttempts) {
         await new Promise(resolve => setTimeout(resolve, 100))
         attempts++
       }
       
       if (!videoRef.current) {
+        if (mediaStream) {
+          mediaStream.getTracks().forEach(track => track.stop())
+        }
         setStream(null)
         setIsScanning(false)
-        setError('Video element not initialized. Please try again.')
+        setError('Video element not initialized. Please refresh the page and try again.')
         return
       }
       
       const video = videoRef.current
-      video.srcObject = stream
+      video.srcObject = mediaStream
       
       // Wait for video metadata to load before playing
       await new Promise((resolve, reject) => {
         const onLoadedMetadata = () => {
           video.removeEventListener('loadedmetadata', onLoadedMetadata)
           video.removeEventListener('error', onError)
+          clearTimeout(timeoutId)
           resolve()
         }
         
         const onError = (err) => {
           video.removeEventListener('loadedmetadata', onLoadedMetadata)
           video.removeEventListener('error', onError)
+          clearTimeout(timeoutId)
           reject(new Error('Video failed to load'))
         }
         
@@ -103,7 +109,7 @@ export default function MerchantStaffPage() {
         video.addEventListener('error', onError)
         
         // Set a timeout
-        setTimeout(() => {
+        const timeoutId = setTimeout(() => {
           video.removeEventListener('loadedmetadata', onLoadedMetadata)
           video.removeEventListener('error', onError)
           reject(new Error('Video load timeout'))
@@ -121,15 +127,15 @@ export default function MerchantStaffPage() {
       // Start QR detection after video is playing
       setTimeout(() => {
         startQRDetection()
-      }, 200)
+      }, 300)
     } catch (err) {
       console.error('Camera error:', err)
       
       // Clean up on error
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop())
-        setStream(null)
+      if (mediaStream) {
+        mediaStream.getTracks().forEach(track => track.stop())
       }
+      setStream(null)
       setIsScanning(false)
       
       // Set specific error messages

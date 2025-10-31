@@ -124,10 +124,8 @@ export default function MerchantStaffPage() {
         throw new Error('Video playback failed. Please click Start Scanning again.')
       }
       
-      // Start QR detection after video is playing
-      setTimeout(() => {
-        startQRDetection()
-      }, 300)
+      // QR detection will start automatically via useEffect when isScanning is true
+      console.log('Video started, QR detection should begin automatically')
     } catch (err) {
       console.error('Camera error:', err)
       
@@ -166,58 +164,71 @@ export default function MerchantStaffPage() {
     }
   }
 
-  const startQRDetection = () => {
-    if (scanIntervalRef.current) {
-      clearInterval(scanIntervalRef.current)
-      scanIntervalRef.current = null
-    }
-
-    if (!videoRef.current || !canvasRef.current) {
-      console.error('Video or canvas ref not available')
-      setError('Camera initialization failed. Please try again.')
-      return
-    }
-
-    scanIntervalRef.current = setInterval(() => {
-      try {
+  // Auto-scan QR codes when camera is active
+  useEffect(() => {
+    if (isScanning && videoRef.current && canvasRef.current) {
+      console.log('Starting QR detection loop')
+      
+      const scanLoop = () => {
         if (!videoRef.current || !canvasRef.current || !isScanning) {
-          if (scanIntervalRef.current) {
-            clearInterval(scanIntervalRef.current)
-            scanIntervalRef.current = null
+          return
+        }
+        
+        try {
+          const video = videoRef.current
+          const canvas = canvasRef.current
+
+          // Check if video is ready
+          if (video.readyState !== video.HAVE_ENOUGH_DATA) {
+            return
           }
-          return
-        }
 
-        const video = videoRef.current
-        const canvas = canvasRef.current
+          const context = canvas.getContext('2d')
+          
+          // Set canvas size to match video (only if dimensions changed)
+          if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+            canvas.width = video.videoWidth
+            canvas.height = video.videoHeight
+          }
+          
+          context.drawImage(video, 0, 0, canvas.width, canvas.height)
+          const imageData = context.getImageData(0, 0, canvas.width, canvas.height)
+          const code = jsQR(imageData.data, imageData.width, imageData.height)
 
-        if (video.readyState !== video.HAVE_ENOUGH_DATA) {
-          return
+          if (code && code.data) {
+            // Found a QR code, stop scanning and verify
+            console.log('QR code detected:', code.data.substring(0, 50) + '...')
+            if (scanIntervalRef.current) {
+              clearInterval(scanIntervalRef.current)
+              scanIntervalRef.current = null
+            }
+            setScannedCode(code.data)
+            stopScanning()
+            verifyTicket(code.data)
+          }
+        } catch (err) {
+          // Silently ignore frame capture errors during auto-scan
+          console.debug('Frame capture error:', err)
         }
-
-        const context = canvas.getContext('2d')
-        
-        // Set canvas size to match video
-        if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
-          canvas.width = video.videoWidth
-          canvas.height = video.videoHeight
-        }
-        
-        context.drawImage(video, 0, 0, canvas.width, canvas.height)
-        const imageData = context.getImageData(0, 0, canvas.width, canvas.height)
-        const code = jsQR(imageData.data, imageData.width, imageData.height)
-
-        if (code && code.data) {
-          setScannedCode(code.data)
-          stopScanning()
-          verifyTicket(code.data)
-        }
-      } catch (err) {
-        console.error('QR detection error:', err)
-        // Don't stop scanning on detection errors, just log them
       }
-    }, 200) // Scan every 200ms for better performance
-  }
+
+      // Start scanning every 200ms
+      scanIntervalRef.current = setInterval(scanLoop, 200)
+      
+      return () => {
+        if (scanIntervalRef.current) {
+          clearInterval(scanIntervalRef.current)
+          scanIntervalRef.current = null
+        }
+      }
+    } else {
+      // Clean up when scanning stops
+      if (scanIntervalRef.current) {
+        clearInterval(scanIntervalRef.current)
+        scanIntervalRef.current = null
+      }
+    }
+  }, [isScanning])
 
   const verifyTicket = async (qrData) => {
     try {

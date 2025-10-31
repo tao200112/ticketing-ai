@@ -59,11 +59,24 @@ export async function POST(request) {
     }
 
     // 验证密码
-    console.log('🔑 验证密码:', { password, hash: user.password_hash?.substring(0, 20) + '...' })
+    if (!user.password_hash) {
+      console.log('❌ 用户没有密码哈希')
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'INVALID_CREDENTIALS',
+          message: '邮箱或密码错误'
+        },
+        { status: 401 }
+      )
+    }
+    
+    console.log('🔑 验证密码:', { password: password.substring(0, 2) + '***', hash: user.password_hash?.substring(0, 20) + '...' })
     const isValidPassword = await bcrypt.compare(password, user.password_hash)
     console.log('✅ 密码验证结果:', isValidPassword)
     
     if (!isValidPassword) {
+      console.log('❌ 密码验证失败')
       return NextResponse.json(
         {
           success: false,
@@ -91,6 +104,18 @@ export async function POST(request) {
     if (merchant?.id) {
       // 如果是owner，角色是boss
       merchantRole = 'boss'
+      // 但也要检查是否同时在merchant_members中，如果是staff，也要记录
+      const { data: member } = await supabase
+        .from('merchant_members')
+        .select('role')
+        .eq('user_id', user.id)
+        .eq('merchant_id', merchant.id)
+        .single()
+      
+      if (member) {
+        // 如果同时在merchant_members中，使用该角色（可能是staff）
+        merchantRole = member.role
+      }
     } else {
       // 如果不是owner，查询是否是员工
       const { data: member, error: memberError } = await supabase
@@ -113,18 +138,56 @@ export async function POST(request) {
         if (memberMerchant) {
           merchant = memberMerchant
         }
+      } else {
+        // 既不是owner也不是员工，返回错误
+        console.log('❌ 用户既不是商家owner也不是员工')
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'NO_MERCHANT_ACCESS',
+            message: '您没有商家访问权限'
+          },
+          { status: 403 }
+        )
       }
+    }
+    
+    // 确保用户有merchant_id
+    if (!merchant?.id && !memberMerchantId) {
+      console.log('❌ 用户没有关联的商家')
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'NO_MERCHANT_ACCESS',
+          message: '您没有关联的商家账户'
+        },
+        { status: 403 }
+      )
     }
 
     // 移除密码字段
     delete user.password_hash
 
     // 构造返回数据，包含 merchant_id 和 role 字段
+    const finalMerchantId = merchant?.id || memberMerchantId
     const userData = {
       ...user,
-      merchant_id: merchant?.id || memberMerchantId || null,
+      merchant_id: finalMerchantId,
       merchant: merchant || null,
       merchant_role: merchantRole // 商家内部角色: boss 或 staff
+    }
+    
+    // 确保merchant_id存在
+    if (!finalMerchantId) {
+      console.log('❌ 无法确定用户的商家ID')
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'NO_MERCHANT_ACCESS',
+          message: '无法确定您的商家账户'
+        },
+        { status: 403 }
+      )
     }
     
     console.log('📤 返回的用户数据:', { 

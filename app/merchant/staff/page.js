@@ -142,12 +142,56 @@ export default function MerchantStaffPage() {
       const result = await response.json()
       
       if (response.ok && result.success) {
-        setScanResult({
-          ticket_id: result.data.ticket_id,
-          status: result.data.status,
-          redeemed_at: result.data.redeemed_at,
-          success: true
+        // Use the verify API to get detailed ticket information
+        const verifyResponse = await fetch('/api/tickets/verify', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            qr_payload: qrData,
+            redeem: false
+          }),
         })
+        
+        const verifyResult = await verifyResponse.json()
+        
+        if (verifyResponse.ok && verifyResult.success) {
+          const { ticket, event, validity } = verifyResult.data
+          
+          // Determine validity status
+          let validityStatus = 'valid'
+          let validityMessage = validity?.message || 'Ticket verification completed'
+          
+          if (!validity?.valid || ticket.status === 'used' || ticket.status === 'refunded' || ticket.status === 'cancelled') {
+            validityStatus = 'invalid'
+            // Update message to be more specific
+            if (ticket.status === 'used') {
+              validityMessage = 'Ticket has already been redeemed'
+            } else if (validity?.status === 'expired') {
+              validityMessage = 'Ticket has expired'
+            } else if (ticket.status === 'refunded' || ticket.status === 'cancelled') {
+              validityMessage = 'Ticket has been cancelled or refunded'
+            }
+          }
+          
+          setScanResult({
+            ticket_id: ticket.short_id || ticket.id,
+            status: ticket.status,
+            redeemed_at: ticket.used_at || result.data.redeemed_at,
+            validity_status: validityStatus,
+            validity_message: validityMessage,
+            success: true
+          })
+        } else {
+          // Fallback to original result if verify API fails
+          setScanResult({
+            ticket_id: result.data.ticket_id,
+            status: result.data.status,
+            redeemed_at: result.data.redeemed_at,
+            success: true
+          })
+        }
         setError('')
       } else {
         const errorCode = result.error || result.code
@@ -287,25 +331,38 @@ export default function MerchantStaffPage() {
             </h2>
             
             <div style={{
-              backgroundColor: 'rgba(16, 185, 129, 0.1)',
-              border: '1px solid #10b981',
+              backgroundColor: scanResult.validity_status === 'invalid' 
+                ? 'rgba(239, 68, 68, 0.1)' 
+                : 'rgba(16, 185, 129, 0.1)',
+              border: `1px solid ${scanResult.validity_status === 'invalid' ? '#ef4444' : '#10b981'}`,
               borderRadius: '8px',
               padding: '16px',
               marginBottom: '16px'
             }}>
               <div style={{
-                color: '#10b981',
+                color: scanResult.validity_status === 'invalid' ? '#ef4444' : '#10b981',
                 fontWeight: '600',
                 marginBottom: '8px'
               }}>
-                ✓ Ticket Redeemed Successfully
+                {scanResult.validity_status === 'invalid' ? '✗ Ticket Invalid' : '✓ Ticket Redeemed Successfully'}
               </div>
+              {scanResult.validity_message && (
+                <div style={{ 
+                  color: scanResult.validity_status === 'invalid' ? '#ef4444' : '#94a3b8', 
+                  fontSize: '0.875rem',
+                  marginBottom: '8px'
+                }}>
+                  {scanResult.validity_message}
+                </div>
+              )}
               <div style={{ color: '#94a3b8', fontSize: '0.875rem' }}>
                 Ticket ID: {scanResult.ticket_id}
               </div>
-              <div style={{ color: '#94a3b8', fontSize: '0.875rem' }}>
-                Redeemed At: {new Date(scanResult.redeemed_at).toLocaleString()}
-              </div>
+              {scanResult.redeemed_at && (
+                <div style={{ color: '#94a3b8', fontSize: '0.875rem' }}>
+                  Redeemed At: {new Date(scanResult.redeemed_at).toLocaleString()}
+                </div>
+              )}
             </div>
 
             <button

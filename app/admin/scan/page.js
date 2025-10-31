@@ -129,12 +129,19 @@ export default function AdminScanPage() {
 
       if (response.ok && result.success) {
         const { ticket, event, validity } = result.data
+        
+        // Determine validity status: invalid if ticket is used, expired, or validity check failed
+        let validityStatus = 'valid'
+        if (!validity.valid || ticket.status === 'used' || ticket.status === 'refunded' || ticket.status === 'cancelled') {
+          validityStatus = 'invalid'
+        }
+        
         setScanResult({
           ticket_id: ticket.short_id || ticket.id,
           ticket_tier: ticket.tier || 'N/A',
           holder_name: ticket.holder_name || 'Unknown',
           event_name: event?.title || 'Unknown Event',
-          validity_status: validity.valid ? 'valid' : 'invalid',
+          validity_status: validityStatus,
           validity_message: validity.message || 'Ticket verification completed'
         })
       } else {

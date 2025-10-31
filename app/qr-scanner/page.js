@@ -336,6 +336,12 @@ export default function QRScannerPage() {
             stopScanning()
           } else {
             // Normal verification result
+            // Determine validity status: invalid if ticket is used, expired, or validity check failed
+            let validityStatus = 'valid'
+            if (!validity?.valid || ticket.status === 'used' || ticket.status === 'refunded' || ticket.status === 'cancelled') {
+              validityStatus = 'invalid'
+            }
+            
             setScanResult({
               ticket_id: ticket.short_id || ticket.id,
               ticket_tier: ticket.tier || 'N/A',
@@ -343,7 +349,7 @@ export default function QRScannerPage() {
               holder_age: ticket.holder_age || null,
               event_name: event?.title || 'Unknown Event',
               event_venue: event?.venue_name || 'N/A',
-              validity_status: (validity?.valid && ticket.status !== 'used') ? 'valid' : 'invalid',
+              validity_status: validityStatus,
               validity_message: validity?.message || 'Ticket verification completed',
               valid_from: validFrom,
               valid_until: validUntil,

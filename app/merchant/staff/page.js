@@ -54,56 +54,85 @@ export default function MerchantStaffPage() {
         return
       }
 
+      // First, set scanning state to true so video element renders
+      setIsScanning(true)
+      
+      // Wait a moment for React to render the video element
+      await new Promise(resolve => setTimeout(resolve, 50))
+      
+      // Now get camera stream
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'environment' }
       })
       
       setStream(stream)
       
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream
-        
-        // Wait for video metadata to load before playing
-        await new Promise((resolve, reject) => {
-          const video = videoRef.current
-          if (!video) {
-            reject(new Error('Video element not found'))
-            return
-          }
-          
-          const onLoadedMetadata = () => {
-            video.removeEventListener('loadedmetadata', onLoadedMetadata)
-            resolve()
-          }
-          
-          const onError = () => {
-            video.removeEventListener('error', onError)
-            reject(new Error('Video failed to load'))
-          }
-          
-          video.addEventListener('loadedmetadata', onLoadedMetadata)
-          video.addEventListener('error', onError)
-          
-          // Set a timeout
-          setTimeout(() => {
-            video.removeEventListener('loadedmetadata', onLoadedMetadata)
-            video.removeEventListener('error', onError)
-            reject(new Error('Video load timeout'))
-          }, 5000)
-        })
-        
-        await videoRef.current.play()
-        setIsScanning(true)
-        
-        // Start QR detection after video is playing
-        setTimeout(() => {
-          startQRDetection()
-        }, 100)
-      } else {
-        setError('Video element not initialized')
+      // Wait for video element to be available
+      let attempts = 0
+      const maxAttempts = 10
+      while (!videoRef.current && attempts < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, 100))
+        attempts++
       }
+      
+      if (!videoRef.current) {
+        setStream(null)
+        setIsScanning(false)
+        setError('Video element not initialized. Please try again.')
+        return
+      }
+      
+      const video = videoRef.current
+      video.srcObject = stream
+      
+      // Wait for video metadata to load before playing
+      await new Promise((resolve, reject) => {
+        const onLoadedMetadata = () => {
+          video.removeEventListener('loadedmetadata', onLoadedMetadata)
+          video.removeEventListener('error', onError)
+          resolve()
+        }
+        
+        const onError = (err) => {
+          video.removeEventListener('loadedmetadata', onLoadedMetadata)
+          video.removeEventListener('error', onError)
+          reject(new Error('Video failed to load'))
+        }
+        
+        video.addEventListener('loadedmetadata', onLoadedMetadata)
+        video.addEventListener('error', onError)
+        
+        // Set a timeout
+        setTimeout(() => {
+          video.removeEventListener('loadedmetadata', onLoadedMetadata)
+          video.removeEventListener('error', onError)
+          reject(new Error('Video load timeout'))
+        }, 5000)
+      })
+      
+      try {
+        await video.play()
+      } catch (playError) {
+        console.error('Video play error:', playError)
+        // Try again with user interaction
+        throw new Error('Video playback failed. Please click Start Scanning again.')
+      }
+      
+      // Start QR detection after video is playing
+      setTimeout(() => {
+        startQRDetection()
+      }, 200)
     } catch (err) {
       console.error('Camera error:', err)
+      
+      // Clean up on error
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop())
+        setStream(null)
+      }
+      setIsScanning(false)
+      
+      // Set specific error messages
       if (err.name === 'NotAllowedError') {
         setError('Camera access denied. Please allow camera permission and try again.')
       } else if (err.name === 'NotFoundError') {
@@ -345,11 +374,20 @@ export default function MerchantStaffPage() {
                   maxWidth: '600px',
                   borderRadius: '8px',
                   marginBottom: '16px',
-                  display: 'block'
+                  display: 'block',
+                  backgroundColor: '#000'
                 }}
                 playsInline
                 autoPlay
                 muted
+                onLoadedMetadata={() => {
+                  console.log('Video metadata loaded')
+                  if (videoRef.current) {
+                    videoRef.current.play().catch(err => {
+                      console.error('Auto-play failed:', err)
+                    })
+                  }
+                }}
               />
               <canvas 
                 ref={canvasRef} 

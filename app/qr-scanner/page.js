@@ -15,8 +15,12 @@ export default function QRScannerPage() {
   const [loading, setLoading] = useState(false)
   const [stream, setStream] = useState(null)
   const scanIntervalRef = useRef(null)
+  const [permissionStatus, setPermissionStatus] = useState(null)
 
   useEffect(() => {
+    // Check permission status on mount
+    checkPermissionStatus()
+    
     return () => {
       if (stream) {
         stream.getTracks().forEach(track => track.stop())
@@ -26,6 +30,35 @@ export default function QRScannerPage() {
       }
     }
   }, [stream])
+
+  // Monitor permission changes
+  useEffect(() => {
+    if (permissionStatus === 'granted' && error.includes('Unable to access camera')) {
+      // Permission was granted, clear error and try again
+      setError('')
+      setTimeout(() => {
+        startScanning()
+      }, 500)
+    }
+  }, [permissionStatus])
+
+  const checkPermissionStatus = async () => {
+    try {
+      // Use Permissions API if available
+      if ('permissions' in navigator && 'query' in navigator.permissions) {
+        const result = await navigator.permissions.query({ name: 'camera' })
+        setPermissionStatus(result.state)
+        
+        // Listen for permission changes
+        result.onchange = () => {
+          setPermissionStatus(result.state)
+        }
+      }
+    } catch (err) {
+      // Permissions API might not be fully supported, ignore
+      console.debug('Permission API not available:', err)
+    }
+  }
 
   // Auto-scan when camera is active
   useEffect(() => {
@@ -125,11 +158,19 @@ export default function QRScannerPage() {
         
         setIsScanning(true)
       } catch (permissionError) {
+        // Update permission status
+        await checkPermissionStatus()
+        
         // Handle specific permission errors
         let errorMessage = 'Unable to access camera. '
         
         if (permissionError.name === 'NotAllowedError' || permissionError.name === 'PermissionDeniedError') {
-          errorMessage += 'Please allow camera access in your browser settings. On mobile: Settings > Browser > Camera permissions.'
+          // Check if permission was actually denied or just not granted yet
+          if (permissionStatus === 'prompt') {
+            errorMessage += 'Please allow camera access when prompted. If you already granted permission, try refreshing the page.'
+          } else {
+            errorMessage += 'Camera permission was denied. Please enable it in your browser settings. On mobile: Settings > Browser > Camera permissions, then refresh this page.'
+          }
         } else if (permissionError.name === 'NotFoundError' || permissionError.name === 'DevicesNotFoundError') {
           errorMessage += 'No camera found. Please ensure your device has a camera.'
         } else if (permissionError.name === 'NotReadableError' || permissionError.name === 'TrackStartError') {
@@ -148,16 +189,18 @@ export default function QRScannerPage() {
               }
             }
             setIsScanning(true)
+            setError('') // Clear error on success
             return
           } catch (fallbackError) {
             errorMessage = 'Unable to access camera with any settings. Please check your device permissions.'
           }
         } else {
-          errorMessage += `Error: ${permissionError.message || 'Unknown error'}`
+          errorMessage += `Error: ${permissionError.message || permissionError.name || 'Unknown error'}`
         }
         
         setError(errorMessage)
         console.error('Camera access error:', permissionError)
+        console.error('Permission status:', permissionStatus)
       }
     } catch (err) {
       setError('Unexpected error while accessing camera. Please try again or use manual input.')
@@ -585,17 +628,50 @@ export default function QRScannerPage() {
                 <div style={{ color: '#fca5a5', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem' }}>
                   Camera Access Error
                 </div>
-                <div style={{ color: '#fca5a5', fontSize: '0.875rem', lineHeight: '1.5' }}>
+                <div style={{ color: '#fca5a5', fontSize: '0.875rem', lineHeight: '1.5', marginBottom: '1rem' }}>
                   {error}
                 </div>
-                <div style={{ color: '#fca5a5', fontSize: '0.75rem', marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid rgba(239, 68, 68, 0.3)' }}>
-                  <strong>Mobile Instructions:</strong><br />
-                  1. Open your device Settings<br />
-                  2. Go to Browser/App Permissions<br />
-                  3. Enable Camera permission<br />
-                  4. Refresh this page and try again<br />
+                
+                {/* Retry button */}
+                <div style={{ marginBottom: '0.75rem' }}>
+                  <button
+                    onClick={() => {
+                      setError('')
+                      checkPermissionStatus()
+                      setTimeout(() => startScanning(), 300)
+                    }}
+                    style={{
+                      padding: '0.5rem 1rem',
+                      backgroundColor: '#7c3aed',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '0.375rem',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = '#6d28d9'
+                      e.target.style.transform = 'scale(1.02)'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = '#7c3aed'
+                      e.target.style.transform = 'scale(1)'
+                    }}
+                  >
+                    🔄 Retry Camera Access
+                  </button>
+                </div>
+                
+                <div style={{ color: '#fca5a5', fontSize: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid rgba(239, 68, 68, 0.3)' }}>
+                  <strong>If permission is already granted:</strong><br />
+                  1. Make sure you're on HTTPS (not HTTP)<br />
+                  2. Try refreshing this page<br />
+                  3. Close and reopen the browser tab<br />
+                  4. Check if other apps are using the camera<br />
                   <br />
-                  You can also use the manual input below to enter the ticket code directly.
+                  <strong>Or use manual input:</strong> Enter the ticket code below instead.
                 </div>
               </div>
             </div>

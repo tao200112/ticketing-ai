@@ -10,25 +10,25 @@ export async function POST(request) {
     const body = await request.json()
     const { email, password } = body
 
-    // 验证必需字段
+    // Validate required fields
     if (!email || !password) {
       return NextResponse.json(
         {
           success: false,
           error: 'MISSING_FIELDS',
-          message: '缺少必需字段'
+          message: 'Email and password are required'
         },
         { status: 400 }
       )
     }
 
-    // 如果没有配置 Supabase，返回配置错误
+    // If Supabase is not configured, return configuration error
     if (!supabaseUrl || !supabaseKey) {
       return NextResponse.json(
         {
           success: false,
           error: 'CONFIG_ERROR',
-          message: '系统未配置 Supabase，无法登录'
+          message: 'Supabase is not configured, login is not available'
         },
         { status: 500 }
       )
@@ -36,7 +36,7 @@ export async function POST(request) {
 
     const supabase = createClient(supabaseUrl, supabaseKey)
 
-    // 查找商家用户
+    // Find merchant user
     const { data: user, error } = await supabase
       .from('users')
       .select('*')
@@ -44,50 +44,50 @@ export async function POST(request) {
       .eq('role', 'merchant')
       .single()
 
-    console.log('🔍 查询用户结果:', { user, error })
+    console.log('🔍 Query user result:', { user, error })
 
     if (error || !user) {
-      console.log('❌ 未找到商家用户或查询错误:', error)
+      console.log('❌ Merchant user not found or query error:', error)
       return NextResponse.json(
         {
           success: false,
           error: 'INVALID_CREDENTIALS',
-          message: '邮箱或密码错误'
+          message: 'Invalid email or password'
         },
         { status: 401 }
       )
     }
 
-    // 验证密码
+    // Validate password
     if (!user.password_hash) {
-      console.log('❌ 用户没有密码哈希')
+      console.log('❌ User has no password hash')
       return NextResponse.json(
         {
           success: false,
           error: 'INVALID_CREDENTIALS',
-          message: '邮箱或密码错误'
+          message: 'Invalid email or password'
         },
         { status: 401 }
       )
     }
     
-    console.log('🔑 验证密码:', { password: password.substring(0, 2) + '***', hash: user.password_hash?.substring(0, 20) + '...' })
+    console.log('🔑 Verifying password...')
     const isValidPassword = await bcrypt.compare(password, user.password_hash)
-    console.log('✅ 密码验证结果:', isValidPassword)
+    console.log('✅ Password verification result:', isValidPassword)
     
     if (!isValidPassword) {
-      console.log('❌ 密码验证失败')
+      console.log('❌ Password verification failed')
       return NextResponse.json(
         {
           success: false,
           error: 'INVALID_CREDENTIALS',
-          message: '邮箱或密码错误'
+          message: 'Invalid email or password'
         },
         { status: 401 }
       )
     }
 
-    // 获取商家信息（先尝试作为owner）
+    // Get merchant information (try as owner first)
     let merchant = null
     let merchantId = null
     
@@ -100,9 +100,9 @@ export async function POST(request) {
     if (!merchantError && ownerMerchant) {
       merchant = ownerMerchant
       merchantId = ownerMerchant.id
-      console.log('🏪 找到商家（owner）:', merchant.id)
+      console.log('🏪 Found merchant (owner):', merchant.id)
     } else {
-      // 如果不是owner，尝试作为员工查找
+      // If not owner, try to find as staff
       const { data: member, error: memberError } = await supabase
         .from('merchant_members')
         .select('merchant_id')
@@ -111,7 +111,7 @@ export async function POST(request) {
       
       if (!memberError && member) {
         merchantId = member.merchant_id
-        // 获取员工所属的商家信息
+        // Get merchant information for staff
         const { data: memberMerchant } = await supabase
           .from('merchants')
           .select('*')
@@ -120,22 +120,22 @@ export async function POST(request) {
         
         if (memberMerchant) {
           merchant = memberMerchant
-          console.log('🏪 找到商家（员工）:', merchant.id)
+          console.log('🏪 Found merchant (staff):', merchant.id)
         }
       }
     }
     
-    // 如果既不是owner也不是员工，尝试自动创建商家记录（向后兼容）
+    // If neither owner nor staff, try to auto-create merchant record (backward compatibility)
     if (!merchant && !merchantId) {
-      console.log('⚠️ 用户没有关联的商家，尝试自动创建...')
+      console.log('⚠️ User has no merchant association, attempting auto-create...')
       
-      // 自动为merchant用户创建商家记录（仅作为owner）
+      // Auto-create merchant record for merchant user (as owner)
       const { data: autoMerchant, error: createError } = await supabase
         .from('merchants')
         .insert([{
           owner_user_id: user.id,
-          name: user.name || '未命名商家',
-          description: '自动创建的商家账户',
+          name: user.name || 'Unnamed Merchant',
+          description: 'Auto-created merchant account',
           contact_email: user.email,
           verified: false,
           status: 'active'
@@ -146,35 +146,35 @@ export async function POST(request) {
       if (!createError && autoMerchant) {
         merchant = autoMerchant
         merchantId = autoMerchant.id
-        console.log('✅ 自动创建商家记录:', merchant.id)
+        console.log('✅ Auto-created merchant record:', merchant.id)
       } else {
-        console.log('❌ 无法自动创建商家记录:', createError)
+        console.log('❌ Failed to auto-create merchant record:', createError)
         return NextResponse.json(
           {
             success: false,
             error: 'NO_MERCHANT_ACCESS',
-            message: '您没有关联的商家账户，请联系管理员'
+            message: 'You do not have a merchant account associated. Please contact administrator'
           },
           { status: 403 }
         )
       }
     }
 
-    // 移除密码字段
+    // Remove password field
     delete user.password_hash
 
-    // 构造返回数据
-    // 注意：不区分boss/staff角色，所有商家用户登录后都能访问Staff和Boss页面
-    // Boss页面通过第二重密码（boss123）验证
+    // Construct return data
+    // Note: All merchant users can access Staff and Boss pages after login
+    // Boss page requires second-factor password (boss123) verification
     const finalMerchantId = merchant?.id || merchantId
     const userData = {
       ...user,
       merchant_id: finalMerchantId,
       merchant: merchant || null,
-      merchant_role: 'boss' // 默认设置为boss，但不用于页面访问控制
+      merchant_role: 'boss' // Default to boss, but not used for page access control
     }
     
-    console.log('📤 返回的用户数据:', { 
+    console.log('📤 Returning user data:', { 
       id: userData.id, 
       merchant_id: userData.merchant_id, 
       merchant_role: userData.merchant_role,
@@ -183,17 +183,17 @@ export async function POST(request) {
 
     return NextResponse.json({
       success: true,
-      message: '登录成功',
+      message: 'Login successful',
       user: userData
     })
 
   } catch (error) {
-    console.error('❌ API 错误:', error)
+    console.error('❌ API error:', error)
     return NextResponse.json(
       {
         success: false,
         error: 'INTERNAL_ERROR',
-        message: '服务器内部错误'
+        message: 'Internal server error'
       },
       { status: 500 }
     )

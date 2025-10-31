@@ -20,10 +20,10 @@ export default function InviteCodesPage() {
       if (data.success) {
         setInviteCodes(data.inviteCodes || [])
       } else {
-        setError(data.error || '获取邀请码失败')
+        setError(data.error || 'Failed to fetch invite codes')
       }
     } catch (err) {
-      setError('网络错误: ' + err.message)
+      setError('Network error: ' + err.message)
     } finally {
       setLoading(false)
     }
@@ -45,20 +45,20 @@ export default function InviteCodesPage() {
       const data = await response.json()
       
       if (data.success) {
-        // 重新获取邀请码列表
+        // Refresh invite codes list
         await fetchInviteCodes()
-        alert('邀请码生成成功!')
+        alert('Invite code generated successfully!')
       } else {
-        alert('生成失败: ' + (data.error || '未知错误'))
+        alert('Generation failed: ' + (data.error || 'Unknown error'))
       }
     } catch (err) {
-      alert('生成邀请码时出错: ' + err.message)
+      alert('Error generating invite code: ' + err.message)
     }
   }
 
   const formatDate = (dateString) => {
-    if (!dateString) return '未知'
-    return new Date(dateString).toLocaleString('zh-CN')
+    if (!dateString) return 'Unknown'
+    return new Date(dateString).toLocaleString()
   }
 
   const isExpired = (expiresAt) => {
@@ -75,7 +75,7 @@ export default function InviteCodesPage() {
         alignItems: 'center',
         justifyContent: 'center'
       }}>
-        <div style={{ color: 'white', fontSize: '1.5rem' }}>加载中...</div>
+        <div style={{ color: 'white', fontSize: '1.5rem' }}>Loading...</div>
       </div>
     )
   }
@@ -87,7 +87,7 @@ export default function InviteCodesPage() {
       padding: '2rem'
     }}>
       <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-        {/* 页面标题 */}
+        {/* Page Title */}
         <div style={{ marginBottom: '2rem' }}>
           <h1 style={{ 
             fontSize: '2.5rem', 
@@ -95,18 +95,18 @@ export default function InviteCodesPage() {
             color: 'white', 
             marginBottom: '0.5rem' 
           }}>
-            商家邀请码管理
+            Merchant Invite Code Management
           </h1>
           <p style={{ 
             fontSize: '1.125rem', 
             color: '#94a3b8',
             margin: 0 
           }}>
-            管理商家注册邀请码，控制平台访问权限
+            Manage merchant registration invite codes and control platform access
           </p>
         </div>
 
-        {/* 操作按钮 */}
+        {/* Action Buttons */}
         <div style={{ 
           display: 'flex', 
           gap: '1rem', 
@@ -129,7 +129,7 @@ export default function InviteCodesPage() {
             onMouseEnter={(e) => e.target.style.backgroundColor = '#059669'}
             onMouseLeave={(e) => e.target.style.backgroundColor = '#10b981'}
           >
-            ➕ 生成新邀请码
+            ➕ Generate New Invite Code
           </button>
           
           <button
@@ -148,11 +148,11 @@ export default function InviteCodesPage() {
             onMouseEnter={(e) => e.target.style.backgroundColor = '#2563eb'}
             onMouseLeave={(e) => e.target.style.backgroundColor = '#3b82f6'}
           >
-            🔄 刷新列表
+            🔄 Refresh List
           </button>
         </div>
 
-        {/* 错误信息 */}
+        {/* Error Message */}
         {error && (
           <div style={{
             backgroundColor: '#fef2f2',
@@ -166,7 +166,7 @@ export default function InviteCodesPage() {
           </div>
         )}
 
-        {/* 邀请码列表 */}
+        {/* Invite Codes List */}
         <div style={{
           backgroundColor: 'rgba(15, 23, 42, 0.8)',
           borderRadius: '16px',
@@ -179,7 +179,7 @@ export default function InviteCodesPage() {
             color: 'white', 
             marginBottom: '1.5rem' 
           }}>
-            邀请码列表 ({inviteCodes.length} 个)
+            Invite Code List ({inviteCodes.length})
           </h2>
 
           {inviteCodes.length === 0 ? (
@@ -189,9 +189,9 @@ export default function InviteCodesPage() {
               color: '#94a3b8'
             }}>
               <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📝</div>
-              <div style={{ fontSize: '1.125rem' }}>暂无邀请码</div>
+              <div style={{ fontSize: '1.125rem' }}>No invite codes yet</div>
               <div style={{ fontSize: '0.875rem', marginTop: '0.5rem' }}>
-                点击上方按钮生成第一个邀请码
+                Click the button above to generate your first invite code
               </div>
             </div>
           ) : (
@@ -226,7 +226,7 @@ export default function InviteCodesPage() {
                         fontSize: '0.875rem',
                         fontWeight: '500'
                       }}>
-                        {code.is_active ? '✅ 活跃' : '❌ 已停用'}
+                        {code.is_active ? '✅ Active' : '❌ Disabled'}
                       </div>
                       
                       {isExpired(code.expires_at) && (
@@ -238,7 +238,7 @@ export default function InviteCodesPage() {
                           fontSize: '0.875rem',
                           fontWeight: '500'
                         }}>
-                          ⏰ 已过期
+                          ⏰ Expired
                         </div>
                       )}
                     </div>
@@ -260,15 +260,15 @@ export default function InviteCodesPage() {
                       flexDirection: 'column',
                       gap: '0.25rem'
                     }}>
-                      <div>最大活动数: {code.max_events || '无限制'}</div>
-                      <div>创建时间: {formatDate(code.created_at)}</div>
-                      <div>过期时间: {formatDate(code.expires_at) || '永不过期'}</div>
-                      <div>创建者: {code.created_by || '未知'}</div>
+                      <div>Max Events: {code.max_events || 'Unlimited'}</div>
+                      <div>Created At: {formatDate(code.created_at)}</div>
+                      <div>Expires At: {formatDate(code.expires_at) || 'Never'}</div>
+                      <div>Created By: {code.created_by || 'Unknown'}</div>
                       {code.used_by && (
-                        <div>使用者: {code.used_by}</div>
+                        <div>Used By: {code.used_by}</div>
                       )}
                       {code.used_at && (
-                        <div>使用时间: {formatDate(code.used_at)}</div>
+                        <div>Used At: {formatDate(code.used_at)}</div>
                       )}
                     </div>
                   </div>
@@ -282,7 +282,7 @@ export default function InviteCodesPage() {
                     <button
                       onClick={() => {
                         navigator.clipboard.writeText(code.code)
-                        alert('邀请码已复制到剪贴板!')
+                        alert('Invite code copied to clipboard!')
                       }}
                       style={{
                         backgroundColor: '#7c3aed',
@@ -297,7 +297,7 @@ export default function InviteCodesPage() {
                       onMouseEnter={(e) => e.target.style.backgroundColor = '#6d28d9'}
                       onMouseLeave={(e) => e.target.style.backgroundColor = '#7c3aed'}
                     >
-                      📋 复制
+                      📋 Copy
                     </button>
                   </div>
                 </div>

@@ -153,8 +153,8 @@ export default function MerchantStaffPage() {
         const errorCode = result.error || result.code
         let errorMessage = result.message || 'Ticket verification failed'
         
-        if (errorCode === 'NOT_YOUR_MERCHANT_TICKET' || errorMessage.includes('不是你们店的票')) {
-          errorMessage = '不是你们店的票'
+        if (errorCode === 'NOT_YOUR_MERCHANT_TICKET' || errorMessage.includes('Not your merchant')) {
+          errorMessage = 'This ticket does not belong to your merchant'
         }
         
         setError(errorMessage)
@@ -192,7 +192,7 @@ export default function MerchantStaffPage() {
           marginBottom: '24px',
           textAlign: 'center'
         }}>
-          员工扫码验票
+          Staff Ticket Scanner
         </h1>
 
         {/* Scanner Area */}
@@ -219,7 +219,7 @@ export default function MerchantStaffPage() {
                   marginBottom: '16px'
                 }}
               >
-                开始扫码
+                Start Scanning
               </button>
             </div>
           ) : (
@@ -249,7 +249,7 @@ export default function MerchantStaffPage() {
                   cursor: 'pointer'
                 }}
               >
-                停止扫码
+                Stop Scanning
               </button>
             </div>
           )}
@@ -283,7 +283,7 @@ export default function MerchantStaffPage() {
               color: 'white',
               marginBottom: '16px'
             }}>
-              核销结果
+              Redemption Result
             </h2>
             
             <div style={{
@@ -298,13 +298,13 @@ export default function MerchantStaffPage() {
                 fontWeight: '600',
                 marginBottom: '8px'
               }}>
-                ✓ 票券核销成功
+                ✓ Ticket Redeemed Successfully
               </div>
               <div style={{ color: '#94a3b8', fontSize: '0.875rem' }}>
-                票券ID: {scanResult.ticket_id}
+                Ticket ID: {scanResult.ticket_id}
               </div>
               <div style={{ color: '#94a3b8', fontSize: '0.875rem' }}>
-                核销时间: {new Date(scanResult.redeemed_at).toLocaleString('zh-CN')}
+                Redeemed At: {new Date(scanResult.redeemed_at).toLocaleString()}
               </div>
             </div>
 
@@ -322,7 +322,7 @@ export default function MerchantStaffPage() {
                 cursor: 'pointer'
               }}
             >
-              继续扫码
+              Continue Scanning
             </button>
           </div>
         )}

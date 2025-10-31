@@ -322,7 +322,7 @@ export default function QRScannerPage() {
               event_name: event?.title || 'Unknown Event',
               event_venue: event?.venue_name || 'N/A',
               validity_status: 'redeemed',
-              validity_message: '✅ 票券已成功核销',
+              validity_message: '✅ Ticket redeemed successfully',
               valid_from: validFrom,
               valid_until: validUntil,
               verification_count: ticket.verification_count || 1,
@@ -362,9 +362,9 @@ export default function QRScannerPage() {
           console.error('Error parsing response data:', parseError)
           if (redeem) {
             // If redeem was requested, assume success if we got a 200 response
-            setError('核销成功，但页面更新时出现错误。请刷新页面查看状态。')
+            setError('Redemption successful, but page update failed. Please refresh to check status.')
           } else {
-            setError('处理验证结果时出错，请重试')
+            setError('Error processing verification result, please try again')
           }
         }
       } else {
@@ -373,8 +373,8 @@ export default function QRScannerPage() {
         let errorMessage = result.message || result.error || 'Ticket verification failed'
         
         // Show Chinese message for "not your merchant ticket" error
-        if (errorCode === 'NOT_YOUR_MERCHANT_TICKET' || errorMessage.includes('不是你们店的票')) {
-          errorMessage = '不是你们店的票'
+        if (errorCode === 'NOT_YOUR_MERCHANT_TICKET' || errorMessage.includes('not your merchant')) {
+          errorMessage = 'This ticket does not belong to your merchant'
         }
         
         setError(errorMessage)
@@ -854,9 +854,9 @@ export default function QRScannerPage() {
                   fontWeight: '600',
                   fontSize: '0.875rem'
                 }}>
-                  {scanResult.validity_status === 'redeemed' ? '✅ 票券已核销' :
-                   scanResult.validity_status === 'valid' ? '✓ 票券有效' : 
-                   '✗ 票券无效'}
+                  {scanResult.validity_status === 'redeemed' ? '✅ Ticket Redeemed' :
+                   scanResult.validity_status === 'valid' ? '✓ Ticket Valid' : 
+                   '✗ Ticket Invalid'}
                 </span>
               </div>
               {scanResult.validity_message && (
@@ -908,10 +908,10 @@ export default function QRScannerPage() {
                     <svg style={{ width: '1.25rem', height: '1.25rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    {loading ? '核销中...' : '核销票券'}
+                    {loading ? 'Redeeming...' : 'Redeem Ticket'}
                   </button>
                   <p style={{ color: '#94a3b8', fontSize: '0.75rem', marginTop: '0.5rem', textAlign: 'center' }}>
-                    点击核销后，票券将被标记为已使用，无法再次使用
+                    After redemption, the ticket will be marked as used and cannot be used again
                   </p>
                 </div>
               )}

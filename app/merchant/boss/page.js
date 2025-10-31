@@ -54,7 +54,7 @@ export default function MerchantBossPage() {
       sessionStorage.setItem('bossVerified', 'true')
       loadStats()
     } else {
-      setPasswordError('密码错误，请重试')
+      setPasswordError('Incorrect password, please try again')
       setBossPassword('')
     }
   }
@@ -147,7 +147,7 @@ export default function MerchantBossPage() {
             marginBottom: '8px',
             textAlign: 'center'
           }}>
-            Boss 管理后台
+            Boss Management
           </h2>
           <p style={{
             color: '#94a3b8',
@@ -155,7 +155,7 @@ export default function MerchantBossPage() {
             textAlign: 'center',
             fontSize: '0.875rem'
           }}>
-            请输入密码以访问完整功能
+            Please enter password to access full features
           </p>
           
           <form onSubmit={handleBossPasswordSubmit}>
@@ -164,7 +164,7 @@ export default function MerchantBossPage() {
                 type="password"
                 value={bossPassword}
                 onChange={(e) => setBossPassword(e.target.value)}
-                placeholder="请输入管理密码"
+                placeholder="Enter management password"
                 style={{
                   width: '100%',
                   padding: '12px 16px',
@@ -206,7 +206,7 @@ export default function MerchantBossPage() {
               onMouseEnter={(e) => e.target.style.transform = 'scale(1.02)'}
               onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
             >
-              验证
+              Verify
             </button>
           </form>
         </div>
@@ -225,7 +225,7 @@ export default function MerchantBossPage() {
         justifyContent: 'center'
       }}>
         <MerchantNavbar userRole={userRole} />
-        <div style={{ color: 'white', fontSize: '1.25rem' }}>加载中...</div>
+        <div style={{ color: 'white', fontSize: '1.25rem' }}>Loading...</div>
       </div>
     )
   }
@@ -275,30 +275,30 @@ export default function MerchantBossPage() {
 
   const statCards = [
     {
-      title: '今日售票',
+      title: 'Tickets Sold Today',
       value: stats?.todaySold || 0,
-      subtitle: '张',
+      subtitle: 'tickets',
       icon: '🎫',
       color: '#22c55e'
     },
     {
-      title: '今日验票',
+      title: 'Verified Today',
       value: stats?.todayVerified || 0,
-      subtitle: '张',
+      subtitle: 'tickets',
       icon: '✅',
       color: '#3b82f6'
     },
     {
-      title: '今日收入',
-      value: `¥${(stats?.totalRevenue || 0).toLocaleString()}`,
-      subtitle: '元',
+      title: 'Revenue Today',
+      value: `$${(stats?.totalRevenue || 0).toLocaleString()}`,
+      subtitle: 'USD',
       icon: '💰',
       color: '#eab308'
     },
     {
-      title: '低库存提醒',
+      title: 'Low Stock Alerts',
       value: stats?.lowStockAlerts || 0,
-      subtitle: '个活动',
+      subtitle: 'events',
       icon: '⚠️',
       color: '#f97316'
     }
@@ -319,12 +319,12 @@ export default function MerchantBossPage() {
             color: 'white',
             marginBottom: '8px'
           }}>
-            Boss 管理后台
+            Boss Management
           </h1>
-          <p style={{ color: '#94a3b8' }}>查看和管理您的活动数据</p>
+          <p style={{ color: '#94a3b8' }}>View and manage your event data</p>
         </div>
 
-        {/* 统计卡片 */}
+        {/* Statistics Cards */}
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
@@ -368,7 +368,7 @@ export default function MerchantBossPage() {
           ))}
         </div>
 
-        {/* 快速操作 */}
+        {/* Quick Actions */}
         <div style={{
           background: 'rgba(15, 23, 42, 0.6)',
           border: '1px solid rgba(255, 255, 255, 0.1)',
@@ -381,7 +381,7 @@ export default function MerchantBossPage() {
             color: 'white',
             marginBottom: '24px'
           }}>
-            快速操作
+            Quick Actions
           </h2>
           <div style={{
             display: 'grid',
@@ -408,10 +408,10 @@ export default function MerchantBossPage() {
               >
                 <div style={{ fontSize: '2rem', marginBottom: '12px' }}>📅</div>
                 <h3 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: 'white', marginBottom: '4px' }}>
-                  活动管理
+                  Event Management
                 </h3>
                 <p style={{ color: '#94a3b8', fontSize: '0.875rem' }}>
-                  查看和编辑活动
+                  View and edit events
                 </p>
               </div>
             </Link>
@@ -436,10 +436,10 @@ export default function MerchantBossPage() {
               >
                 <div style={{ fontSize: '2rem', marginBottom: '12px' }}>📊</div>
                 <h3 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: 'white', marginBottom: '4px' }}>
-                  流水记录
+                  Revenue
                 </h3>
                 <p style={{ color: '#94a3b8', fontSize: '0.875rem' }}>
-                  查看所有订单和收入
+                  View all orders and revenue
                 </p>
               </div>
             </Link>
@@ -464,10 +464,10 @@ export default function MerchantBossPage() {
               >
                 <div style={{ fontSize: '2rem', marginBottom: '12px' }}>📱</div>
                 <h3 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: 'white', marginBottom: '4px' }}>
-                  扫码验票
+                  Scan Tickets
                 </h3>
                 <p style={{ color: '#94a3b8', fontSize: '0.875rem' }}>
-                  核销和管理票券
+                  Redeem and manage tickets
                 </p>
               </div>
             </Link>

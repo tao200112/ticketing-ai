@@ -152,8 +152,8 @@ export default function MerchantScanPage() {
         let errorMessage = result.message || 'Ticket verification failed'
         
         // Show Chinese message for "not your merchant ticket" error
-        if (errorCode === 'NOT_YOUR_MERCHANT_TICKET' || errorMessage.includes('不是你们店的票')) {
-          errorMessage = '不是你们店的票'
+        if (errorCode === 'NOT_YOUR_MERCHANT_TICKET' || errorMessage.includes('not your merchant')) {
+          errorMessage = 'This ticket does not belong to your merchant'
         }
         
         showToast(errorMessage, 'error')

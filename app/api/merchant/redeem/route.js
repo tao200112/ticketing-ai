@@ -144,7 +144,7 @@ export async function POST(request) {
       })
       throw ErrorHandler.authorizationError(
         'NOT_YOUR_MERCHANT_TICKET',
-        '不是你们店的票'
+        'This ticket does not belong to your merchant'
       )
     }
 

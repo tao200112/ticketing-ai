@@ -64,14 +64,14 @@ export default function MerchantOverviewPage() {
               color: 'white',
               marginBottom: '16px'
             }}>
-              商家控制台
+              Merchant Console
             </h1>
             <p style={{
               color: '#94a3b8',
               marginBottom: '48px',
               fontSize: '1.125rem'
             }}>
-              请选择访问模式
+              Please select access mode
             </p>
             
             <div style={{
@@ -120,19 +120,19 @@ export default function MerchantOverviewPage() {
                   color: 'white',
                   marginBottom: '12px'
                 }}>
-                  Staff（员工）
+                  Staff
                 </h2>
                 <p style={{
                   color: '#94a3b8',
                   marginBottom: '24px'
                 }}>
-                  扫码验票功能
+                  Scan and verify tickets
                 </p>
                 <div style={{
                   color: '#ec4899',
                   fontWeight: '500'
                 }}>
-                  直接进入 →
+                  Direct Access →
                 </div>
               </div>
               
@@ -175,19 +175,19 @@ export default function MerchantOverviewPage() {
                   color: 'white',
                   marginBottom: '12px'
                 }}>
-                  Boss（老板）
+                  Boss
                 </h2>
                 <p style={{
                   color: '#94a3b8',
                   marginBottom: '24px'
                 }}>
-                  完整管理功能<br/>（需密码验证）
+                  Full Management<br/>(Password Required)
                 </p>
                 <div style={{
                   color: '#7c3aed',
                   fontWeight: '500'
                 }}>
-                  密码验证进入 →
+                  Verify Password →
                 </div>
               </div>
             </div>

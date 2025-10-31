@@ -245,17 +245,25 @@ export default function MerchantStaffPage() {
             return
           }
           
-          // Try to detect QR code
-          let code
+          // Try to detect QR code with multiple attempts
+          let code = null
           try {
+            // First attempt: normal scan
             code = jsQR(imageData.data, imageData.width, imageData.height, {
-              inversionAttempts: 'dontInvert'
+              inversionAttempts: 'attemptBoth'
             })
-          } catch (qrError) {
-            if (frameCount % 25 === 0) {
-              setDebugInfo(`QR scan error: ${qrError.message}`)
+            
+            // If not found, try with different options
+            if (!code) {
+              code = jsQR(imageData.data, imageData.width, imageData.height, {
+                inversionAttempts: 'onlyInvert'
+              })
             }
-            return
+          } catch (qrError) {
+            // QR scan errors are usually fine, just continue
+            if (frameCount % 25 === 0) {
+              setDebugInfo(`Scanning... Frame ${frameCount}. QR scan active.`)
+            }
           }
 
           if (code && code.data) {
@@ -270,9 +278,11 @@ export default function MerchantStaffPage() {
             setScannedCode(code.data)
             stopScanning()
             verifyTicket(code.data)
-          } else if (frameCount % 25 === 0) {
-            // Update debug info to show we're actively scanning
-            setDebugInfo(`Scanning... Frame ${frameCount}. No QR detected yet.`)
+          } else {
+            // Show we're scanning even when no QR is found
+            if (frameCount % 25 === 0) {
+              setDebugInfo(`Scanning... Frame ${frameCount}. Point camera at QR code.`)
+            }
           }
         } catch (err) {
           // Log errors but don't stop scanning
@@ -460,28 +470,53 @@ export default function MerchantStaffPage() {
             </div>
           ) : (
             <div>
-              <video
-                ref={videoRef}
-                style={{
-                  width: '100%',
-                  maxWidth: '600px',
-                  borderRadius: '8px',
-                  marginBottom: '16px',
-                  display: 'block',
-                  backgroundColor: '#000'
-                }}
-                playsInline
-                autoPlay
-                muted
-                onLoadedMetadata={() => {
-                  console.log('Video metadata loaded')
-                  if (videoRef.current) {
-                    videoRef.current.play().catch(err => {
-                      console.error('Auto-play failed:', err)
+              <div style={{ position: 'relative', marginBottom: '16px' }}>
+                <video
+                  ref={videoRef}
+                  style={{
+                    width: '100%',
+                    maxWidth: '600px',
+                    borderRadius: '8px',
+                    display: 'block',
+                    backgroundColor: '#000',
+                    minHeight: '300px'
+                  }}
+                  playsInline
+                  autoPlay
+                  muted
+                  onLoadedMetadata={() => {
+                    console.log('Video metadata loaded', {
+                      width: videoRef.current?.videoWidth,
+                      height: videoRef.current?.videoHeight,
+                      readyState: videoRef.current?.readyState
                     })
-                  }
-                }}
-              />
+                    if (videoRef.current) {
+                      videoRef.current.play().catch(err => {
+                        console.error('Auto-play failed:', err)
+                      })
+                    }
+                  }}
+                  onPlay={() => {
+                    console.log('Video started playing')
+                    setDebugInfo('Camera active. Scanning for QR codes...')
+                  }}
+                />
+                {/* Scanning overlay indicator */}
+                <div style={{
+                  position: 'absolute',
+                  top: '10px',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  background: 'rgba(0, 0, 0, 0.7)',
+                  color: 'white',
+                  padding: '8px 16px',
+                  borderRadius: '20px',
+                  fontSize: '0.875rem',
+                  fontWeight: '500'
+                }}>
+                  🔍 Scanning...
+                </div>
+              </div>
               <canvas 
                 ref={canvasRef} 
                 style={{ display: 'none' }}

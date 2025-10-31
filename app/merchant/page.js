@@ -12,6 +12,9 @@ export default function MerchantOverviewPage() {
   const [error, setError] = useState('')
   const [merchantUser, setMerchantUser] = useState(null)
   const [userRole, setUserRole] = useState(null) // 'boss' or 'staff'
+  const [isBossVerified, setIsBossVerified] = useState(false) // 第二重密码验证状态
+  const [bossPassword, setBossPassword] = useState('')
+  const [passwordError, setPasswordError] = useState('')
 
   useEffect(() => {
     // 检查商家登录状态
@@ -37,12 +40,36 @@ export default function MerchantOverviewPage() {
         return
       }
       
-      // Boss用户加载统计数据
-      loadStats()
+      // Boss用户需要第二重密码验证
+      // 检查是否已经验证过（通过sessionStorage）
+      const bossVerified = sessionStorage.getItem('bossVerified') === 'true'
+      if (bossVerified) {
+        setIsBossVerified(true)
+        loadStats()
+      }
+      // 否则显示密码输入界面
     }
     
     checkMerchantAuth()
   }, [router])
+
+  const handleBossPasswordSubmit = (e) => {
+    e.preventDefault()
+    setPasswordError('')
+    
+    // 这里使用一个固定的第二重密码，实际应用中应该从后端验证
+    // 或者存储在环境变量中
+    const correctPassword = 'boss123' // 可以在环境变量中配置
+    
+    if (bossPassword === correctPassword) {
+      setIsBossVerified(true)
+      sessionStorage.setItem('bossVerified', 'true')
+      loadStats()
+    } else {
+      setPasswordError('密码错误，请重试')
+      setBossPassword('')
+    }
+  }
 
   const handleLogout = () => {
     localStorage.removeItem('merchantToken')
@@ -129,6 +156,108 @@ export default function MerchantOverviewPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  // 如果是boss但未通过第二重密码验证，显示密码输入界面
+  if (userRole === 'boss' && !isBossVerified) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #0f172a 0%, #7c3aed 50%, #0f172a 100%)',
+        padding: '32px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}>
+        <div style={{
+          maxWidth: '400px',
+          width: '100%',
+          background: 'rgba(15, 23, 42, 0.8)',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          borderRadius: '16px',
+          padding: '32px'
+        }}>
+          <h2 style={{
+            fontSize: '1.5rem',
+            fontWeight: 'bold',
+            color: 'white',
+            marginBottom: '8px',
+            textAlign: 'center'
+          }}>
+            商家管理后台
+          </h2>
+          <p style={{
+            color: '#94a3b8',
+            marginBottom: '24px',
+            textAlign: 'center',
+            fontSize: '0.875rem'
+          }}>
+            请输入第二重密码以访问完整功能
+          </p>
+          
+          <form onSubmit={handleBossPasswordSubmit}>
+            <div style={{ marginBottom: '16px' }}>
+              <input
+                type="password"
+                value={bossPassword}
+                onChange={(e) => setBossPassword(e.target.value)}
+                placeholder="请输入管理密码"
+                style={{
+                  width: '100%',
+                  padding: '12px 16px',
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  borderRadius: '8px',
+                  color: 'white',
+                  fontSize: '1rem',
+                  outline: 'none'
+                }}
+                required
+                autoFocus
+              />
+              {passwordError && (
+                <p style={{
+                  color: '#ef4444',
+                  fontSize: '0.875rem',
+                  marginTop: '8px'
+                }}>
+                  {passwordError}
+                </p>
+              )}
+            </div>
+            
+            <button
+              type="submit"
+              style={{
+                width: '100%',
+                padding: '12px 16px',
+                background: 'linear-gradient(135deg, #7C3AED 0%, #22D3EE 100%)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '1rem',
+                fontWeight: '600',
+                cursor: 'pointer',
+                transition: 'transform 0.2s'
+              }}
+              onMouseEnter={(e) => e.target.style.transform = 'scale(1.02)'}
+              onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
+            >
+              验证
+            </button>
+          </form>
+          
+          <p style={{
+            color: '#6b7280',
+            fontSize: '0.75rem',
+            marginTop: '16px',
+            textAlign: 'center'
+          }}>
+            只有商家老板可以访问此页面
+          </p>
+        </div>
+      </div>
+    )
   }
 
   if (loading) {
@@ -274,9 +403,10 @@ export default function MerchantOverviewPage() {
     <div style={{
       minHeight: '100vh',
       background: 'linear-gradient(135deg, #0f172a 0%, #7c3aed 50%, #0f172a 100%)',
-      padding: '32px'
+      paddingTop: '80px'
     }}>
-      <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+      <MerchantNavbar userRole={userRole} />
+      <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '32px' }}>
         {/* 页面标题 */}
         <div style={{ marginBottom: '32px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>

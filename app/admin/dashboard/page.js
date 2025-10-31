@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import EventCreationForm from '../../../components/EventCreationForm'
-import NavbarPartyTix from '../../../components/NavbarPartyTix'
+import AdminNavbar from '@/components/AdminNavbar'
 
 export const dynamic = 'force-dynamic'
 
@@ -337,13 +337,14 @@ export default function AdminDashboard() {
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #0f172a 0%, #7c3aed 50%, #0f172a 100%)'
+      background: 'linear-gradient(135deg, #0f172a 0%, #7c3aed 50%, #0f172a 100%)',
+      paddingTop: '80px'
     }}>
-      <NavbarPartyTix />
+      <AdminNavbar />
       <div style={{
         maxWidth: '1200px',
         margin: '0 auto',
-        padding: '100px 24px 40px 24px'
+        padding: '24px'
       }}>
         {/* Header */}
         <div style={{

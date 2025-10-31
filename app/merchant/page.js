@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 // import { hasSupabase } from '../../lib/safeEnv' // 已移除，使用新的 API 客户端
 import Link from 'next/link'
+import MerchantNavbar from '@/components/MerchantNavbar'
 
 export default function MerchantOverviewPage() {
   const router = useRouter()

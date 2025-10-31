@@ -255,8 +255,9 @@ export async function POST(request) {
         tier: ticket.tier,
         holder_name: holderName,
         holder_age: holderAge,
-        status: ticket.status,
-        verification_count: (ticket.verification_count || 0) + 1,
+        status: ticket.status, // Updated status if redeemed
+        used_at: ticket.used_at || updateData.used_at || null,
+        verification_count: updateData.verification_count || (ticket.verification_count || 0) + 1,
         first_verified_at: updateData.first_verified_at || ticket.first_verified_at,
         last_verified_at: updateData.last_verified_at,
         validity_start_time: ticket.validity_start_time,

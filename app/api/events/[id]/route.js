@@ -193,3 +193,4 @@ export async function PUT(request, { params }) {
   } catch (error) {
     return handleApiError(error, request, logger)
   }
+}

@@ -74,42 +74,74 @@ export async function POST(request) {
       )
     }
 
-    // Find ticket with related data
-    const { data: ticket, error } = await supabase
-      .from('tickets')
-      .select(`
-        *,
-        events (
-          id,
-          title,
-          start_at,
-          end_at,
-          venue_name
-        ),
-        orders (
-          id,
-          customer_name,
-          customer_email
-        )
-      `)
-      .eq('id', ticketId)
-      .single()
+    // Find ticket (simplified query to avoid join issues)
+    let ticket, event, order
+    
+    try {
+      // First, get the ticket
+      const { data: ticketData, error: ticketError } = await supabase
+        .from('tickets')
+        .select('*')
+        .eq('id', ticketId)
+        .single()
 
-    if (error) {
-      if (error.code === 'PGRST116') {
+      if (ticketError) {
+        logger.error('Ticket query error', { error: ticketError, ticketId })
+        if (ticketError.code === 'PGRST116') {
+          throw ErrorHandler.notFoundError(
+            'TICKET_NOT_FOUND',
+            'Ticket not found'
+          )
+        }
+        throw ErrorHandler.databaseError(ticketError, 'DATABASE_QUERY_ERROR')
+      }
+
+      if (!ticketData) {
         throw ErrorHandler.notFoundError(
           'TICKET_NOT_FOUND',
           'Ticket not found'
         )
       }
-      throw ErrorHandler.databaseError(error, 'DATABASE_QUERY_ERROR')
-    }
 
-    if (!ticket) {
-      throw ErrorHandler.notFoundError(
-        'TICKET_NOT_FOUND',
-        'Ticket not found'
-      )
+      ticket = ticketData
+
+      // Then get event data if event_id exists
+      if (ticket.event_id) {
+        const { data: eventData, error: eventError } = await supabase
+          .from('events')
+          .select('id, title, start_at, end_at, venue_name')
+          .eq('id', ticket.event_id)
+          .single()
+        
+        if (!eventError && eventData) {
+          event = eventData
+        } else {
+          logger.warn('Event query error (non-blocking)', { error: eventError, eventId: ticket.event_id })
+        }
+      }
+
+      // Get order data if order_id exists
+      if (ticket.order_id) {
+        const { data: orderData, error: orderError } = await supabase
+          .from('orders')
+          .select('id, customer_name, customer_email')
+          .eq('id', ticket.order_id)
+          .single()
+        
+        if (!orderError && orderData) {
+          order = orderData
+        } else {
+          logger.warn('Order query error (non-blocking)', { error: orderError, orderId: ticket.order_id })
+        }
+      }
+    } catch (queryError) {
+      // Re-throw if it's already an AppError
+      if (queryError.code && queryError.statusCode) {
+        throw queryError
+      }
+      // Otherwise wrap in database error
+      logger.error('Database query failed', { error: queryError, ticketId })
+      throw ErrorHandler.databaseError(queryError, 'DATABASE_QUERY_ERROR')
     }
 
     // Get current time
@@ -152,8 +184,8 @@ export async function POST(request) {
       }
     }
     // Priority 2: Check event end time
-    else if (ticket.events && ticket.events.end_at) {
-      const eventEnd = new Date(ticket.events.end_at)
+    else if (event && event.end_at) {
+      const eventEnd = new Date(event.end_at)
       if (now > eventEnd) {
         isValid = false
         validityMessage = 'Ticket has expired - event has ended'
@@ -182,7 +214,7 @@ export async function POST(request) {
     }
 
     // Get holder information (from ticket or order)
-    const holderName = ticket.holder_name || ticket.orders?.customer_name || 'Unknown'
+    const holderName = ticket.holder_name || order?.customer_name || 'Unknown'
     const holderAge = ticket.holder_age || null
 
     // Update verification tracking or redeem ticket
@@ -263,12 +295,12 @@ export async function POST(request) {
         validity_start_time: ticket.validity_start_time,
         validity_end_time: ticket.validity_end_time
       },
-      event: ticket.events ? {
-        id: ticket.events.id,
-        title: ticket.events.title,
-        start_at: ticket.events.start_at,
-        end_at: ticket.events.end_at,
-        venue_name: ticket.events.venue_name
+      event: event ? {
+        id: event.id,
+        title: event.title,
+        start_at: event.start_at,
+        end_at: event.end_at,
+        venue_name: event.venue_name
       } : null,
       validity: {
         valid: isValid,

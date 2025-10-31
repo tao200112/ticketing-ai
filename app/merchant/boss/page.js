@@ -29,8 +29,8 @@ export default function MerchantBossPage() {
       const parsedUser = JSON.parse(user)
       setMerchantUser(parsedUser)
       
-      const role = parsedUser.merchant_role || 'boss'
-      setUserRole(role)
+      // 所有商家用户都可以访问Boss页面，通过密码验证
+      setUserRole('boss') // 设置为boss，但仅用于导航栏显示
       
       // 检查是否已经通过Boss验证
       const bossVerified = sessionStorage.getItem('bossVerified') === 'true'

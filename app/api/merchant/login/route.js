@@ -87,47 +87,30 @@ export async function POST(request) {
       )
     }
 
-    // 获取商家信息（注意：数据库字段是 owner_user_id）
-    const { data: merchant, error: merchantError } = await supabase
+    // 获取商家信息（先尝试作为owner）
+    let merchant = null
+    let merchantId = null
+    
+    const { data: ownerMerchant, error: merchantError } = await supabase
       .from('merchants')
       .select('*')
       .eq('owner_user_id', user.id)
       .single()
     
-    console.log('🏪 商家信息:', merchant)
-    console.log('🏪 商家查询错误:', merchantError)
-
-    // 查询用户在 merchant_members 表中的角色（如果是员工）
-    let merchantRole = 'boss' // 默认为boss（owner）
-    let memberMerchantId = merchant?.id || null
-    
-    if (merchant?.id) {
-      // 如果是owner，角色是boss
-      merchantRole = 'boss'
-      // 但也要检查是否同时在merchant_members中，如果是staff，也要记录
-      const { data: member } = await supabase
-        .from('merchant_members')
-        .select('role')
-        .eq('user_id', user.id)
-        .eq('merchant_id', merchant.id)
-        .single()
-      
-      if (member) {
-        // 如果同时在merchant_members中，使用该角色（可能是staff）
-        merchantRole = member.role
-      }
+    if (!merchantError && ownerMerchant) {
+      merchant = ownerMerchant
+      merchantId = ownerMerchant.id
+      console.log('🏪 找到商家（owner）:', merchant.id)
     } else {
-      // 如果不是owner，查询是否是员工
+      // 如果不是owner，尝试作为员工查找
       const { data: member, error: memberError } = await supabase
         .from('merchant_members')
-        .select('merchant_id, role')
+        .select('merchant_id')
         .eq('user_id', user.id)
         .single()
       
       if (!memberError && member) {
-        merchantRole = member.role
-        memberMerchantId = member.merchant_id
-        
+        merchantId = member.merchant_id
         // 获取员工所属的商家信息
         const { data: memberMerchant } = await supabase
           .from('merchants')
@@ -137,29 +120,19 @@ export async function POST(request) {
         
         if (memberMerchant) {
           merchant = memberMerchant
+          console.log('🏪 找到商家（员工）:', merchant.id)
         }
-      } else {
-        // 既不是owner也不是员工，返回错误
-        console.log('❌ 用户既不是商家owner也不是员工')
-        return NextResponse.json(
-          {
-            success: false,
-            error: 'NO_MERCHANT_ACCESS',
-            message: '您没有商家访问权限'
-          },
-          { status: 403 }
-        )
       }
     }
     
-    // 确保用户有merchant_id
-    if (!merchant?.id && !memberMerchantId) {
+    // 如果既不是owner也不是员工，返回错误
+    if (!merchant && !merchantId) {
       console.log('❌ 用户没有关联的商家')
       return NextResponse.json(
         {
           success: false,
           error: 'NO_MERCHANT_ACCESS',
-          message: '您没有关联的商家账户'
+          message: '您没有关联的商家账户，请联系管理员'
         },
         { status: 403 }
       )
@@ -168,26 +141,15 @@ export async function POST(request) {
     // 移除密码字段
     delete user.password_hash
 
-    // 构造返回数据，包含 merchant_id 和 role 字段
-    const finalMerchantId = merchant?.id || memberMerchantId
+    // 构造返回数据
+    // 注意：不区分boss/staff角色，所有商家用户登录后都能访问Staff和Boss页面
+    // Boss页面通过第二重密码（boss123）验证
+    const finalMerchantId = merchant?.id || merchantId
     const userData = {
       ...user,
       merchant_id: finalMerchantId,
       merchant: merchant || null,
-      merchant_role: merchantRole // 商家内部角色: boss 或 staff
-    }
-    
-    // 确保merchant_id存在
-    if (!finalMerchantId) {
-      console.log('❌ 无法确定用户的商家ID')
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'NO_MERCHANT_ACCESS',
-          message: '无法确定您的商家账户'
-        },
-        { status: 403 }
-      )
+      merchant_role: 'boss' // 默认设置为boss，但不用于页面访问控制
     }
     
     console.log('📤 返回的用户数据:', { 

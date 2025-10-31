@@ -30,8 +30,8 @@ export default function MerchantStaffPage() {
       }
       
       const parsedUser = JSON.parse(user)
-      const role = parsedUser.merchant_role || 'boss'
-      setUserRole(role)
+      // 所有商家用户都可以访问Staff页面，不需要区分角色
+      setUserRole('boss') // 设置为boss，但仅用于导航栏显示
     }
     
     checkMerchantAuth()

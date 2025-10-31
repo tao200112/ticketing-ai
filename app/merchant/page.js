@@ -25,9 +25,9 @@ export default function MerchantOverviewPage() {
       const parsedUser = JSON.parse(user)
       setMerchantUser(parsedUser)
       
-      // 获取用户角色
-      const role = parsedUser.merchant_role || 'boss' // 默认boss
-      setUserRole(role)
+      // 所有商家用户都可以访问两个页面，不需要区分角色
+      // Boss页面通过第二重密码验证
+      setUserRole('boss') // 设置为boss，但仅用于显示，不影响页面访问
       
       // 登录后不再自动跳转，显示导航栏和选择界面
       // 主页面只显示Staff/Boss选择，不进行验证

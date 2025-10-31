@@ -176,8 +176,11 @@ export default function MerchantStaffPage() {
       setDebugInfo('QR detection started. Scanning every 200ms...')
       
       let frameCount = 0
+      let lastUpdateTime = Date.now()
+      
       const scanLoop = () => {
         frameCount++
+        const now = Date.now()
         
         if (!videoRef.current || !canvasRef.current || !isScanning) {
           return
@@ -187,9 +190,14 @@ export default function MerchantStaffPage() {
           const video = videoRef.current
           const canvas = canvasRef.current
 
-          // Update debug info every 50 frames (10 seconds)
-          if (frameCount % 50 === 0) {
-            setDebugInfo(`Scanning... Frame ${frameCount}. Video ready: ${video.readyState === video.HAVE_ENOUGH_DATA ? 'Yes' : 'No'}`)
+          // Update debug info every 2 seconds
+          if (now - lastUpdateTime > 2000) {
+            const videoReady = video.readyState === video.HAVE_ENOUGH_DATA ? 'Yes' : 'No'
+            const videoSize = video.videoWidth > 0 && video.videoHeight > 0 
+              ? `${video.videoWidth}x${video.videoHeight}` 
+              : 'Not set'
+            setDebugInfo(`Scanning... Frame ${frameCount}. Video: ${videoReady}, Size: ${videoSize}`)
+            lastUpdateTime = now
           }
 
           // Check if video is ready
@@ -200,38 +208,77 @@ export default function MerchantStaffPage() {
             return
           }
 
+          // Check if video has valid dimensions
+          if (video.videoWidth === 0 || video.videoHeight === 0) {
+            if (frameCount === 1) {
+              setDebugInfo('Waiting for video dimensions...')
+            }
+            return
+          }
+
           const context = canvas.getContext('2d')
           
-          // Set canvas size to match video (only if dimensions changed)
-          if (video.videoWidth > 0 && video.videoHeight > 0) {
-            if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
-              canvas.width = video.videoWidth
-              canvas.height = video.videoHeight
-            }
-            
+          // Set canvas size to match video (always update to ensure sync)
+          if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+            canvas.width = video.videoWidth
+            canvas.height = video.videoHeight
+          }
+          
+          // Draw video frame to canvas
+          try {
             context.drawImage(video, 0, 0, canvas.width, canvas.height)
-            const imageData = context.getImageData(0, 0, canvas.width, canvas.height)
-            const code = jsQR(imageData.data, imageData.width, imageData.height)
-
-            if (code && code.data) {
-              // Found a QR code, stop scanning and verify
-              console.log('QR code detected:', code.data.substring(0, 50) + '...')
-              setDebugInfo(`QR Code detected! Verifying...`)
-              setScanAttempts(prev => prev + 1)
-              if (scanIntervalRef.current) {
-                clearInterval(scanIntervalRef.current)
-                scanIntervalRef.current = null
-              }
-              setScannedCode(code.data)
-              stopScanning()
-              verifyTicket(code.data)
+          } catch (drawError) {
+            if (frameCount % 25 === 0) {
+              setDebugInfo(`Draw error: ${drawError.message}`)
             }
+            return
+          }
+          
+          // Get image data
+          let imageData
+          try {
+            imageData = context.getImageData(0, 0, canvas.width, canvas.height)
+          } catch (imageDataError) {
+            if (frameCount % 25 === 0) {
+              setDebugInfo(`ImageData error: ${imageDataError.message}`)
+            }
+            return
+          }
+          
+          // Try to detect QR code
+          let code
+          try {
+            code = jsQR(imageData.data, imageData.width, imageData.height, {
+              inversionAttempts: 'dontInvert'
+            })
+          } catch (qrError) {
+            if (frameCount % 25 === 0) {
+              setDebugInfo(`QR scan error: ${qrError.message}`)
+            }
+            return
+          }
+
+          if (code && code.data) {
+            // Found a QR code, stop scanning and verify
+            console.log('QR code detected:', code.data.substring(0, 50) + '...')
+            setDebugInfo(`QR Code detected! Verifying...`)
+            setScanAttempts(prev => prev + 1)
+            if (scanIntervalRef.current) {
+              clearInterval(scanIntervalRef.current)
+              scanIntervalRef.current = null
+            }
+            setScannedCode(code.data)
+            stopScanning()
+            verifyTicket(code.data)
+          } else if (frameCount % 25 === 0) {
+            // Update debug info to show we're actively scanning
+            setDebugInfo(`Scanning... Frame ${frameCount}. No QR detected yet.`)
           }
         } catch (err) {
           // Log errors but don't stop scanning
-          console.debug('Frame capture error:', err)
-          if (frameCount % 50 === 0) {
-            setDebugInfo(`Error: ${err.message}`)
+          console.error('Frame capture error:', err)
+          if (frameCount % 25 === 0) {
+            setDebugInfo(`Error: ${err.message || 'Unknown error'}`)
           }
         }
       }

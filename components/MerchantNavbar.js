@@ -78,42 +78,8 @@ export default function MerchantNavbar({ userRole = 'boss' }) {
             alignItems: 'center',
             gap: '24px'
           }}>
-            {userRole === 'boss' && (
-              <>
-                <Link 
-                  href="/merchant" 
-                  style={{ 
-                    color: 'white', 
-                    textDecoration: 'none',
-                    transition: 'color 0.3s ease'
-                  }}
-                >
-                  Dashboard
-                </Link>
-                <Link 
-                  href="/merchant/events" 
-                  style={{ 
-                    color: 'white', 
-                    textDecoration: 'none',
-                    transition: 'color 0.3s ease'
-                  }}
-                >
-                  Events
-                </Link>
-                <Link 
-                  href="/merchant/purchases" 
-                  style={{ 
-                    color: 'white', 
-                    textDecoration: 'none',
-                    transition: 'color 0.3s ease'
-                  }}
-                >
-                  Revenue
-                </Link>
-              </>
-            )}
             <Link 
-              href="/merchant/scan" 
+              href="/merchant/staff" 
               style={{ 
                 color: 'white', 
                 textDecoration: 'none',
@@ -130,7 +96,25 @@ export default function MerchantNavbar({ userRole = 'boss' }) {
               <svg style={{ width: '1rem', height: '1rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0 0v-4m0 0h4m-4 0H6m12 0h-2M7 7h10a2 2 0 012 2v10a2 2 0 01-2 2H7a2 2 0 01-2-2V9a2 2 0 012-2z" />
               </svg>
-              Scan Tickets
+              Staff
+            </Link>
+            <Link 
+              href="/merchant/boss" 
+              style={{ 
+                color: 'white', 
+                textDecoration: 'none',
+                transition: 'color 0.3s ease',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                background: 'rgba(124, 58, 237, 0.2)',
+                padding: '8px 16px',
+                borderRadius: '8px',
+                border: '1px solid rgba(124, 58, 237, 0.3)'
+              }}
+            >
+              👔
+              Boss
             </Link>
             <button
               onClick={handleLogout}
@@ -190,51 +174,8 @@ export default function MerchantNavbar({ userRole = 'boss' }) {
           flexDirection: 'column',
           gap: '16px'
         }}>
-          {userRole === 'boss' && (
-            <>
-              <Link 
-                href="/merchant" 
-                style={{ 
-                  color: 'white', 
-                  textDecoration: 'none',
-                  fontSize: '16px',
-                  padding: '8px 0',
-                  transition: 'color 0.3s ease'
-                }}
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                Dashboard
-              </Link>
-              <Link 
-                href="/merchant/events" 
-                style={{ 
-                  color: 'white', 
-                  textDecoration: 'none',
-                  fontSize: '16px',
-                  padding: '8px 0',
-                  transition: 'color 0.3s ease'
-                }}
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                Events
-              </Link>
-              <Link 
-                href="/merchant/purchases" 
-                style={{ 
-                  color: 'white', 
-                  textDecoration: 'none',
-                  fontSize: '16px',
-                  padding: '8px 0',
-                  transition: 'color 0.3s ease'
-                }}
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                Revenue
-              </Link>
-            </>
-          )}
           <Link 
-            href="/merchant/scan" 
+            href="/merchant/staff" 
             style={{ 
               color: 'white', 
               textDecoration: 'none',
@@ -253,7 +194,27 @@ export default function MerchantNavbar({ userRole = 'boss' }) {
             <svg style={{ width: '16px', height: '16px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0 0v-4m0 0h4m-4 0H6m12 0h-2M7 7h10a2 2 0 012 2v10a2 2 0 01-2 2H7a2 2 0 01-2-2V9a2 2 0 012-2z" />
             </svg>
-            Scan Tickets
+            Staff
+          </Link>
+          <Link 
+            href="/merchant/boss" 
+            style={{ 
+              color: 'white', 
+              textDecoration: 'none',
+              fontSize: '16px',
+              padding: '12px 16px',
+              transition: 'color 0.3s ease',
+              background: 'rgba(124, 58, 237, 0.2)',
+              borderRadius: '8px',
+              border: '1px solid rgba(124, 58, 237, 0.3)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
+            onClick={() => setIsMobileMenuOpen(false)}
+          >
+            👔
+            Boss
           </Link>
           <button
             onClick={handleLogout}

@@ -46,13 +46,22 @@ export default function QRScannerPage() {
     try {
       // Use Permissions API if available
       if ('permissions' in navigator && 'query' in navigator.permissions) {
-        const result = await navigator.permissions.query({ name: 'camera' })
-        setPermissionStatus(result.state)
-        
-        // Listen for permission changes
-        result.onchange = () => {
+        try {
+          const result = await navigator.permissions.query({ name: 'camera' })
           setPermissionStatus(result.state)
+          console.log('Camera permission status:', result.state)
+          
+          // Listen for permission changes
+          result.onchange = () => {
+            console.log('Permission status changed:', result.state)
+            setPermissionStatus(result.state)
+          }
+        } catch (permErr) {
+          // Some browsers might not support camera permission query
+          console.debug('Camera permission query not supported:', permErr)
         }
+      } else {
+        console.debug('Permissions API not available')
       }
     } catch (err) {
       // Permissions API might not be fully supported, ignore
@@ -128,9 +137,17 @@ export default function QRScannerPage() {
       // Check if we're on HTTPS or localhost (required for camera access)
       const isSecureContext = window.isSecureContext || location.protocol === 'https:' || location.hostname === 'localhost'
       if (!isSecureContext) {
-        setError('Camera access requires HTTPS connection. Please access this page via HTTPS.')
+        setError(`Camera access requires HTTPS connection. Current protocol: ${location.protocol}, hostname: ${location.hostname}`)
         return
       }
+      
+      // Log environment info for debugging
+      console.log('Environment info:', {
+        protocol: location.protocol,
+        hostname: location.hostname,
+        isSecureContext: window.isSecureContext,
+        userAgent: navigator.userAgent
+      })
 
       // Request camera permission with better error handling for mobile
       let constraints = {
@@ -160,6 +177,17 @@ export default function QRScannerPage() {
       } catch (permissionError) {
         // Update permission status
         await checkPermissionStatus()
+        
+        // Log detailed error for debugging
+        console.error('Detailed camera error:', {
+          name: permissionError.name,
+          message: permissionError.message,
+          stack: permissionError.stack,
+          permissionStatus: permissionStatus,
+          isSecureContext: window.isSecureContext,
+          protocol: location.protocol,
+          hostname: location.hostname
+        })
         
         // Handle specific permission errors
         let errorMessage = 'Unable to access camera. '
@@ -667,9 +695,18 @@ export default function QRScannerPage() {
                 <div style={{ color: '#fca5a5', fontSize: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid rgba(239, 68, 68, 0.3)' }}>
                   <strong>If permission is already granted:</strong><br />
                   1. Make sure you're on HTTPS (not HTTP)<br />
-                  2. Try refreshing this page<br />
+                  2. Try refreshing this page (hard refresh: Ctrl+Shift+R or Cmd+Shift+R)<br />
                   3. Close and reopen the browser tab<br />
                   4. Check if other apps are using the camera<br />
+                  5. Try accessing production URL instead of preview URL<br />
+                  <br />
+                  <div style={{ marginTop: '0.5rem', padding: '0.5rem', backgroundColor: 'rgba(0,0,0,0.2)', borderRadius: '0.25rem' }}>
+                    <strong>Debug Info:</strong><br />
+                    Protocol: {location.protocol}<br />
+                    Hostname: {location.hostname}<br />
+                    Secure Context: {window.isSecureContext ? 'Yes' : 'No'}<br />
+                    Permission Status: {permissionStatus || 'Unknown'}
+                  </div>
                   <br />
                   <strong>Or use manual input:</strong> Enter the ticket code below instead.
                 </div>

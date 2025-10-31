@@ -11,6 +11,7 @@ export default function MerchantOverviewPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [merchantUser, setMerchantUser] = useState(null)
+  const [userRole, setUserRole] = useState(null) // 'boss' or 'staff'
 
   useEffect(() => {
     // 检查商家登录状态
@@ -23,7 +24,20 @@ export default function MerchantOverviewPage() {
         return
       }
       
-      setMerchantUser(JSON.parse(user))
+      const parsedUser = JSON.parse(user)
+      setMerchantUser(parsedUser)
+      
+      // 获取用户角色
+      const role = parsedUser.merchant_role || 'boss' // 默认boss
+      setUserRole(role)
+      
+      // Staff用户直接跳转到扫码页面
+      if (role === 'staff') {
+        router.push('/merchant/scan')
+        return
+      }
+      
+      // Boss用户加载统计数据
       loadStats()
     }
     
@@ -370,7 +384,7 @@ export default function MerchantOverviewPage() {
           ))}
         </div>
 
-        {/* 快速操作 */}
+        {/* 快速操作 - 根据角色显示 */}
         <div style={{
           background: 'rgba(15, 23, 42, 0.6)',
           border: '1px solid rgba(255, 255, 255, 0.1)',
@@ -390,7 +404,8 @@ export default function MerchantOverviewPage() {
             gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
             gap: '24px'
           }}>
-            {/* Manage Events Card */}
+            {/* Manage Events Card - 仅boss可见 */}
+            {userRole === 'boss' && (
             <div 
               style={{
                 display: 'block',
@@ -473,8 +488,10 @@ export default function MerchantOverviewPage() {
                 <span>Access Events →</span>
               </div>
             </div>
+            )}
             
-            {/* Create Event Card */}
+            {/* Create Event Card - 仅boss可见 */}
+            {userRole === 'boss' && (
             <div 
               style={{
                 display: 'block',
@@ -557,8 +574,10 @@ export default function MerchantOverviewPage() {
                 <span>Start Creating →</span>
               </div>
             </div>
+            )}
             
-            {/* Purchase Records Card */}
+            {/* Purchase Records Card - 仅boss可见 */}
+            {userRole === 'boss' && (
             <div 
               style={{
                 display: 'block',
@@ -639,6 +658,91 @@ export default function MerchantOverviewPage() {
                 fontWeight: '500'
               }}>
                 <span>View Records →</span>
+              </div>
+            </div>
+            )}
+            
+            {/* Scan Tickets Card - boss和staff都可见 */}
+            <div 
+              style={{
+                display: 'block',
+                background: 'linear-gradient(135deg, rgba(236, 72, 153, 0.1) 0%, rgba(219, 39, 119, 0.1) 100%)',
+                border: '1px solid rgba(236, 72, 153, 0.2)',
+                borderRadius: '16px',
+                padding: '24px',
+                textDecoration: 'none',
+                transition: 'all 0.3s ease',
+                position: 'relative',
+                overflow: 'hidden',
+                cursor: 'pointer'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-4px)'
+                e.currentTarget.style.boxShadow = '0 20px 40px rgba(236, 72, 153, 0.15)'
+                e.currentTarget.style.borderColor = 'rgba(236, 72, 153, 0.4)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)'
+                e.currentTarget.style.boxShadow = 'none'
+                e.currentTarget.style.borderColor = 'rgba(236, 72, 153, 0.2)'
+              }}
+              onClick={() => router.push('/merchant/scan')}
+            >
+              <div style={{
+                position: 'absolute',
+                top: '-20px',
+                right: '-20px',
+                width: '80px',
+                height: '80px',
+                background: 'linear-gradient(135deg, rgba(236, 72, 153, 0.1) 0%, rgba(219, 39, 119, 0.1) 100%)',
+                borderRadius: '50%',
+                opacity: '0.3'
+              }}></div>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                marginBottom: '16px'
+              }}>
+                <div style={{
+                  width: '48px',
+                  height: '48px',
+                  background: 'linear-gradient(135deg, #ec4899 0%, #db2777 100%)',
+                  borderRadius: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '1.5rem',
+                  marginRight: '16px',
+                  boxShadow: '0 8px 16px rgba(236, 72, 153, 0.3)'
+                }}>
+                  📱
+                </div>
+                <div>
+                  <h3 style={{
+                    fontSize: '1.25rem',
+                    fontWeight: 'bold',
+                    color: 'white',
+                    marginBottom: '4px'
+                  }}>
+                    Scan Tickets
+                  </h3>
+                  <p style={{
+                    fontSize: '0.875rem',
+                    color: '#94a3b8',
+                    margin: '0'
+                  }}>
+                    Verify and redeem tickets
+                  </p>
+                </div>
+              </div>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                color: '#ec4899',
+                fontSize: '0.875rem',
+                fontWeight: '500'
+              }}>
+                <span>Start Scanning →</span>
               </div>
             </div>
           </div>

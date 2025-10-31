@@ -368,7 +368,16 @@ export default function QRScannerPage() {
           }
         }
       } else {
-        setError(result.message || result.error || 'Ticket verification failed')
+        // Check for specific error codes
+        const errorCode = result.error || result.code
+        let errorMessage = result.message || result.error || 'Ticket verification failed'
+        
+        // Show Chinese message for "not your merchant ticket" error
+        if (errorCode === 'NOT_YOUR_MERCHANT_TICKET' || errorMessage.includes('不是你们店的票')) {
+          errorMessage = '不是你们店的票'
+        }
+        
+        setError(errorMessage)
         setScanResult(null)
       }
     } catch (err) {

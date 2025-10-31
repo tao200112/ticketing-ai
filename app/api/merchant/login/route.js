@@ -84,17 +84,55 @@ export async function POST(request) {
     console.log('🏪 商家信息:', merchant)
     console.log('🏪 商家查询错误:', merchantError)
 
+    // 查询用户在 merchant_members 表中的角色（如果是员工）
+    let merchantRole = 'boss' // 默认为boss（owner）
+    let memberMerchantId = merchant?.id || null
+    
+    if (merchant?.id) {
+      // 如果是owner，角色是boss
+      merchantRole = 'boss'
+    } else {
+      // 如果不是owner，查询是否是员工
+      const { data: member, error: memberError } = await supabase
+        .from('merchant_members')
+        .select('merchant_id, role')
+        .eq('user_id', user.id)
+        .single()
+      
+      if (!memberError && member) {
+        merchantRole = member.role
+        memberMerchantId = member.merchant_id
+        
+        // 获取员工所属的商家信息
+        const { data: memberMerchant } = await supabase
+          .from('merchants')
+          .select('*')
+          .eq('id', member.merchant_id)
+          .single()
+        
+        if (memberMerchant) {
+          merchant = memberMerchant
+        }
+      }
+    }
+
     // 移除密码字段
     delete user.password_hash
 
-    // 构造返回数据，包含 merchant_id 字段
+    // 构造返回数据，包含 merchant_id 和 role 字段
     const userData = {
       ...user,
-      merchant_id: merchant?.id || null, // 添加 merchant_id 字段
-      merchant: merchant || null // 保留完整的 merchant 对象
+      merchant_id: merchant?.id || memberMerchantId || null,
+      merchant: merchant || null,
+      merchant_role: merchantRole // 商家内部角色: boss 或 staff
     }
     
-    console.log('📤 返回的用户数据:', { id: userData.id, merchant_id: userData.merchant_id, hasMerchant: !!userData.merchant })
+    console.log('📤 返回的用户数据:', { 
+      id: userData.id, 
+      merchant_id: userData.merchant_id, 
+      merchant_role: userData.merchant_role,
+      hasMerchant: !!userData.merchant 
+    })
 
     return NextResponse.json({
       success: true,

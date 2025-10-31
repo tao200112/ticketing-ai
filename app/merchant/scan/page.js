@@ -100,16 +100,45 @@ export default function MerchantScanPage() {
 
   const verifyTicket = async (code) => {
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      // Get merchant user info from localStorage
+      const merchantUserStr = localStorage.getItem('merchantUser')
+      if (!merchantUserStr) {
+        showToast('Please login first', 'error')
+        return { valid: false, message: 'Authentication required' }
+      }
       
-      const isValid = Math.random() > 0.3
+      const merchantUser = JSON.parse(merchantUserStr)
+      const userId = merchantUser.id
       
-      if (isValid) {
-        showToast('Ticket verification successful!', 'success')
-        return { valid: true, message: 'Ticket is valid' }
+      // Call redemption API
+      const response = await fetch('/api/merchant/redeem', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          qr_payload: code,
+          user_id: userId
+        }),
+      })
+      
+      const result = await response.json()
+      
+      if (response.ok && result.success) {
+        showToast('Ticket redeemed successfully!', 'success')
+        return { valid: true, message: 'Ticket redeemed successfully' }
       } else {
-        showToast('Ticket verification failed!', 'error')
-        return { valid: false, message: 'Ticket is invalid or already used' }
+        // Check for specific error codes
+        const errorCode = result.error || result.code
+        let errorMessage = result.message || 'Ticket verification failed'
+        
+        // Show Chinese message for "not your merchant ticket" error
+        if (errorCode === 'NOT_YOUR_MERCHANT_TICKET' || errorMessage.includes('不是你们店的票')) {
+          errorMessage = '不是你们店的票'
+        }
+        
+        showToast(errorMessage, 'error')
+        return { valid: false, message: errorMessage }
       }
     } catch (error) {
       showToast('Error occurred during verification', 'error')

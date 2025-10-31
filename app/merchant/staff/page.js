@@ -59,15 +59,60 @@ export default function MerchantStaffPage() {
       })
       
       setStream(stream)
+      
       if (videoRef.current) {
         videoRef.current.srcObject = stream
+        
+        // Wait for video metadata to load before playing
+        await new Promise((resolve, reject) => {
+          const video = videoRef.current
+          if (!video) {
+            reject(new Error('Video element not found'))
+            return
+          }
+          
+          const onLoadedMetadata = () => {
+            video.removeEventListener('loadedmetadata', onLoadedMetadata)
+            resolve()
+          }
+          
+          const onError = () => {
+            video.removeEventListener('error', onError)
+            reject(new Error('Video failed to load'))
+          }
+          
+          video.addEventListener('loadedmetadata', onLoadedMetadata)
+          video.addEventListener('error', onError)
+          
+          // Set a timeout
+          setTimeout(() => {
+            video.removeEventListener('loadedmetadata', onLoadedMetadata)
+            video.removeEventListener('error', onError)
+            reject(new Error('Video load timeout'))
+          }, 5000)
+        })
+        
         await videoRef.current.play()
         setIsScanning(true)
-        startQRDetection()
+        
+        // Start QR detection after video is playing
+        setTimeout(() => {
+          startQRDetection()
+        }, 100)
+      } else {
+        setError('Video element not initialized')
       }
     } catch (err) {
-      setError('Unable to access camera. Please check permissions.')
       console.error('Camera error:', err)
+      if (err.name === 'NotAllowedError') {
+        setError('Camera access denied. Please allow camera permission and try again.')
+      } else if (err.name === 'NotFoundError') {
+        setError('No camera found. Please connect a camera device.')
+      } else if (err.name === 'NotReadableError') {
+        setError('Camera is already in use by another application.')
+      } else {
+        setError(`Unable to access camera: ${err.message || 'Unknown error'}`)
+      }
     }
   }
 
@@ -89,29 +134,54 @@ export default function MerchantStaffPage() {
   const startQRDetection = () => {
     if (scanIntervalRef.current) {
       clearInterval(scanIntervalRef.current)
+      scanIntervalRef.current = null
+    }
+
+    if (!videoRef.current || !canvasRef.current) {
+      console.error('Video or canvas ref not available')
+      setError('Camera initialization failed. Please try again.')
+      return
     }
 
     scanIntervalRef.current = setInterval(() => {
-      if (videoRef.current && canvasRef.current) {
+      try {
+        if (!videoRef.current || !canvasRef.current || !isScanning) {
+          if (scanIntervalRef.current) {
+            clearInterval(scanIntervalRef.current)
+            scanIntervalRef.current = null
+          }
+          return
+        }
+
         const video = videoRef.current
         const canvas = canvasRef.current
-        const context = canvas.getContext('2d')
 
-        if (video.readyState === video.HAVE_ENOUGH_DATA) {
-          canvas.height = video.videoHeight
-          canvas.width = video.videoWidth
-          context.drawImage(video, 0, 0, canvas.width, canvas.height)
-          const imageData = context.getImageData(0, 0, canvas.width, canvas.height)
-          const code = jsQR(imageData.data, imageData.width, imageData.height)
-
-          if (code) {
-            setScannedCode(code.data)
-            stopScanning()
-            verifyTicket(code.data)
-          }
+        if (video.readyState !== video.HAVE_ENOUGH_DATA) {
+          return
         }
+
+        const context = canvas.getContext('2d')
+        
+        // Set canvas size to match video
+        if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+          canvas.width = video.videoWidth
+          canvas.height = video.videoHeight
+        }
+        
+        context.drawImage(video, 0, 0, canvas.width, canvas.height)
+        const imageData = context.getImageData(0, 0, canvas.width, canvas.height)
+        const code = jsQR(imageData.data, imageData.width, imageData.height)
+
+        if (code && code.data) {
+          setScannedCode(code.data)
+          stopScanning()
+          verifyTicket(code.data)
+        }
+      } catch (err) {
+        console.error('QR detection error:', err)
+        // Don't stop scanning on detection errors, just log them
       }
-    }, 100)
+    }, 200) // Scan every 200ms for better performance
   }
 
   const verifyTicket = async (qrData) => {
@@ -274,11 +344,17 @@ export default function MerchantStaffPage() {
                   width: '100%',
                   maxWidth: '600px',
                   borderRadius: '8px',
-                  marginBottom: '16px'
+                  marginBottom: '16px',
+                  display: 'block'
                 }}
                 playsInline
+                autoPlay
+                muted
               />
-              <canvas ref={canvasRef} style={{ display: 'none' }} />
+              <canvas 
+                ref={canvasRef} 
+                style={{ display: 'none' }}
+              />
               <button
                 onClick={stopScanning}
                 style={{

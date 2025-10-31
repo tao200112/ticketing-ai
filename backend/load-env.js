@@ -1,12 +1,30 @@
 // 加载环境变量
 require('dotenv').config();
 
-// 设置环境变量
+// 设置环境变量（移除硬编码的敏感信息）
 process.env.NODE_ENV = process.env.NODE_ENV || 'development';
 process.env.PORT = process.env.PORT || '3001';
-process.env.SUPABASE_URL = process.env.SUPABASE_URL || 'https://htaqcvnyipiqdbmvvfvj.supabase.co';
-process.env.SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh0YXFjdm55aXBpcWRibXZ2ZnZqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MTA3NjA5OCwiZXhwIjoyMDc2NjUyMDk4fQ.84ZGW8t9veGNDJwvy-grFeOa67jtsp1UMLFRcw5hEKM';
-process.env.JWT_SECRET = process.env.JWT_SECRET || 'your-production-jwt-secret-minimum-32-characters';
+
+// 检查必需的环境变量
+const requiredEnvVars = [
+  'SUPABASE_URL',
+  'SUPABASE_SERVICE_ROLE_KEY',
+  'JWT_SECRET'
+];
+
+const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName]);
+
+if (missingEnvVars.length > 0) {
+  console.error('❌ 缺少必需的环境变量:');
+  missingEnvVars.forEach(varName => {
+    console.error(`   - ${varName}`);
+  });
+  console.error('\n请设置这些环境变量后再启动服务器。');
+  console.error('参考 .env.example 文件了解如何配置。');
+  process.exit(1);
+}
+
+// 设置可选的环境变量（使用默认值）
 process.env.JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h';
 process.env.JWT_REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
 process.env.BCRYPT_SALT_ROUNDS = process.env.BCRYPT_SALT_ROUNDS || '12';

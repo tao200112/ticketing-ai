@@ -1,5 +1,9 @@
 import { NextResponse } from 'next/server'
 import Stripe from 'stripe'
+import { ErrorHandler, handleApiError } from '@/lib/error-handler'
+import { createLogger } from '@/lib/logger'
+
+const logger = createLogger('checkout-sessions-api')
 
 // 安全地初始化Stripe
 const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY, {
@@ -10,31 +14,34 @@ export async function POST(request) {
   try {
     // 检查Stripe是否已初始化
     if (!stripe) {
-      console.error('❌ Stripe未配置')
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'STRIPE_NOT_CONFIGURED',
-          message: '支付服务未配置'
-        },
-        { status: 500 }
+      throw ErrorHandler.configurationError(
+        'STRIPE_NOT_CONFIGURED',
+        '支付服务未配置'
       )
     }
 
     const body = await request.json()
     const { event_id, price_id, quantity = 1, customer_email, customer_name, userId } = body
 
-    console.log('📦 收到请求:', { event_id, price_id, quantity, customer_email, customer_name, userId })
+    logger.info('Received checkout request', { 
+      eventId: event_id, 
+      priceId: price_id, 
+      quantity 
+    })
 
     if (!event_id || !price_id) {
-      console.error('❌ 缺少必需字段:', { event_id, price_id })
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'MISSING_FIELDS',
-          message: '缺少必需字段'
-        },
-        { status: 400 }
+      throw ErrorHandler.validationError(
+        'MISSING_FIELDS',
+        '缺少必需字段'
+      )
+    }
+    
+    // 验证数量
+    const quantityNum = parseInt(quantity)
+    if (isNaN(quantityNum) || quantityNum < 1 || quantityNum > 10) {
+      throw ErrorHandler.validationError(
+        'INVALID_QUANTITY',
+        '数量必须在1-10之间'
       )
     }
 
@@ -43,13 +50,9 @@ export async function POST(request) {
     const eventResult = await eventResponse.json()
 
     if (!eventResult.success || !eventResult.data) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'EVENT_NOT_FOUND',
-          message: '活动不存在'
-        },
-        { status: 404 }
+      throw ErrorHandler.notFoundError(
+        'EVENT_NOT_FOUND',
+        '活动不存在'
       )
     }
 
@@ -57,13 +60,25 @@ export async function POST(request) {
     const price = event.prices?.find(p => p.id === price_id)
 
     if (!price) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'PRICE_NOT_FOUND',
-          message: '票种不存在'
-        },
-        { status: 404 }
+      throw ErrorHandler.notFoundError(
+        'PRICE_NOT_FOUND',
+        '票种不存在'
+      )
+    }
+    
+    // 验证库存
+    if (price.inventory !== null && price.inventory < quantityNum) {
+      throw ErrorHandler.validationError(
+        'INSUFFICIENT_INVENTORY',
+        '库存不足'
+      )
+    }
+
+    // 验证金额
+    if (!price.amount_cents || price.amount_cents <= 0) {
+      throw ErrorHandler.validationError(
+        'INVALID_PRICE',
+        '价格无效'
       )
     }
 
@@ -80,7 +95,7 @@ export async function POST(request) {
             },
             unit_amount: price.amount_cents,
           },
-          quantity: quantity,
+          quantity: quantityNum,
         },
       ],
       mode: 'payment',
@@ -91,11 +106,13 @@ export async function POST(request) {
         event_id: event_id,
         price_id: price_id,
         price_name: price.name,
-        quantity: quantity.toString(),
+        quantity: quantityNum.toString(),
         customer_name: customer_name || '',
         user_id: userId || '',
       },
     })
+
+    logger.success('Checkout session created', { sessionId: session.id })
 
     return NextResponse.json({
       success: true,
@@ -104,14 +121,6 @@ export async function POST(request) {
     })
 
   } catch (error) {
-    console.error('❌ 创建支付会话失败:', error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'PAYMENT_ERROR',
-        message: error.message || '创建支付会话失败'
-      },
-      { status: 500 }
-    )
+    return handleApiError(error, request, logger)
   }
 }

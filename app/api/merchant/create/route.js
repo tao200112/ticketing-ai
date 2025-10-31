@@ -1,39 +1,34 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase-api'
+import { ErrorHandler, handleApiError } from '@/lib/error-handler'
+import { createLogger } from '@/lib/logger'
 import bcrypt from 'bcryptjs'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+const logger = createLogger('merchant-create-api')
 
 export async function POST(request) {
   try {
     const body = await request.json()
     const { businessName, phone, inviteCode, userId, email, password, name, age } = body
 
-    console.log('📦 收到商家注册请求:', { businessName, inviteCode, userId })
+    logger.info('Received merchant registration request', { businessName, inviteCode, userId: userId ? 'provided' : 'missing' })
 
     // 验证必需字段
     if (!businessName || !inviteCode) {
-      return NextResponse.json(
-        {
-          ok: false,
-          reason: 'MISSING_FIELDS'
-        },
-        { status: 400 }
+      throw ErrorHandler.validationError(
+        'MISSING_FIELDS',
+        'Business name and invite code are required'
       )
     }
 
-    if (!supabaseUrl || !supabaseKey) {
-      return NextResponse.json(
-        {
-          ok: false,
-          reason: 'CONFIG_ERROR'
-        },
-        { status: 500 }
+    if (!isSupabaseConfigured()) {
+      throw ErrorHandler.configurationError(
+        'CONFIG_ERROR',
+        'Supabase is not configured'
       )
     }
 
-    const supabase = createClient(supabaseUrl, supabaseKey)
+    const supabase = createSupabaseClient()
 
     // 验证邀请码
     const { data: inviteCodeData, error: inviteError } = await supabase
@@ -44,74 +39,68 @@ export async function POST(request) {
       .single()
 
     if (inviteError || !inviteCodeData) {
-      console.error('❌ 邀请码无效:', inviteError)
-      return NextResponse.json(
-        {
-          ok: false,
-          reason: 'invalid_invite'
-        },
-        { status: 400 }
+      throw ErrorHandler.validationError(
+        'INVALID_INVITE_CODE',
+        'Invalid invite code'
       )
     }
 
     // 检查邀请码是否过期
     if (new Date(inviteCodeData.expires_at) < new Date()) {
-      console.error('❌ 邀请码已过期')
-      return NextResponse.json(
-        {
-          ok: false,
-          reason: 'invalid_invite'
-        },
-        { status: 400 }
+      throw ErrorHandler.validationError(
+        'INVITE_CODE_EXPIRED',
+        'Invite code has expired'
       )
     }
 
     // 检查邀请码是否已被使用
     if (inviteCodeData.used_by) {
-      console.error('❌ 邀请码已被使用')
-      return NextResponse.json(
-        {
-          ok: false,
-          reason: 'invalid_invite'
-        },
-        { status: 400 }
+      throw ErrorHandler.validationError(
+        'INVITE_CODE_ALREADY_USED',
+        'Invite code has already been used'
       )
     }
 
     let userRecord
     let finalUserId = userId
 
-    // 如果没有 userId，需要先创建用户
-    if (!userId) {
-      if (!email || !password || !name || !age) {
-        return NextResponse.json(
-          {
-            ok: false,
-            reason: 'MISSING_USER_INFO'
-          },
-          { status: 400 }
-        )
-      }
+      // 如果没有 userId，需要先创建用户
+      if (!userId) {
+        if (!email || !password || !name || !age) {
+          throw ErrorHandler.validationError(
+            'MISSING_USER_INFO',
+            'Email, password, name, and age are required when creating a new user'
+          )
+        }
+        
+        // 验证邮箱格式
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+        if (!emailRegex.test(email)) {
+          throw ErrorHandler.validationError('INVALID_EMAIL')
+        }
 
-      // 检查邮箱是否已存在
+      // 检查邮箱是否已存在（只检查merchant角色）
       const { data: existingUser } = await supabase
         .from('users')
         .select('id')
         .eq('email', email)
+        .eq('role', 'merchant')
         .single()
 
       if (existingUser) {
-        return NextResponse.json(
-          {
-            ok: false,
-            reason: 'EMAIL_EXISTS'
-          },
-          { status: 400 }
+        throw ErrorHandler.conflictError(
+          'EMAIL_EXISTS',
+          'Email already registered as merchant'
         )
       }
 
+      // 验证密码长度
+      if (password.length < 8) {
+        throw ErrorHandler.validationError('PASSWORD_TOO_SHORT')
+      }
+
       // 加密密码
-      const hashedPassword = await bcrypt.hash(password, 10)
+      const hashedPassword = await bcrypt.hash(password, 12)
 
       // 创建商家用户
       const { data: newUser, error: userError } = await supabase
@@ -127,14 +116,7 @@ export async function POST(request) {
         .single()
 
       if (userError) {
-        console.error('❌ 创建用户失败:', userError)
-        return NextResponse.json(
-          {
-            ok: false,
-            reason: 'USER_CREATION_FAILED'
-          },
-          { status: 500 }
-        )
+        throw ErrorHandler.fromSupabaseError(userError, 'USER_CREATION_FAILED')
       }
 
       userRecord = newUser
@@ -149,14 +131,7 @@ export async function POST(request) {
         .single()
 
       if (updateError) {
-        console.error('❌ 更新用户失败:', updateError)
-        return NextResponse.json(
-          {
-            ok: false,
-            reason: 'USER_UPDATE_FAILED'
-          },
-          { status: 500 }
-        )
+        throw ErrorHandler.fromSupabaseError(updateError, 'USER_UPDATE_FAILED')
       }
 
       userRecord = updatedUser
@@ -170,13 +145,9 @@ export async function POST(request) {
       .single()
 
     if (existingMerchant) {
-      console.error('❌ 用户已有商家账户')
-      return NextResponse.json(
-        {
-          ok: false,
-          reason: 'merchant_exists'
-        },
-        { status: 400 }
+      throw ErrorHandler.conflictError(
+        'MERCHANT_EXISTS',
+        'User already has a merchant account'
       )
     }
 
@@ -186,7 +157,7 @@ export async function POST(request) {
       .insert([{
         owner_user_id: finalUserId,
         name: businessName,
-        description: `商家联系方式: ${phone}`,
+        description: phone ? `商家联系方式: ${phone}` : null,
         contact_email: userRecord.email,
         verified: false,
         status: 'active'
@@ -195,18 +166,11 @@ export async function POST(request) {
       .single()
 
     if (merchantError) {
-      console.error('❌ 创建商家失败:', merchantError)
-      return NextResponse.json(
-        {
-          ok: false,
-          reason: 'MERCHANT_CREATION_FAILED'
-        },
-        { status: 500 }
-      )
+      throw ErrorHandler.fromSupabaseError(merchantError, 'MERCHANT_CREATION_FAILED')
     }
 
     // 标记邀请码为已使用
-    await supabase
+    const { error: updateInviteError } = await supabase
       .from('admin_invite_codes')
       .update({
         used_by: finalUserId,
@@ -214,25 +178,27 @@ export async function POST(request) {
       })
       .eq('id', inviteCodeData.id)
 
-    console.log('✅ 商家创建成功:', newMerchant.id)
+    if (updateInviteError) {
+      logger.warn('Failed to update invite code', { error: updateInviteError })
+      // 非阻塞性错误，商家已创建成功
+    }
+
+    logger.success('Merchant created successfully', { merchantId: newMerchant.id })
 
     return NextResponse.json({
       ok: true,
+      success: true,
       merchant: newMerchant,
       user: userRecord
     })
 
   } catch (error) {
-    console.error('❌ API 错误:', error)
-    return NextResponse.json(
-      {
-        ok: false,
-        reason: 'INTERNAL_ERROR'
-      },
-      { status: 500 }
-    )
+    return handleApiError(error, request, logger)
   }
 }
+
+
+
 
 
 

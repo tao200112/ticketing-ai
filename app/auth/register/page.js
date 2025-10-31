@@ -105,17 +105,39 @@ export default function RegisterPage() {
       const result = await response.json()
       
       if (response.ok && result.success) {
-        setMessage('注册成功，正在跳转...')
+        setMessage('Registration successful! Please check your email and click the verification link to complete registration.')
         
         // 保存用户会话（简化实现）
         localStorage.setItem('userSession', JSON.stringify(result.data))
         
-        // Navigate directly to account page after a brief delay
+        // 发送邮箱验证邮件
+        try {
+          const emailResponse = await fetch('/api/auth/send-verification', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              email: formData.email
+            })
+          })
+          
+          if (emailResponse.ok) {
+            setMessage('Registration successful! Verification email has been sent, please check your inbox and click the verification link to complete registration.')
+          } else {
+            setMessage('Registration successful! But verification email sending failed, please try again later.')
+          }
+        } catch (emailError) {
+          console.error('Email verification error:', emailError)
+          setMessage('Registration successful! But verification email sending failed, please try again later.')
+        }
+        
+        // Navigate to account page after a brief delay
         setTimeout(() => {
           router.push('/account')
-        }, 1500)
+        }, 3000)
       } else {
-        setMessage(result.message || '注册失败，请重试')
+        setMessage(result.message || 'Registration failed, please try again')
       }
     } catch (error) {
       console.error('Registration error:', error)

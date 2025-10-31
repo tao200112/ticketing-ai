@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import MerchantNavbar from '@/components/MerchantNavbar'
 
 export default function MerchantScanPage() {
   const router = useRouter()
@@ -12,6 +13,7 @@ export default function MerchantScanPage() {
   const [toast, setToast] = useState(null)
   const [scanResult, setScanResult] = useState(null)
   const [scanHistory, setScanHistory] = useState([])
+  const [userRole, setUserRole] = useState(null)
   
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
@@ -20,7 +22,24 @@ export default function MerchantScanPage() {
   const toastTimeoutRef = useRef(null)
 
   useEffect(() => {
+    // 检查商家登录状态
+    const checkMerchantAuth = () => {
+      const token = localStorage.getItem('merchantToken')
+      const user = localStorage.getItem('merchantUser')
+      
+      if (!token || !user) {
+        router.push('/merchant/auth/login')
+        return
+      }
+      
+      const parsedUser = JSON.parse(user)
+      const role = parsedUser.merchant_role || 'boss'
+      setUserRole(role)
+    }
+    
+    checkMerchantAuth()
     checkCameraPermission()
+    
     return () => {
       stopScanning()
       // 清理toast定时器
@@ -28,7 +47,7 @@ export default function MerchantScanPage() {
         clearTimeout(toastTimeoutRef.current)
       }
     }
-  }, [])
+  }, [router])
 
   const checkCameraPermission = async () => {
     try {
@@ -100,16 +119,45 @@ export default function MerchantScanPage() {
 
   const verifyTicket = async (code) => {
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      // Get merchant user info from localStorage
+      const merchantUserStr = localStorage.getItem('merchantUser')
+      if (!merchantUserStr) {
+        showToast('Please login first', 'error')
+        return { valid: false, message: 'Authentication required' }
+      }
       
-      const isValid = Math.random() > 0.3
+      const merchantUser = JSON.parse(merchantUserStr)
+      const userId = merchantUser.id
       
-      if (isValid) {
-        showToast('Ticket verification successful!', 'success')
-        return { valid: true, message: 'Ticket is valid' }
+      // Call redemption API
+      const response = await fetch('/api/merchant/redeem', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          qr_payload: code,
+          user_id: userId
+        }),
+      })
+      
+      const result = await response.json()
+      
+      if (response.ok && result.success) {
+        showToast('Ticket redeemed successfully!', 'success')
+        return { valid: true, message: 'Ticket redeemed successfully' }
       } else {
-        showToast('Ticket verification failed!', 'error')
-        return { valid: false, message: 'Ticket is invalid or already used' }
+        // Check for specific error codes
+        const errorCode = result.error || result.code
+        let errorMessage = result.message || 'Ticket verification failed'
+        
+        // Show Chinese message for "not your merchant ticket" error
+        if (errorCode === 'NOT_YOUR_MERCHANT_TICKET' || errorMessage.includes('not your merchant')) {
+          errorMessage = 'This ticket does not belong to your merchant'
+        }
+        
+        showToast(errorMessage, 'error')
+        return { valid: false, message: errorMessage }
       }
     } catch (error) {
       showToast('Error occurred during verification', 'error')
@@ -134,14 +182,15 @@ export default function MerchantScanPage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#f9fafb' }}>
-      {/* Navigation Bar */}
+    <div style={{ minHeight: '100vh', backgroundColor: '#f9fafb', paddingTop: '80px' }}>
+      <MerchantNavbar userRole={userRole} />
+      {/* Navigation Bar (replaced by MerchantNavbar) */}
       <div style={{
         backgroundColor: 'white',
         borderBottom: '1px solid #e5e7eb',
         position: 'sticky',
-        top: 0,
-        zIndex: 50
+        top: 80,
+        zIndex: 40
       }}>
         <div style={{ maxWidth: '56rem', margin: '0 auto', padding: '1rem 1.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>

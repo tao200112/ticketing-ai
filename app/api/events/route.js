@@ -1,15 +1,15 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase-api'
+import { ErrorHandler, handleApiError } from '@/lib/error-handler'
+import { createLogger } from '@/lib/logger'
 
-// 从环境变量获取 Supabase 配置
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+const logger = createLogger('events-api')
 
 export async function GET() {
   try {
     // 如果没有配置 Supabase，返回空数组
-    if (!supabaseUrl || !supabaseKey) {
-      console.warn('⚠️ Supabase 未配置，返回空活动列表')
+    if (!isSupabaseConfigured()) {
+      logger.warn('Supabase not configured, returning empty events list')
       return NextResponse.json({ 
         success: true, 
         data: [] 
@@ -17,7 +17,7 @@ export async function GET() {
     }
 
     // 创建 Supabase 客户端
-    const supabase = createClient(supabaseUrl, supabaseKey)
+    const supabase = createSupabaseClient()
 
     // 从 Supabase 获取活动数据
     // 查询所有已发布的活动，如果没有则查询所有活动（包括草稿）
@@ -42,7 +42,7 @@ export async function GET() {
     
     // 如果没有已发布的活动，查询所有活动（开发环境）
     if (!events || events.length === 0) {
-      console.log('⚠️ 没有已发布的活动，查询所有活动')
+      logger.info('No published events found, querying all events')
       const { data: allEvents, error: allError } = await supabase
         .from('events')
         .select(`
@@ -63,31 +63,25 @@ export async function GET() {
       
       if (!allError && allEvents) {
         events = allEvents
-        console.log(`✅ 找到 ${allEvents.length} 个活动（包括草稿）`)
+        logger.info(`Found ${allEvents.length} events (including drafts)`)
       }
     }
 
-    // 只处理第一次查询的错误
+    // 处理数据库错误
     if (error && (!events || events.length === 0)) {
-      console.error('❌ 获取活动失败:', error)
-      return NextResponse.json(
-        { 
-          success: false, 
-          error: 'DATABASE_ERROR',
-          message: '获取活动数据失败' 
-        },
-        { status: 500 }
-      )
+      throw ErrorHandler.fromSupabaseError(error, 'DATABASE_QUERY_ERROR')
     }
     
-    // 过滤掉空活动和测试活动
+    // 过滤掉无效活动和测试活动
+    // 将硬编码的过滤逻辑改为配置化
+    const INVALID_TITLES = ['11', 'bb', 'aa']
     if (events && events.length > 0) {
       events = events.filter(event => {
         const title = event.title?.trim() || ''
-        const isValidTitle = title.length > 1 && title !== '11' && title !== 'bb' && title !== 'aa'
+        const isValidTitle = title.length > 1 && !INVALID_TITLES.includes(title)
         return isValidTitle
       })
-      console.log(`✅ 过滤后活动数量: ${events.length}`)
+      logger.info(`Filtered events count: ${events.length}`)
     }
 
     return NextResponse.json({
@@ -96,35 +90,22 @@ export async function GET() {
     })
 
   } catch (error) {
-    console.error('❌ API 错误:', error)
-    return NextResponse.json(
-      { 
-        success: false, 
-        error: 'INTERNAL_ERROR',
-        message: '服务器内部错误' 
-      },
-      { status: 500 }
-    )
+    return handleApiError(error, null, logger)
   }
 }
 
 export async function POST(request) {
   try {
     // 如果没有配置 Supabase，返回错误
-    if (!supabaseUrl || !supabaseKey) {
-      console.warn('⚠️ Supabase 未配置，无法创建活动')
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'CONFIG_ERROR',
-          message: '系统未配置 Supabase'
-        },
-        { status: 500 }
+    if (!isSupabaseConfigured()) {
+      throw ErrorHandler.configurationError(
+        'CONFIG_ERROR',
+        'Supabase is not configured'
       )
     }
 
     // 创建 Supabase 客户端
-    const supabase = createClient(supabaseUrl, supabaseKey)
+    const supabase = createSupabaseClient()
 
     // 获取请求体
     const body = await request.json()
@@ -142,13 +123,9 @@ export async function POST(request) {
 
     // 验证必需字段
     if (!title || !description || !startTime || !endTime || !location) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'MISSING_FIELDS',
-          message: '缺少必需字段'
-        },
-        { status: 400 }
+      throw ErrorHandler.validationError(
+        'MISSING_FIELDS',
+        '缺少必需字段'
       )
     }
 
@@ -174,15 +151,7 @@ export async function POST(request) {
       .single()
 
     if (eventError) {
-      console.error('❌ 创建活动失败:', eventError)
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'CREATE_ERROR',
-          message: '创建活动失败'
-        },
-        { status: 500 }
-      )
+      throw ErrorHandler.fromSupabaseError(eventError, 'CREATE_ERROR')
     }
 
     // 如果有价格信息，创建价格记录
@@ -201,12 +170,12 @@ export async function POST(request) {
         .insert(priceRecords)
 
       if (pricesError) {
-        console.error('❌ 创建价格失败:', pricesError)
-        // 即使价格创建失败，也返回活动创建成功
+        logger.warn('Failed to create prices', { error: pricesError, eventId: event.id })
+        // 即使价格创建失败，也返回活动创建成功（非阻塞性错误）
       }
     }
 
-    console.log('✅ 活动创建成功:', event.id)
+    logger.success('Event created successfully', { eventId: event.id })
 
     return NextResponse.json({
       success: true,
@@ -215,14 +184,6 @@ export async function POST(request) {
     })
 
   } catch (error) {
-    console.error('❌ API 错误:', error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'INTERNAL_ERROR',
-        message: '服务器内部错误'
-      },
-      { status: 500 }
-    )
+    return handleApiError(error, request, logger)
   }
 }

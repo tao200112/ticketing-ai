@@ -28,3 +28,6 @@ LEFT JOIN users u ON t.user_id = u.id
 ORDER BY t.created_at DESC
 LIMIT 10;
 
+
+
+

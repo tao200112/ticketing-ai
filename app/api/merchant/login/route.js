@@ -125,17 +125,39 @@ export async function POST(request) {
       }
     }
     
-    // 如果既不是owner也不是员工，返回错误
+    // 如果既不是owner也不是员工，尝试自动创建商家记录（向后兼容）
     if (!merchant && !merchantId) {
-      console.log('❌ 用户没有关联的商家')
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'NO_MERCHANT_ACCESS',
-          message: '您没有关联的商家账户，请联系管理员'
-        },
-        { status: 403 }
-      )
+      console.log('⚠️ 用户没有关联的商家，尝试自动创建...')
+      
+      // 自动为merchant用户创建商家记录（仅作为owner）
+      const { data: autoMerchant, error: createError } = await supabase
+        .from('merchants')
+        .insert([{
+          owner_user_id: user.id,
+          name: user.name || '未命名商家',
+          description: '自动创建的商家账户',
+          contact_email: user.email,
+          verified: false,
+          status: 'active'
+        }])
+        .select()
+        .single()
+      
+      if (!createError && autoMerchant) {
+        merchant = autoMerchant
+        merchantId = autoMerchant.id
+        console.log('✅ 自动创建商家记录:', merchant.id)
+      } else {
+        console.log('❌ 无法自动创建商家记录:', createError)
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'NO_MERCHANT_ACCESS',
+            message: '您没有关联的商家账户，请联系管理员'
+          },
+          { status: 403 }
+        )
+      }
     }
 
     // 移除密码字段

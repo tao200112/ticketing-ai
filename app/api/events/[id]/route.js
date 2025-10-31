@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase-api'
+import { ErrorHandler, handleApiError } from '@/lib/error-handler'
+import { createLogger } from '@/lib/logger'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+const logger = createLogger('event-detail-api')
 
 export async function GET(request, { params }) {
   try {
@@ -26,11 +27,14 @@ export async function GET(request, { params }) {
       return NextResponse.json({ success: true, data: defaultEvent })
     }
 
-    if (!supabaseUrl || !supabaseKey) {
-      return NextResponse.json({ success: false, error: 'CONFIG_ERROR', message: 'Supabase 未配置' }, { status: 500 })
+    if (!isSupabaseConfigured()) {
+      throw ErrorHandler.configurationError(
+        'CONFIG_ERROR',
+        'Supabase is not configured'
+      )
     }
 
-    const supabase = createClient(supabaseUrl, supabaseKey)
+    const supabase = createSupabaseClient()
 
     const { data: event, error } = await supabase
       .from('events')
@@ -43,14 +47,16 @@ export async function GET(request, { params }) {
       .single()
 
     if (error || !event) {
-      return NextResponse.json({ success: false, error: 'EVENT_NOT_FOUND', message: '活动不存在' }, { status: 404 })
+      throw ErrorHandler.notFoundError(
+        'EVENT_NOT_FOUND',
+        '活动不存在'
+      )
     }
 
     return NextResponse.json({ success: true, data: event })
 
   } catch (error) {
-    console.error('❌ API 错误:', error)
-    return NextResponse.json({ success: false, error: 'INTERNAL_ERROR', message: '服务器内部错误' }, { status: 500 })
+    return handleApiError(error, request, logger)
   }
 }
 
@@ -58,28 +64,33 @@ export async function DELETE(request, { params }) {
   try {
     const { id } = await params
 
-    if (!supabaseUrl || !supabaseKey) {
-      return NextResponse.json({ success: false, error: 'CONFIG_ERROR', message: '系统未配置 Supabase' }, { status: 500 })
+    if (!isSupabaseConfigured()) {
+      throw ErrorHandler.configurationError(
+        'CONFIG_ERROR',
+        'Supabase is not configured'
+      )
     }
 
-    const supabase = createClient(supabaseUrl, supabaseKey)
+    const supabase = createSupabaseClient()
 
-    // 删除价格记录
-    await supabase.from('prices').delete().eq('event_id', id)
+    // 删除价格记录（如果失败不影响主删除操作）
+    const { error: pricesError } = await supabase.from('prices').delete().eq('event_id', id)
+    if (pricesError) {
+      logger.warn('Failed to delete prices', { error: pricesError, eventId: id })
+    }
 
     // 删除活动
     const { error } = await supabase.from('events').delete().eq('id', id)
 
     if (error) {
-      console.error('❌ 删除活动失败:', error)
-      return NextResponse.json({ success: false, error: 'DELETE_ERROR', message: '删除活动失败' }, { status: 500 })
+      throw ErrorHandler.fromSupabaseError(error, 'DELETE_ERROR')
     }
 
+    logger.success('Event deleted successfully', { eventId: id })
     return NextResponse.json({ success: true, message: '活动删除成功' })
 
   } catch (error) {
-    console.error('❌ API 错误:', error)
-    return NextResponse.json({ success: false, error: 'INTERNAL_ERROR', message: '服务器内部错误' }, { status: 500 })
+    return handleApiError(error, request, logger)
   }
 }
 
@@ -110,7 +121,7 @@ export async function PUT(request, { params }) {
         ]
       }
       
-      console.log('✅ 默认活动更新成功（虚拟更新）:', updatedEvent.title)
+      logger.info('Default event updated (virtual)', { title: updatedEvent.title })
       return NextResponse.json({ 
         success: true, 
         data: updatedEvent, 
@@ -118,11 +129,14 @@ export async function PUT(request, { params }) {
       })
     }
 
-    if (!supabaseUrl || !supabaseKey) {
-      return NextResponse.json({ success: false, error: 'CONFIG_ERROR', message: '系统未配置 Supabase' }, { status: 500 })
+    if (!isSupabaseConfigured()) {
+      throw ErrorHandler.configurationError(
+        'CONFIG_ERROR',
+        'Supabase is not configured'
+      )
     }
 
-    const supabase = createClient(supabaseUrl, supabaseKey)
+    const supabase = createSupabaseClient()
 
     // 更新活动基本信息
     const { data: event, error } = await supabase
@@ -142,14 +156,16 @@ export async function PUT(request, { params }) {
       .single()
 
     if (error) {
-      console.error('❌ 更新活动失败:', error)
-      return NextResponse.json({ success: false, error: 'UPDATE_ERROR', message: '更新活动失败' }, { status: 500 })
+      throw ErrorHandler.fromSupabaseError(error, 'UPDATE_ERROR')
     }
 
     // 如果有价格信息，更新价格
     if (prices && Array.isArray(prices) && prices.length > 0) {
       // 先删除现有价格
-      await supabase.from('prices').delete().eq('event_id', id)
+      const { error: deleteError } = await supabase.from('prices').delete().eq('event_id', id)
+      if (deleteError) {
+        logger.warn('Failed to delete existing prices', { error: deleteError, eventId: id })
+      }
       
       // 插入新价格
       const priceRecords = prices.map(price => ({
@@ -166,16 +182,14 @@ export async function PUT(request, { params }) {
         .insert(priceRecords)
 
       if (pricesError) {
-        console.error('❌ 更新价格失败:', pricesError)
-        // 即使价格更新失败，也返回活动更新成功
+        logger.warn('Failed to update prices', { error: pricesError, eventId: id })
+        // 即使价格更新失败，也返回活动更新成功（非阻塞性错误）
       }
     }
 
-    console.log('✅ 活动更新成功:', event.id)
+    logger.success('Event updated successfully', { eventId: event.id })
     return NextResponse.json({ success: true, data: event, message: '活动更新成功' })
 
   } catch (error) {
-    console.error('❌ API 错误:', error)
-    return NextResponse.json({ success: false, error: 'INTERNAL_ERROR', message: '服务器内部错误' }, { status: 500 })
+    return handleApiError(error, request, logger)
   }
-}

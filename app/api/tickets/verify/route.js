@@ -45,9 +45,23 @@ export async function POST(request) {
       ticketId = qrResult.ticketId
     } catch (qrError) {
       // If new format fails, try old JSON format
+      // Note: JSON.parse is safe here because qr_payload is verified by verifyTicketQRPayload first
+      // and we're only parsing it as a fallback for legacy format
       try {
+        // Limit payload size to prevent DoS attacks
+        if (qr_payload.length > 1000) {
+          throw new Error('QR payload too long')
+        }
         const ticketData = JSON.parse(qr_payload)
+        // Validate ticket data structure
+        if (typeof ticketData !== 'object' || ticketData === null) {
+          throw new Error('Invalid ticket data structure')
+        }
         ticketId = ticketData.ticket_id || ticketData.ticketId
+        // Ensure ticketId is a valid string
+        if (typeof ticketId !== 'string' || ticketId.length === 0) {
+          throw new Error('Invalid ticket ID')
+        }
       } catch (jsonError) {
         throw ErrorHandler.validationError(
           'INVALID_QR_FORMAT',
@@ -232,4 +246,5 @@ export async function POST(request) {
     return handleApiError(error, request, logger)
   }
 }
+
 

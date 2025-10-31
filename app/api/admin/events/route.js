@@ -1,17 +1,19 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase-api'
+import { ErrorHandler, handleApiError } from '@/lib/error-handler'
+import { createLogger } from '@/lib/logger'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+const logger = createLogger('admin-events-api')
 
 export async function GET() {
   try {
     // 如果没有配置 Supabase，返回空数组
-    if (!supabaseUrl || !supabaseKey) {
+    if (!isSupabaseConfigured()) {
+      logger.warn('Supabase not configured, returning empty array')
       return NextResponse.json([])
     }
 
-    const supabase = createClient(supabaseUrl, supabaseKey)
+    const supabase = createSupabaseClient()
 
     // 从 Supabase 获取所有活动
     const { data: events, error } = await supabase
@@ -33,13 +35,11 @@ export async function GET() {
       .order('created_at', { ascending: false })
 
     if (error) {
-      console.error('❌ 获取活动失败:', error)
-      return NextResponse.json([])
+      throw ErrorHandler.fromSupabaseError(error, 'DATABASE_QUERY_ERROR')
     }
 
     return NextResponse.json(events || [])
   } catch (error) {
-    console.error('Error fetching events:', error)
-    return NextResponse.json([])
+    return handleApiError(error, null, logger)
   }
 }

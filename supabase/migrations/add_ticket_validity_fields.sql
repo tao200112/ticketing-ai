@@ -61,3 +61,4 @@ SELECT
     ELSE 'Migration failed: Validity fields not found'
   END AS migration_status;
 
+

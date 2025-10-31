@@ -171,20 +171,56 @@ export default function MerchantStaffPage() {
 
   // Auto-scan QR codes when camera is active
   useEffect(() => {
-    if (isScanning && videoRef.current && canvasRef.current) {
-      console.log('Starting QR detection loop')
-      setDebugInfo('QR detection started. Scanning every 200ms...')
-      
-      let frameCount = 0
-      let lastUpdateTime = Date.now()
-      
-      const scanLoop = () => {
-        frameCount++
-        const now = Date.now()
-        
-        if (!videoRef.current || !canvasRef.current || !isScanning) {
-          return
+    // Only run when scanning is active
+    if (!isScanning) {
+      // Clean up when not scanning
+      if (scanIntervalRef.current) {
+        clearInterval(scanIntervalRef.current)
+        scanIntervalRef.current = null
+      }
+      setDebugInfo('')
+      return
+    }
+    
+    // Check if refs are available
+    if (!videoRef.current || !canvasRef.current) {
+      setDebugInfo('Waiting for video/canvas elements...')
+      // Retry after a short delay
+      const retryTimeout = setTimeout(() => {
+        if (isScanning && videoRef.current && canvasRef.current) {
+          setDebugInfo('Elements ready, starting detection...')
         }
+      }, 500)
+      return () => clearTimeout(retryTimeout)
+    }
+    
+    console.log('Starting QR detection loop', {
+      isScanning,
+      hasVideo: !!videoRef.current,
+      hasCanvas: !!canvasRef.current,
+      videoReady: videoRef.current?.readyState
+    })
+    setDebugInfo('QR detection started. Scanning every 200ms...')
+    
+    let frameCount = 0
+    let lastUpdateTime = Date.now()
+    let lastFrameUpdate = 0
+    
+    const scanLoop = () => {
+      frameCount++
+      const now = Date.now()
+      
+      // Early exit checks
+      if (!videoRef.current || !canvasRef.current) {
+        console.warn('Video or canvas ref lost during scan')
+        return
+      }
+      
+      // Force update debug info more frequently at start
+      if (frameCount < 10 || now - lastFrameUpdate > 1000) {
+        setDebugInfo(`Active: Frame ${frameCount}`)
+        lastFrameUpdate = now
+      }
         
         try {
           const video = videoRef.current
@@ -248,6 +284,14 @@ export default function MerchantStaffPage() {
           // Try to detect QR code with multiple attempts
           let code = null
           try {
+            // Validate imageData
+            if (!imageData || !imageData.data || imageData.width === 0 || imageData.height === 0) {
+              if (frameCount % 50 === 0) {
+                setDebugInfo(`Invalid imageData: ${imageData.width}x${imageData.height}`)
+              }
+              return
+            }
+            
             // First attempt: normal scan
             code = jsQR(imageData.data, imageData.width, imageData.height, {
               inversionAttempts: 'attemptBoth'
@@ -259,17 +303,23 @@ export default function MerchantStaffPage() {
                 inversionAttempts: 'onlyInvert'
               })
             }
+            
+            // Log detection attempts periodically
+            if (frameCount % 50 === 0) {
+              setDebugInfo(`Scanning Frame ${frameCount}... Point at QR code`)
+            }
           } catch (qrError) {
-            // QR scan errors are usually fine, just continue
-            if (frameCount % 25 === 0) {
-              setDebugInfo(`Scanning... Frame ${frameCount}. QR scan active.`)
+            // QR scan errors - log but continue
+            console.error('QR scan error:', qrError)
+            if (frameCount % 50 === 0) {
+              setDebugInfo(`Scan error: ${qrError.message || 'Unknown'}`)
             }
           }
 
           if (code && code.data) {
             // Found a QR code, stop scanning and verify
             console.log('QR code detected:', code.data.substring(0, 50) + '...')
-            setDebugInfo(`QR Code detected! Verifying...`)
+            setDebugInfo(`✅ QR Code detected! Verifying...`)
             setScanAttempts(prev => prev + 1)
             if (scanIntervalRef.current) {
               clearInterval(scanIntervalRef.current)
@@ -278,11 +328,6 @@ export default function MerchantStaffPage() {
             setScannedCode(code.data)
             stopScanning()
             verifyTicket(code.data)
-          } else {
-            // Show we're scanning even when no QR is found
-            if (frameCount % 25 === 0) {
-              setDebugInfo(`Scanning... Frame ${frameCount}. Point camera at QR code.`)
-            }
           }
         } catch (err) {
           // Log errors but don't stop scanning
@@ -295,24 +340,23 @@ export default function MerchantStaffPage() {
 
       // Start scanning every 200ms
       scanIntervalRef.current = setInterval(scanLoop, 200)
+      console.log('QR detection interval started:', scanIntervalRef.current)
+      
+      // Also run an immediate check
+      setTimeout(() => {
+        if (isScanning && videoRef.current && canvasRef.current) {
+          scanLoop()
+        }
+      }, 100)
       
       return () => {
+        console.log('Cleaning up QR detection interval')
         if (scanIntervalRef.current) {
           clearInterval(scanIntervalRef.current)
           scanIntervalRef.current = null
         }
       }
-    } else {
-      // Clean up when scanning stops
-      if (scanIntervalRef.current) {
-        clearInterval(scanIntervalRef.current)
-        scanIntervalRef.current = null
-      }
-      if (!isScanning) {
-        setDebugInfo('')
-      }
-    }
-  }, [isScanning])
+  }, [isScanning, stream])
 
   const verifyTicket = async (qrData) => {
     try {
@@ -467,6 +511,22 @@ export default function MerchantStaffPage() {
               >
                 Start Scanning
               </button>
+              <div style={{ 
+                fontSize: '0.875rem', 
+                color: '#94a3b8', 
+                marginTop: '16px',
+                padding: '12px',
+                background: 'rgba(59, 130, 246, 0.1)',
+                borderRadius: '8px'
+              }}>
+                <div style={{ marginBottom: '8px', fontWeight: '500' }}>📱 Scanning Tips:</div>
+                <div style={{ fontSize: '0.75rem', textAlign: 'left', paddingLeft: '8px', lineHeight: '1.6' }}>
+                  • Ensure good lighting conditions<br/>
+                  • Hold QR code steady in frame<br/>
+                  • Keep camera 10-30cm from QR code<br/>
+                  • Make sure entire QR code is visible
+                </div>
+              </div>
             </div>
           ) : (
             <div>

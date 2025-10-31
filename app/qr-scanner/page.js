@@ -14,32 +14,154 @@ export default function QRScannerPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [stream, setStream] = useState(null)
+  const scanIntervalRef = useRef(null)
 
   useEffect(() => {
     return () => {
       if (stream) {
         stream.getTracks().forEach(track => track.stop())
       }
+      if (scanIntervalRef.current) {
+        clearInterval(scanIntervalRef.current)
+      }
     }
   }, [stream])
+
+  // Auto-scan when camera is active
+  useEffect(() => {
+    if (isScanning && videoRef.current && canvasRef.current) {
+      // Start auto-scanning every 500ms
+      const scanLoop = () => {
+        if (!videoRef.current || !canvasRef.current || !isScanning) return
+        
+        try {
+          const video = videoRef.current
+          const canvas = canvasRef.current
+          
+          // Check if video is ready
+          if (video.readyState !== video.HAVE_ENOUGH_DATA) return
+          
+          const context = canvas.getContext('2d')
+
+          canvas.width = video.videoWidth
+          canvas.height = video.videoHeight
+          context.drawImage(video, 0, 0, canvas.width, canvas.height)
+
+          // Use jsQR to scan QR code
+          const imageData = context.getImageData(0, 0, canvas.width, canvas.height)
+          const code = jsQR(imageData.data, imageData.width, imageData.height)
+
+          if (code && code.data) {
+            // Found a QR code, stop scanning and verify
+            if (scanIntervalRef.current) {
+              clearInterval(scanIntervalRef.current)
+              scanIntervalRef.current = null
+            }
+            setScannedCode(code.data)
+            verifyTicketFromQR(code.data)
+          }
+        } catch (err) {
+          // Silently ignore frame capture errors during auto-scan
+          console.debug('Frame capture error:', err)
+        }
+      }
+
+      scanIntervalRef.current = setInterval(scanLoop, 500)
+    } else {
+      if (scanIntervalRef.current) {
+        clearInterval(scanIntervalRef.current)
+        scanIntervalRef.current = null
+      }
+    }
+
+    return () => {
+      if (scanIntervalRef.current) {
+        clearInterval(scanIntervalRef.current)
+        scanIntervalRef.current = null
+      }
+    }
+  }, [isScanning])
 
   const startScanning = async () => {
     try {
       setError('')
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' }
-      })
       
-      setStream(mediaStream)
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream
-        videoRef.current.play()
+      // Check if getUserMedia is supported
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setError('Camera access is not supported in this browser. Please use a modern browser on a mobile device.')
+        return
       }
-      
-      setIsScanning(true)
+
+      // Check if we're on HTTPS or localhost (required for camera access)
+      const isSecureContext = window.isSecureContext || location.protocol === 'https:' || location.hostname === 'localhost'
+      if (!isSecureContext) {
+        setError('Camera access requires HTTPS connection. Please access this page via HTTPS.')
+        return
+      }
+
+      // Request camera permission with better error handling for mobile
+      let constraints = {
+        video: {
+          facingMode: 'environment', // Prefer rear camera on mobile
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }
+      }
+
+      try {
+        const mediaStream = await navigator.mediaDevices.getUserMedia(constraints)
+        
+        setStream(mediaStream)
+        if (videoRef.current) {
+          videoRef.current.srcObject = mediaStream
+          
+          // Wait for video to be ready before playing
+          videoRef.current.onloadedmetadata = () => {
+            videoRef.current.play().catch(err => {
+              console.error('Video play error:', err)
+            })
+          }
+        }
+        
+        setIsScanning(true)
+      } catch (permissionError) {
+        // Handle specific permission errors
+        let errorMessage = 'Unable to access camera. '
+        
+        if (permissionError.name === 'NotAllowedError' || permissionError.name === 'PermissionDeniedError') {
+          errorMessage += 'Please allow camera access in your browser settings. On mobile: Settings > Browser > Camera permissions.'
+        } else if (permissionError.name === 'NotFoundError' || permissionError.name === 'DevicesNotFoundError') {
+          errorMessage += 'No camera found. Please ensure your device has a camera.'
+        } else if (permissionError.name === 'NotReadableError' || permissionError.name === 'TrackStartError') {
+          errorMessage += 'Camera is already in use by another app. Please close other apps using the camera.'
+        } else if (permissionError.name === 'OverconstrainedError' || permissionError.name === 'ConstraintNotSatisfiedError') {
+          errorMessage += 'Camera settings not supported. Trying with default settings...'
+          
+          // Fallback to simpler constraints
+          try {
+            const fallbackStream = await navigator.mediaDevices.getUserMedia({ video: true })
+            setStream(fallbackStream)
+            if (videoRef.current) {
+              videoRef.current.srcObject = fallbackStream
+              videoRef.current.onloadedmetadata = () => {
+                videoRef.current.play().catch(err => console.error('Video play error:', err))
+              }
+            }
+            setIsScanning(true)
+            return
+          } catch (fallbackError) {
+            errorMessage = 'Unable to access camera with any settings. Please check your device permissions.'
+          }
+        } else {
+          errorMessage += `Error: ${permissionError.message || 'Unknown error'}`
+        }
+        
+        setError(errorMessage)
+        console.error('Camera access error:', permissionError)
+      }
     } catch (err) {
-      setError('Unable to access camera, please check permissions')
-      console.error('Camera access error:', err)
+      setError('Unexpected error while accessing camera. Please try again or use manual input.')
+      console.error('Unexpected camera error:', err)
     }
   }
 
@@ -55,25 +177,37 @@ export default function QRScannerPage() {
   }
 
   const captureFrame = () => {
-    if (!videoRef.current || !canvasRef.current) return
+    if (!videoRef.current || !canvasRef.current || !isScanning) return
+    
+    try {
+      const video = videoRef.current
+      const canvas = canvasRef.current
+      
+      // Check if video is ready
+      if (video.readyState !== video.HAVE_ENOUGH_DATA) return
+      
+      const context = canvas.getContext('2d')
 
-    const video = videoRef.current
-    const canvas = canvasRef.current
-    const context = canvas.getContext('2d')
+      canvas.width = video.videoWidth
+      canvas.height = video.videoHeight
+      context.drawImage(video, 0, 0, canvas.width, canvas.height)
 
-    canvas.width = video.videoWidth
-    canvas.height = video.videoHeight
-    context.drawImage(video, 0, 0, canvas.width, canvas.height)
+      // Use jsQR to scan QR code
+      const imageData = context.getImageData(0, 0, canvas.width, canvas.height)
+      const code = jsQR(imageData.data, imageData.width, imageData.height)
 
-    // Use jsQR to scan QR code
-    const imageData = context.getImageData(0, 0, canvas.width, canvas.height)
-    const code = jsQR(imageData.data, imageData.width, imageData.height)
-
-    if (code) {
-      setScannedCode(code.data)
-      verifyTicketFromQR(code.data)
-    } else {
-      setError('No QR code detected, please ensure QR code is clearly visible')
+      if (code && code.data) {
+        // Found a QR code, stop scanning and verify
+        if (scanIntervalRef.current) {
+          clearInterval(scanIntervalRef.current)
+          scanIntervalRef.current = null
+        }
+        setScannedCode(code.data)
+        verifyTicketFromQR(code.data)
+      }
+    } catch (err) {
+      // Silently ignore frame capture errors during auto-scan
+      console.debug('Frame capture error:', err)
     }
   }
 
@@ -441,11 +575,30 @@ export default function QRScannerPage() {
             border: '1px solid #ef4444',
             borderRadius: '0.5rem',
             padding: '1rem',
-            color: '#fca5a5',
-            fontSize: '0.875rem',
             marginBottom: '2rem'
           }}>
-            {error}
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem' }}>
+              <svg style={{ width: '1.25rem', height: '1.25rem', color: '#fca5a5', flexShrink: 0, marginTop: '0.125rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+              <div style={{ flex: 1 }}>
+                <div style={{ color: '#fca5a5', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem' }}>
+                  Camera Access Error
+                </div>
+                <div style={{ color: '#fca5a5', fontSize: '0.875rem', lineHeight: '1.5' }}>
+                  {error}
+                </div>
+                <div style={{ color: '#fca5a5', fontSize: '0.75rem', marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid rgba(239, 68, 68, 0.3)' }}>
+                  <strong>Mobile Instructions:</strong><br />
+                  1. Open your device Settings<br />
+                  2. Go to Browser/App Permissions<br />
+                  3. Enable Camera permission<br />
+                  4. Refresh this page and try again<br />
+                  <br />
+                  You can also use the manual input below to enter the ticket code directly.
+                </div>
+              </div>
+            </div>
           </div>
         )}
 

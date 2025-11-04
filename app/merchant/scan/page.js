@@ -421,17 +421,18 @@ export default function MerchantScanPage() {
             holder_name: ticket.holder_name || 'Unknown',
             holder_age: ticket.holder_age || null,
             tier: ticket.tier || 'N/A',
-            status: ticket.status,
+            status: ticket.status, // 应该是 'used'
             event_name: event?.title || 'Unknown Event',
             event_venue: event?.venue_name || 'N/A',
             valid_from: validity?.validFrom || validity?.valid_from || null,
             valid_until: validity?.validUntil || validity?.valid_until || null,
             is_valid: false,
-            is_used: true,
-            used_at: ticket.used_at || result.data.redeemed_at,
-            redeemed_at: ticket.redeemed_at || result.data.redeemed_at,
+            is_used: true, // 已使用
+            used_at: ticket.used_at || result.data?.redeemed_at || new Date().toISOString(),
+            redeemed_at: ticket.redeemed_at || result.data?.redeemed_at || new Date().toISOString(),
             can_redeem: false
           })
+          addDebugLog(`✅ Ticket status updated: ${ticket.status}`, 'success')
         }
         setError('')
       } else {

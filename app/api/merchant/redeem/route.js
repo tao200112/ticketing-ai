@@ -47,20 +47,46 @@ export async function POST(request) {
     }
 
     // Parse QR payload to get ticket ID
+    // Support both new TKT format and old JSON format
     let ticketId
     try {
+      // Try new TKT format first
       const qrResult = verifyTicketQRPayload(qr_payload)
       if (!qrResult.valid) {
-        throw ErrorHandler.validationError(
-          'INVALID_QR_FORMAT',
-          qrResult.error || 'Invalid QR code format'
-        )
+        throw new Error(qrResult.error || 'Invalid TKT format')
       }
       ticketId = qrResult.ticketId
     } catch (qrError) {
+      // If new format fails, try old JSON format
+      try {
+        // Limit payload size to prevent DoS attacks
+        if (qr_payload.length > 1000) {
+          throw new Error('QR payload too long')
+        }
+        const ticketData = JSON.parse(qr_payload)
+        // Validate ticket data structure
+        if (typeof ticketData !== 'object' || ticketData === null) {
+          throw new Error('Invalid ticket data structure')
+        }
+        ticketId = ticketData.ticket_id || ticketData.ticketId
+        // Ensure ticketId is a valid string
+        if (typeof ticketId !== 'string' || ticketId.length === 0) {
+          throw new Error('Invalid ticket ID')
+        }
+        logger.info('Using legacy JSON format for QR payload', { ticketId })
+      } catch (jsonError) {
+        logger.error('Failed to parse QR payload', { error: jsonError, qrPayload: qr_payload.substring(0, 100) })
+        throw ErrorHandler.validationError(
+          'INVALID_QR_FORMAT',
+          'Invalid QR code format. Expected TKT format or JSON format.'
+        )
+      }
+    }
+
+    if (!ticketId) {
       throw ErrorHandler.validationError(
         'INVALID_QR_FORMAT',
-        'Invalid QR code format'
+        'Could not extract ticket ID from QR code'
       )
     }
 

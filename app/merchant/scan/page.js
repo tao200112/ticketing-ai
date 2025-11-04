@@ -141,8 +141,16 @@ export default function MerchantScanPage() {
               frameCount,
               videoSize: `${video.videoWidth}x${video.videoHeight}`,
               canvasSize: `${canvas.width}x${canvas.height}`,
-              readyState: video.readyState
+              readyState: video.readyState,
+              isScanning: isScanning,
+              hasVideo: !!videoRef.current,
+              hasCanvas: !!canvasRef.current
             })
+          }
+          
+          // 每10帧输出一次简单状态（确认循环在运行）
+          if (frameCount % 10 === 0 && frameCount <= 50) {
+            console.log('🔍 QR detection loop running, frame:', frameCount)
           }
           
           const context = canvas.getContext('2d')
@@ -186,8 +194,8 @@ export default function MerchantScanPage() {
           })
           
           if (code && code.data) {
-            // Found a QR code!
-            console.log('✅ QR Code detected:', code.data)
+            // Found a QR code! (任何二维码都会被检测到)
+            console.log('✅ QR Code detected:', code.data.substring(0, 100))
             
             // Stop scanning
             stopScanning()
@@ -195,7 +203,7 @@ export default function MerchantScanPage() {
             // Set scanned code
             setQrCode(code.data)
             
-            // Set scan result
+            // Set scan result immediately (显示任何扫描到的二维码)
             setScanResult({
               code: code.data,
               timestamp: new Date().toISOString(),
@@ -212,7 +220,7 @@ export default function MerchantScanPage() {
             }
             setScanHistory(prev => [newHistory, ...prev.slice(0, 9)])
             
-            // Automatically verify the ticket
+            // Automatically verify the ticket (验证任何二维码)
             verifyTicket(code.data).then(result => {
               // Update history with result
               setScanHistory(prev => prev.map(item => 
@@ -220,9 +228,34 @@ export default function MerchantScanPage() {
                   ? { ...item, status: result.valid ? 'success' : 'error' }
                   : item
               ))
+              
+              // 更新scanResult显示验证结果（无论成功还是失败）
+              setScanResult({
+                code: code.data,
+                timestamp: new Date().toISOString(),
+                type: 'qr',
+                ticket: result.ticket || null,
+                event: result.event || null,
+                validity: result.validity || null,
+                valid: result.valid,
+                message: result.message
+              })
+            }).catch(err => {
+              console.error('❌ Verification promise error:', err)
+              // 即使验证失败，也保留扫描结果
+              setScanHistory(prev => prev.map(item => 
+                item.id === newHistory.id 
+                  ? { ...item, status: 'error' }
+                  : item
+              ))
             })
             
-            showToast('QR code detected!', 'success')
+            showToast('QR code detected! Verifying...', 'success')
+          } else {
+            // 每100帧（约20秒）输出一次调试信息，确认检测循环在运行
+            if (frameCount % 100 === 0) {
+              console.log('🔍 Scanning for QR code... (frame:', frameCount, ')')
+            }
           }
         } catch (err) {
           // Log errors for debugging
@@ -286,47 +319,69 @@ export default function MerchantScanPage() {
 
   const verifyTicket = async (code) => {
     try {
-      // Get merchant user info from localStorage
-      const merchantUserStr = localStorage.getItem('merchantUser')
-      if (!merchantUserStr) {
-        showToast('Please login first', 'error')
-        return { valid: false, message: 'Authentication required' }
-      }
+      console.log('🔍 Verifying QR code:', code.substring(0, 50) + '...')
       
-      const merchantUser = JSON.parse(merchantUserStr)
-      const userId = merchantUser.id
-      
-      // Call redemption API
-      const response = await fetch('/api/merchant/redeem', {
+      // 先使用 verify API 验证二维码（更宽松，可以验证任何格式）
+      // 这允许扫描任何二维码，如果不对就显示错误
+      const verifyResponse = await fetch('/api/tickets/verify', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           qr_payload: code,
-          user_id: userId
+          redeem: false  // 只验证，不核销
         }),
       })
       
-      const result = await response.json()
+      const verifyResult = await verifyResponse.json()
       
-      if (response.ok && result.success) {
-        showToast('Ticket redeemed successfully!', 'success')
-        return { valid: true, message: 'Ticket redeemed successfully' }
-      } else {
-        // Check for specific error codes
-        const errorCode = result.error || result.code
-        let errorMessage = result.message || 'Ticket verification failed'
+      if (verifyResponse.ok && verifyResult.success) {
+        // 验证成功，显示票务信息
+        const { ticket, event, validity } = verifyResult.data
         
-        // Show Chinese message for "not your merchant ticket" error
-        if (errorCode === 'NOT_YOUR_MERCHANT_TICKET' || errorMessage.includes('not your merchant')) {
-          errorMessage = 'This ticket does not belong to your merchant'
+        // 检查是否有效
+        const isValid = validity.valid && ticket.status !== 'used' && ticket.status !== 'refunded' && ticket.status !== 'cancelled'
+        
+        if (isValid) {
+          showToast('Ticket verified successfully!', 'success')
+          return { 
+            valid: true, 
+            message: 'Ticket verified successfully',
+            ticket,
+            event,
+            validity
+          }
+        } else {
+          // 票务无效（已使用、过期等）
+          const errorMessage = validity.message || 'Ticket is not valid'
+          showToast(errorMessage, 'error')
+          return { 
+            valid: false, 
+            message: errorMessage,
+            ticket,
+            event,
+            validity
+          }
+        }
+      } else {
+        // 验证失败 - 可能是格式不对、票务不存在等
+        const errorCode = verifyResult.error || verifyResult.code
+        let errorMessage = verifyResult.message || 'Invalid QR code or ticket not found'
+        
+        // 友好的错误消息
+        if (errorCode === 'INVALID_QR_FORMAT') {
+          errorMessage = 'This QR code is not a valid ticket QR code'
+        } else if (errorCode === 'TICKET_NOT_FOUND') {
+          errorMessage = 'Ticket not found in system'
         }
         
+        console.log('❌ Verification failed:', errorMessage)
         showToast(errorMessage, 'error')
         return { valid: false, message: errorMessage }
       }
     } catch (error) {
+      console.error('❌ Verification error:', error)
       showToast('Error occurred during verification', 'error')
       return { valid: false, message: 'Verification failed' }
     }

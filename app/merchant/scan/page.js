@@ -15,12 +15,22 @@ export default function MerchantScanPage() {
   const [scanResult, setScanResult] = useState(null)
   const [scanHistory, setScanHistory] = useState([])
   const [userRole, setUserRole] = useState(null)
+  const [debugInfo, setDebugInfo] = useState([])
+  const [showDebug, setShowDebug] = useState(false)
   
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
   const streamRef = useRef(null)
   const scanIntervalRef = useRef(null)
   const toastTimeoutRef = useRef(null)
+  
+  // 添加调试日志函数（同时显示在UI和控制台）
+  const addDebugLog = (message, type = 'info') => {
+    const timestamp = new Date().toLocaleTimeString()
+    const logEntry = { timestamp, message, type }
+    console.log(`[${timestamp}] ${message}`)
+    setDebugInfo(prev => [...prev.slice(-19), logEntry]) // 保留最近20条
+  }
 
   useEffect(() => {
     // 检查商家登录状态
@@ -65,14 +75,31 @@ export default function MerchantScanPage() {
 
   const startScanning = async () => {
     try {
-      console.log('🎥 Starting camera...')
+      addDebugLog('🎥 Starting camera...', 'info')
+      setDebugInfo([]) // 清空之前的日志
+      
+      // 检查媒体设备支持
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        addDebugLog('❌ Camera API not supported', 'error')
+        showToast('Camera not supported in this browser', 'error')
+        return
+      }
+      
+      addDebugLog('✅ Camera API available', 'success')
+      addDebugLog('📱 Requesting camera permission...', 'info')
+      
       const stream = await navigator.mediaDevices.getUserMedia({ 
         video: { facingMode: 'environment' }
       })
       
+      addDebugLog('✅ Camera permission granted', 'success')
+      addDebugLog('📹 Setting up video stream...', 'info')
+      
       streamRef.current = stream
       if (videoRef.current) {
         videoRef.current.srcObject = stream
+        
+        addDebugLog('⏳ Waiting for video metadata...', 'info')
         
         // 等待视频元数据加载完成
         await new Promise((resolve) => {
@@ -83,16 +110,26 @@ export default function MerchantScanPage() {
           }
         })
         
+        addDebugLog('✅ Video metadata loaded', 'success')
+        addDebugLog('▶️ Starting video playback...', 'info')
+        
         await videoRef.current.play()
+        
+        addDebugLog(`✅ Video playing: ${videoRef.current.videoWidth}x${videoRef.current.videoHeight}`, 'success')
         setIsScanning(true)
         showToast('Camera started successfully', 'success')
         
         // 延迟一点启动检测，确保视频已经开始播放
+        addDebugLog('⏳ Will start QR detection in 300ms...', 'info')
         setTimeout(() => {
           startQRDetection()
         }, 300)
+      } else {
+        addDebugLog('❌ Video element not found', 'error')
       }
     } catch (error) {
+      const errorMsg = error.message || 'Unknown error'
+      addDebugLog(`❌ Failed to start camera: ${errorMsg}`, 'error')
       console.error('❌ Failed to start camera:', error)
       showToast('Unable to access camera, please check permissions', 'error')
     }
@@ -102,19 +139,36 @@ export default function MerchantScanPage() {
     // Clear any existing interval
     if (scanIntervalRef.current) {
       clearInterval(scanIntervalRef.current)
+      addDebugLog('🔄 Clearing previous detection interval', 'info')
     }
 
-    console.log('🔍 Starting QR detection...', {
-      hasVideo: !!videoRef.current,
-      hasCanvas: !!canvasRef.current,
-      isScanning: isScanning,
-      videoWidth: videoRef.current?.videoWidth,
-      videoHeight: videoRef.current?.videoHeight,
-      readyState: videoRef.current?.readyState
-    })
+    const hasVideo = !!videoRef.current
+    const hasCanvas = !!canvasRef.current
+    const videoWidth = videoRef.current?.videoWidth
+    const videoHeight = videoRef.current?.videoHeight
+    const readyState = videoRef.current?.readyState
+
+    addDebugLog('🔍 Starting QR detection...', 'info')
+    addDebugLog(`📊 Status: Video=${hasVideo}, Canvas=${hasCanvas}`, 'info')
+    
+    if (videoRef.current) {
+      addDebugLog(`📐 Video size: ${videoWidth}x${videoHeight}, ReadyState: ${readyState}`, 'info')
+    }
+    
+    if (!hasVideo) {
+      addDebugLog('❌ Video element not available', 'error')
+      return
+    }
+    
+    if (!hasCanvas) {
+      addDebugLog('❌ Canvas element not available', 'error')
+      return
+    }
     
     // 移动端性能优化：限制检测频率
     let frameCount = 0
+    
+    addDebugLog('✅ Starting detection loop (every 200ms)...', 'success')
 
     scanIntervalRef.current = setInterval(() => {
       // 不依赖 isScanning 状态，因为状态更新是异步的
@@ -137,20 +191,13 @@ export default function MerchantScanPage() {
           frameCount++
           // 每50帧（约10秒）输出一次调试信息
           if (frameCount % 50 === 0) {
-            console.log('📊 Scanning status:', {
-              frameCount,
-              videoSize: `${video.videoWidth}x${video.videoHeight}`,
-              canvasSize: `${canvas.width}x${canvas.height}`,
-              readyState: video.readyState,
-              isScanning: isScanning,
-              hasVideo: !!videoRef.current,
-              hasCanvas: !!canvasRef.current
-            })
+            const statusMsg = `📊 Frame ${frameCount}: ${video.videoWidth}x${video.videoHeight}, ReadyState: ${video.readyState}`
+            addDebugLog(statusMsg, 'info')
           }
           
           // 每10帧输出一次简单状态（确认循环在运行）
           if (frameCount % 10 === 0 && frameCount <= 50) {
-            console.log('🔍 QR detection loop running, frame:', frameCount)
+            addDebugLog(`🔍 Detection loop running (frame ${frameCount})`, 'info')
           }
           
           const context = canvas.getContext('2d')
@@ -195,6 +242,8 @@ export default function MerchantScanPage() {
           
           if (code && code.data) {
             // Found a QR code! (任何二维码都会被检测到)
+            const codePreview = code.data.substring(0, 50) + (code.data.length > 50 ? '...' : '')
+            addDebugLog(`✅ QR Code detected: ${codePreview}`, 'success')
             console.log('✅ QR Code detected:', code.data.substring(0, 100))
             
             // Stop scanning
@@ -259,6 +308,10 @@ export default function MerchantScanPage() {
           }
         } catch (err) {
           // Log errors for debugging
+          const errorMsg = err.message || 'Unknown error'
+          if (frameCount % 50 === 0) { // 每50帧才显示一次错误，避免刷屏
+            addDebugLog(`❌ Frame capture error: ${errorMsg}`, 'error')
+          }
           console.error('❌ Frame capture error:', err)
         }
       } else {
@@ -441,6 +494,22 @@ export default function MerchantScanPage() {
             </div>
             
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <button
+                onClick={() => setShowDebug(!showDebug)}
+                style={{
+                  padding: '0.5rem 1rem',
+                  fontSize: '0.875rem',
+                  backgroundColor: showDebug ? '#2563eb' : '#f3f4f6',
+                  color: showDebug ? 'white' : '#374151',
+                  border: 'none',
+                  borderRadius: '0.5rem',
+                  cursor: 'pointer',
+                  fontWeight: '500',
+                  marginRight: '0.5rem'
+                }}
+              >
+                {showDebug ? 'Hide Debug' : 'Show Debug'}
+              </button>
               <div style={{
                 width: '0.5rem',
                 height: '0.5rem',
@@ -665,6 +734,70 @@ export default function MerchantScanPage() {
             </button>
           </div>
         </div>
+
+        {/* Debug Panel */}
+        {showDebug && (
+          <div style={{
+            backgroundColor: '#1e293b',
+            borderRadius: '0.5rem',
+            border: '1px solid #334155',
+            padding: '1.5rem',
+            marginBottom: '2rem',
+            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+            maxHeight: '400px',
+            overflowY: 'auto'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+              <h2 style={{ fontSize: '1.125rem', fontWeight: '600', color: '#f1f5f9' }}>Debug Information</h2>
+              <button
+                onClick={() => setDebugInfo([])}
+                style={{
+                  padding: '0.25rem 0.75rem',
+                  fontSize: '0.75rem',
+                  backgroundColor: '#475569',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '0.25rem',
+                  cursor: 'pointer'
+                }}
+              >
+                Clear
+              </button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontFamily: 'monospace', fontSize: '0.75rem' }}>
+              {debugInfo.length === 0 ? (
+                <div style={{ color: '#94a3b8', fontStyle: 'italic' }}>No debug information yet. Start scanning to see logs.</div>
+              ) : (
+                debugInfo.map((log, index) => (
+                  <div 
+                    key={index}
+                    style={{
+                      padding: '0.5rem',
+                      backgroundColor: log.type === 'error' ? 'rgba(239, 68, 68, 0.1)' : 
+                                       log.type === 'success' ? 'rgba(16, 185, 129, 0.1)' : 
+                                       'rgba(59, 130, 246, 0.1)',
+                      borderRadius: '0.25rem',
+                      borderLeft: `3px solid ${
+                        log.type === 'error' ? '#ef4444' : 
+                        log.type === 'success' ? '#10b981' : 
+                        '#3b82f6'
+                      }`
+                    }}
+                  >
+                    <span style={{ color: '#94a3b8' }}>[{log.timestamp}]</span>{' '}
+                    <span style={{ 
+                      color: log.type === 'error' ? '#fca5a5' : 
+                             log.type === 'success' ? '#6ee7b7' : 
+                             '#bfdbfe'
+                    }}>
+                      {log.message}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Scan Result */}
         {scanResult && (

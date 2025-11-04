@@ -16,7 +16,7 @@ export default function MerchantScanPage() {
   const [scanHistory, setScanHistory] = useState([])
   const [userRole, setUserRole] = useState(null)
   const [debugInfo, setDebugInfo] = useState([])
-  const [showDebug, setShowDebug] = useState(false)
+  const [showDebug, setShowDebug] = useState(true) // 默认显示调试面板
   
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
@@ -536,6 +536,23 @@ export default function MerchantScanPage() {
           <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
             <h2 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#111827', marginBottom: '0.5rem' }}>Scan QR Code</h2>
             <p style={{ color: '#6b7280' }}>Point the camera at the QR code to scan</p>
+            {/* Debug Toggle Button - 放在更明显的位置 */}
+            <button
+              onClick={() => setShowDebug(!showDebug)}
+              style={{
+                marginTop: '1rem',
+                padding: '0.5rem 1rem',
+                fontSize: '0.875rem',
+                backgroundColor: showDebug ? '#2563eb' : '#f3f4f6',
+                color: showDebug ? 'white' : '#374151',
+                border: 'none',
+                borderRadius: '0.5rem',
+                cursor: 'pointer',
+                fontWeight: '500'
+              }}
+            >
+              {showDebug ? '🔽 Hide Debug' : '▶️ Show Debug'}
+            </button>
           </div>
 
           {/* Camera Area */}

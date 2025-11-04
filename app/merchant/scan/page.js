@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import MerchantNavbar from '@/components/MerchantNavbar'
+import jsQR from 'jsqr'
 
 export default function MerchantScanPage() {
   const router = useRouter()
@@ -71,9 +72,10 @@ export default function MerchantScanPage() {
       streamRef.current = stream
       if (videoRef.current) {
         videoRef.current.srcObject = stream
-        videoRef.current.play()
+        await videoRef.current.play()
         setIsScanning(true)
         showToast('Camera started successfully', 'success')
+        startQRDetection()
       }
     } catch (error) {
       console.error('Failed to start camera:', error)
@@ -81,16 +83,100 @@ export default function MerchantScanPage() {
     }
   }
 
+  const startQRDetection = () => {
+    // Clear any existing interval
+    if (scanIntervalRef.current) {
+      clearInterval(scanIntervalRef.current)
+    }
+
+    scanIntervalRef.current = setInterval(() => {
+      if (videoRef.current && canvasRef.current && isScanning) {
+        try {
+          const video = videoRef.current
+          const canvas = canvasRef.current
+          
+          // Check if video is ready
+          if (video.readyState !== video.HAVE_ENOUGH_DATA) return
+          
+          const context = canvas.getContext('2d')
+          
+          // Set canvas size to match video
+          canvas.width = video.videoWidth
+          canvas.height = video.videoHeight
+          
+          // Draw video frame to canvas
+          context.drawImage(video, 0, 0, canvas.width, canvas.height)
+          
+          // Get image data and scan for QR code
+          const imageData = context.getImageData(0, 0, canvas.width, canvas.height)
+          const code = jsQR(imageData.data, imageData.width, imageData.height)
+          
+          if (code && code.data) {
+            // Found a QR code!
+            console.log('QR Code detected:', code.data)
+            
+            // Stop scanning
+            stopScanning()
+            
+            // Set scanned code
+            setQrCode(code.data)
+            
+            // Set scan result
+            setScanResult({
+              code: code.data,
+              timestamp: new Date().toISOString(),
+              type: 'qr'
+            })
+            
+            // Add to scan history
+            const newHistory = {
+              id: Date.now(),
+              code: code.data,
+              timestamp: new Date().toISOString(),
+              type: 'qr',
+              status: 'pending'
+            }
+            setScanHistory(prev => [newHistory, ...prev.slice(0, 9)])
+            
+            // Automatically verify the ticket
+            verifyTicket(code.data).then(result => {
+              // Update history with result
+              setScanHistory(prev => prev.map(item => 
+                item.id === newHistory.id 
+                  ? { ...item, status: result.valid ? 'success' : 'error' }
+                  : item
+              ))
+            })
+            
+            showToast('QR code detected!', 'success')
+          }
+        } catch (err) {
+          // Silently ignore frame capture errors during scanning
+          console.debug('Frame capture error:', err)
+        }
+      }
+    }, 100) // Check every 100ms
+  }
+
   const stopScanning = () => {
+    // Stop camera stream
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop())
       streamRef.current = null
     }
+    
+    // Clear QR detection interval
     if (scanIntervalRef.current) {
       clearInterval(scanIntervalRef.current)
       scanIntervalRef.current = null
     }
+    
     setIsScanning(false)
+    
+    // Clear video source
+    if (videoRef.current) {
+      videoRef.current.srcObject = null
+    }
   }
 
   const handleManualSubmit = () => {

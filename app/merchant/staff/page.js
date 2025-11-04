@@ -597,34 +597,66 @@ export default function MerchantStaffPage() {
             </div>
           )}
           
-          {/* Debug Info - Visible on screen */}
-          {isScanning && (
+          {/* Debug Panel */}
+          {showDebug && (
             <div style={{
-              marginTop: '16px',
-              padding: '12px',
-              background: 'rgba(59, 130, 246, 0.1)',
-              border: '1px solid #3b82f6',
+              backgroundColor: '#1e293b',
               borderRadius: '8px',
-              color: '#3b82f6',
-              fontSize: '0.875rem',
-              fontFamily: 'monospace'
+              border: '1px solid #334155',
+              padding: '16px',
+              marginTop: '16px',
+              maxHeight: '300px',
+              overflowY: 'auto'
             }}>
-              <div style={{ fontWeight: '600', marginBottom: '4px' }}>
-                🔍 {debugInfo || 'Initializing...'}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                <h3 style={{ fontSize: '1rem', fontWeight: '600', color: '#f1f5f9', margin: 0 }}>Debug Information</h3>
+                <button
+                  onClick={() => setDebugInfo([])}
+                  style={{
+                    padding: '0.25rem 0.75rem',
+                    fontSize: '0.75rem',
+                    backgroundColor: '#475569',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '0.25rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Clear
+                </button>
               </div>
-              <div style={{ marginTop: '8px', fontSize: '0.75rem', opacity: 0.8 }}>
-                Video: {videoRef.current ? 
-                  (videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA ? 
-                    `✅ Ready (${videoRef.current.videoWidth}x${videoRef.current.videoHeight})` : 
-                    `⏳ Loading (state: ${videoRef.current.readyState})`) : 
-                  '❌ No Element'} | 
-                Loop: {scanIntervalRef.current ? '✅ Running' : '❌ Stopped'}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontFamily: 'monospace', fontSize: '0.75rem' }}>
+                {debugInfo.length === 0 ? (
+                  <div style={{ color: '#94a3b8', fontStyle: 'italic' }}>No debug information yet. Start scanning to see logs.</div>
+                ) : (
+                  debugInfo.map((log, index) => (
+                    <div 
+                      key={index}
+                      style={{
+                        padding: '0.5rem',
+                        backgroundColor: log.type === 'error' ? 'rgba(239, 68, 68, 0.1)' : 
+                                         log.type === 'success' ? 'rgba(16, 185, 129, 0.1)' : 
+                                         'rgba(59, 130, 246, 0.1)',
+                        borderRadius: '0.25rem',
+                        borderLeft: `3px solid ${
+                          log.type === 'error' ? '#ef4444' : 
+                          log.type === 'success' ? '#10b981' : 
+                          '#3b82f6'
+                        }`
+                      }}
+                    >
+                      <span style={{ color: '#94a3b8' }}>[{log.timestamp}]</span>{' '}
+                      <span style={{ 
+                        color: log.type === 'error' ? '#fca5a5' : 
+                               log.type === 'success' ? '#6ee7b7' : 
+                               '#bfdbfe'
+                      }}>
+                        {log.message}
+                      </span>
+                    </div>
+                  ))
+                )}
               </div>
-              {scanAttempts > 0 && (
-                <div style={{ marginTop: '4px', fontSize: '0.75rem', opacity: 0.8 }}>
-                  QR Codes Found: {scanAttempts}
-                </div>
-              )}
             </div>
           )}
         </div>

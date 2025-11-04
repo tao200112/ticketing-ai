@@ -107,8 +107,14 @@ export default function MerchantScanPage() {
     console.log('🔍 Starting QR detection...', {
       hasVideo: !!videoRef.current,
       hasCanvas: !!canvasRef.current,
-      isScanning: isScanning
+      isScanning: isScanning,
+      videoWidth: videoRef.current?.videoWidth,
+      videoHeight: videoRef.current?.videoHeight,
+      readyState: videoRef.current?.readyState
     })
+    
+    // 移动端性能优化：限制检测频率
+    let frameCount = 0
 
     scanIntervalRef.current = setInterval(() => {
       // 不依赖 isScanning 状态，因为状态更新是异步的
@@ -128,6 +134,17 @@ export default function MerchantScanPage() {
             return
           }
           
+          frameCount++
+          // 每50帧（约10秒）输出一次调试信息
+          if (frameCount % 50 === 0) {
+            console.log('📊 Scanning status:', {
+              frameCount,
+              videoSize: `${video.videoWidth}x${video.videoHeight}`,
+              canvasSize: `${canvas.width}x${canvas.height}`,
+              readyState: video.readyState
+            })
+          }
+          
           const context = canvas.getContext('2d')
           
           // Set canvas size to match video
@@ -138,8 +155,35 @@ export default function MerchantScanPage() {
           context.drawImage(video, 0, 0, canvas.width, canvas.height)
           
           // Get image data and scan for QR code
-          const imageData = context.getImageData(0, 0, canvas.width, canvas.height)
-          const code = jsQR(imageData.data, imageData.width, imageData.height)
+          // 限制canvas尺寸以提高移动端性能（移动设备分辨率可能很高）
+          const maxSize = 640 // 限制最大尺寸以提高性能
+          let imageData, scanWidth, scanHeight
+          
+          if (canvas.width > maxSize || canvas.height > maxSize) {
+            // 如果尺寸太大，进行缩放以提高性能
+            const scale = Math.min(maxSize / canvas.width, maxSize / canvas.height)
+            scanWidth = Math.floor(canvas.width * scale)
+            scanHeight = Math.floor(canvas.height * scale)
+            
+            // 创建临时canvas进行缩放
+            const tempCanvas = document.createElement('canvas')
+            tempCanvas.width = scanWidth
+            tempCanvas.height = scanHeight
+            const tempContext = tempCanvas.getContext('2d')
+            tempContext.drawImage(video, 0, 0, scanWidth, scanHeight)
+            imageData = tempContext.getImageData(0, 0, scanWidth, scanHeight)
+          } else {
+            // 使用原始尺寸
+            scanWidth = canvas.width
+            scanHeight = canvas.height
+            imageData = context.getImageData(0, 0, canvas.width, canvas.height)
+          }
+          
+          // 使用 inversionAttempts 选项提高检测成功率（特别是移动设备）
+          // 这个选项会尝试检测正常和反色的二维码
+          const code = jsQR(imageData.data, imageData.width, imageData.height, {
+            inversionAttempts: 'attemptBoth'
+          })
           
           if (code && code.data) {
             // Found a QR code!
@@ -192,7 +236,7 @@ export default function MerchantScanPage() {
           console.warn('⚠️ Video or canvas not available, stopping detection')
         }
       }
-    }, 100) // Check every 100ms
+    }, 200) // Check every 200ms (降低频率以提高移动端性能)
   }
 
   const stopScanning = () => {

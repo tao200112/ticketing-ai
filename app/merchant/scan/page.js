@@ -65,6 +65,7 @@ export default function MerchantScanPage() {
 
   const startScanning = async () => {
     try {
+      console.log('🎥 Starting camera...')
       const stream = await navigator.mediaDevices.getUserMedia({ 
         video: { facingMode: 'environment' }
       })
@@ -72,13 +73,27 @@ export default function MerchantScanPage() {
       streamRef.current = stream
       if (videoRef.current) {
         videoRef.current.srcObject = stream
+        
+        // 等待视频元数据加载完成
+        await new Promise((resolve) => {
+          if (videoRef.current.readyState >= 2) {
+            resolve()
+          } else {
+            videoRef.current.onloadedmetadata = () => resolve()
+          }
+        })
+        
         await videoRef.current.play()
         setIsScanning(true)
         showToast('Camera started successfully', 'success')
-        startQRDetection()
+        
+        // 延迟一点启动检测，确保视频已经开始播放
+        setTimeout(() => {
+          startQRDetection()
+        }, 300)
       }
     } catch (error) {
-      console.error('Failed to start camera:', error)
+      console.error('❌ Failed to start camera:', error)
       showToast('Unable to access camera, please check permissions', 'error')
     }
   }
@@ -89,14 +104,29 @@ export default function MerchantScanPage() {
       clearInterval(scanIntervalRef.current)
     }
 
+    console.log('🔍 Starting QR detection...', {
+      hasVideo: !!videoRef.current,
+      hasCanvas: !!canvasRef.current,
+      isScanning: isScanning
+    })
+
     scanIntervalRef.current = setInterval(() => {
-      if (videoRef.current && canvasRef.current && isScanning) {
+      // 不依赖 isScanning 状态，因为状态更新是异步的
+      // 直接检查 video 和 canvas 是否存在
+      if (videoRef.current && canvasRef.current) {
         try {
           const video = videoRef.current
           const canvas = canvasRef.current
           
           // Check if video is ready
-          if (video.readyState !== video.HAVE_ENOUGH_DATA) return
+          if (video.readyState !== video.HAVE_ENOUGH_DATA) {
+            return
+          }
+          
+          // 确保视频有有效的尺寸
+          if (video.videoWidth === 0 || video.videoHeight === 0) {
+            return
+          }
           
           const context = canvas.getContext('2d')
           
@@ -113,7 +143,7 @@ export default function MerchantScanPage() {
           
           if (code && code.data) {
             // Found a QR code!
-            console.log('QR Code detected:', code.data)
+            console.log('✅ QR Code detected:', code.data)
             
             // Stop scanning
             stopScanning()
@@ -151,8 +181,15 @@ export default function MerchantScanPage() {
             showToast('QR code detected!', 'success')
           }
         } catch (err) {
-          // Silently ignore frame capture errors during scanning
-          console.debug('Frame capture error:', err)
+          // Log errors for debugging
+          console.error('❌ Frame capture error:', err)
+        }
+      } else {
+        // 如果video或canvas不存在，停止检测
+        if (scanIntervalRef.current) {
+          clearInterval(scanIntervalRef.current)
+          scanIntervalRef.current = null
+          console.warn('⚠️ Video or canvas not available, stopping detection')
         }
       }
     }, 100) // Check every 100ms

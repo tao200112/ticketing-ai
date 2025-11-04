@@ -444,7 +444,7 @@ export default function MerchantBossPage() {
               </div>
             </Link>
             
-            <Link href="/merchant/staff" style={{ textDecoration: 'none' }}>
+            <Link href="/merchant/scan" style={{ textDecoration: 'none' }}>
               <div style={{
                 background: 'linear-gradient(135deg, rgba(236, 72, 153, 0.1) 0%, rgba(219, 39, 119, 0.1) 100%)',
                 border: '1px solid rgba(236, 72, 153, 0.2)',

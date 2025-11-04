@@ -14,8 +14,17 @@ export default function MerchantStaffPage() {
   const [loading, setLoading] = useState(false)
   const [stream, setStream] = useState(null)
   const [userRole, setUserRole] = useState(null)
-  const [debugInfo, setDebugInfo] = useState('')
+  const [debugInfo, setDebugInfo] = useState([])
+  const [showDebug, setShowDebug] = useState(true) // 默认显示调试面板
   const [scanAttempts, setScanAttempts] = useState(0)
+  
+  // 添加调试日志函数（同时显示在UI和控制台）
+  const addDebugLog = (message, type = 'info') => {
+    const timestamp = new Date().toLocaleTimeString()
+    const logEntry = { timestamp, message, type }
+    console.log(`[${timestamp}] ${message}`)
+    setDebugInfo(prev => [...prev.slice(-19), logEntry]) // 保留最近20条
+  }
   const scanIntervalRef = useRef(null)
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
@@ -129,7 +138,7 @@ export default function MerchantStaffPage() {
       
       // QR detection will start automatically via useEffect when isScanning is true
       console.log('Video started, QR detection should begin automatically')
-      setDebugInfo('Camera active. Waiting for QR code...')
+      addDebugLog('✅ Video started, QR detection will begin automatically', 'success')
     } catch (err) {
       console.error('Camera error:', err)
       
@@ -139,7 +148,7 @@ export default function MerchantStaffPage() {
       }
       setStream(null)
       setIsScanning(false)
-      setDebugInfo('')
+      addDebugLog(`❌ Failed to start camera: ${err.message || 'Unknown error'}`, 'error')
       
       // Set specific error messages
       if (err.name === 'NotAllowedError') {
@@ -178,16 +187,13 @@ export default function MerchantStaffPage() {
         clearInterval(scanIntervalRef.current)
         scanIntervalRef.current = null
       }
-      if (!debugInfo.includes('detected')) {
-        setDebugInfo('')
-      }
       return
     }
     
     // Wait for refs to be available
     const checkRefs = () => {
       if (!videoRef.current || !canvasRef.current) {
-        setDebugInfo('Waiting for video/canvas elements...')
+        addDebugLog('⏳ Waiting for video/canvas elements...', 'info')
         setTimeout(checkRefs, 200)
         return
       }
@@ -197,14 +203,22 @@ export default function MerchantStaffPage() {
         return
       }
       
+      const hasVideo = !!videoRef.current
+      const hasCanvas = !!canvasRef.current
+      const videoReady = videoRef.current?.readyState
+      const videoSize = videoRef.current ? `${videoRef.current.videoWidth}x${videoRef.current.videoHeight}` : 'none'
+      
+      addDebugLog('🔍 Starting QR detection...', 'info')
+      addDebugLog(`📊 Status: Video=${hasVideo}, Canvas=${hasCanvas}`, 'info')
+      addDebugLog(`📐 Video size: ${videoSize}, ReadyState: ${videoReady}`, 'info')
+      
       console.log('Starting QR detection loop', {
         isScanning,
-        hasVideo: !!videoRef.current,
-        hasCanvas: !!canvasRef.current,
-        videoReady: videoRef.current?.readyState,
-        videoSize: videoRef.current ? `${videoRef.current.videoWidth}x${videoRef.current.videoHeight}` : 'none'
+        hasVideo,
+        hasCanvas,
+        videoReady,
+        videoSize
       })
-      setDebugInfo('Starting QR detection...')
       
       let frameCount = 0
       let lastUpdateTime = Date.now()
@@ -226,13 +240,13 @@ export default function MerchantStaffPage() {
           const video = videoRef.current
           const canvas = canvasRef.current
 
-          // Update debug info every 1 second (more frequent)
+          // Update debug info every 1 second
           if (now - lastUpdateTime > 1000) {
             const videoReady = video.readyState === video.HAVE_ENOUGH_DATA ? 'Yes' : 'No'
             const videoSize = video.videoWidth > 0 && video.videoHeight > 0 
               ? `${video.videoWidth}x${video.videoHeight}` 
               : 'Not set'
-            setDebugInfo(`🔄 Frame ${frameCount} | Video: ${videoReady} | Size: ${videoSize}`)
+            addDebugLog(`🔄 Frame ${frameCount} | Video: ${videoReady} | Size: ${videoSize}`, 'info')
             lastUpdateTime = now
           }
 
@@ -255,18 +269,40 @@ export default function MerchantStaffPage() {
           // Draw video frame to canvas
           context.drawImage(video, 0, 0, canvas.width, canvas.height)
           
-          // Get image data
-          const imageData = context.getImageData(0, 0, canvas.width, canvas.height)
+          // Get image data with size optimization for mobile
+          const maxSize = 640 // 限制最大尺寸以提高性能
+          let imageData, scanWidth, scanHeight
           
-          // Try to detect QR code
+          if (canvas.width > maxSize || canvas.height > maxSize) {
+            // 如果尺寸太大，进行缩放以提高性能
+            const scale = Math.min(maxSize / canvas.width, maxSize / canvas.height)
+            scanWidth = Math.floor(canvas.width * scale)
+            scanHeight = Math.floor(canvas.height * scale)
+            
+            // 创建临时canvas进行缩放
+            const tempCanvas = document.createElement('canvas')
+            tempCanvas.width = scanWidth
+            tempCanvas.height = scanHeight
+            const tempContext = tempCanvas.getContext('2d')
+            tempContext.drawImage(video, 0, 0, scanWidth, scanHeight)
+            imageData = tempContext.getImageData(0, 0, scanWidth, scanHeight)
+          } else {
+            // 使用原始尺寸
+            scanWidth = canvas.width
+            scanHeight = canvas.height
+            imageData = context.getImageData(0, 0, canvas.width, canvas.height)
+          }
+          
+          // Try to detect QR code with inversionAttempts option
           const code = jsQR(imageData.data, imageData.width, imageData.height, {
             inversionAttempts: 'attemptBoth'
           })
 
           if (code && code.data) {
             // Found a QR code!
+            const codePreview = code.data.substring(0, 50) + (code.data.length > 50 ? '...' : '')
+            addDebugLog(`✅ QR Code detected: ${codePreview}`, 'success')
             console.log('✅ QR code detected:', code.data.substring(0, 50) + '...')
-            setDebugInfo(`✅ QR Code detected! Verifying...`)
             setScanAttempts(prev => prev + 1)
             if (scanIntervalRef.current) {
               clearInterval(scanIntervalRef.current)
@@ -280,7 +316,7 @@ export default function MerchantStaffPage() {
           // Log errors but don't stop scanning
           console.error('Scan loop error:', err)
           if (frameCount % 25 === 0) {
-            setDebugInfo(`⚠️ Error: ${err.message || 'Unknown'}`)
+            addDebugLog(`⚠️ Error: ${err.message || 'Unknown'}`, 'error')
           }
         }
       }
@@ -505,7 +541,8 @@ export default function MerchantStaffPage() {
                   }}
                   onPlay={() => {
                     console.log('Video started playing')
-                    setDebugInfo('Camera active. Scanning for QR codes...')
+                    addDebugLog('▶️ Video started playing', 'success')
+                    addDebugLog('🔍 Camera active. Scanning for QR codes...', 'info')
                   }}
                 />
                 {/* Scanning overlay indicator */}
@@ -561,7 +598,7 @@ export default function MerchantStaffPage() {
           )}
           
           {/* Debug Info - Visible on screen */}
-          {isScanning && debugInfo && (
+          {isScanning && (
             <div style={{
               marginTop: '16px',
               padding: '12px',
@@ -569,12 +606,23 @@ export default function MerchantStaffPage() {
               border: '1px solid #3b82f6',
               borderRadius: '8px',
               color: '#3b82f6',
-              fontSize: '0.875rem'
+              fontSize: '0.875rem',
+              fontFamily: 'monospace'
             }}>
-              🔍 {debugInfo}
+              <div style={{ fontWeight: '600', marginBottom: '4px' }}>
+                🔍 {debugInfo || 'Initializing...'}
+              </div>
+              <div style={{ marginTop: '8px', fontSize: '0.75rem', opacity: 0.8 }}>
+                Video: {videoRef.current ? 
+                  (videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA ? 
+                    `✅ Ready (${videoRef.current.videoWidth}x${videoRef.current.videoHeight})` : 
+                    `⏳ Loading (state: ${videoRef.current.readyState})`) : 
+                  '❌ No Element'} | 
+                Loop: {scanIntervalRef.current ? '✅ Running' : '❌ Stopped'}
+              </div>
               {scanAttempts > 0 && (
                 <div style={{ marginTop: '4px', fontSize: '0.75rem', opacity: 0.8 }}>
-                  Scan attempts: {scanAttempts}
+                  QR Codes Found: {scanAttempts}
                 </div>
               )}
             </div>

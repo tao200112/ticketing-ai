@@ -258,6 +258,9 @@ export default function MerchantScanPage() {
               scanIntervalRef.current = null
             }
             stopScanning()
+            // 清除之前的错误信息
+            setError('')
+            // 扫描成功后自动验证票务信息
             verifyTicket(code.data)
           }
         } catch (err) {

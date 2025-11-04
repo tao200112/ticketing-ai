@@ -83,7 +83,7 @@ export default function MerchantOverviewPage() {
             }}>
               {/* Staff 入口 */}
               <div
-                onClick={() => router.push('/merchant/staff')}
+                onClick={() => router.push('/merchant/scan')}
                 style={{
                   background: 'linear-gradient(135deg, rgba(236, 72, 153, 0.1) 0%, rgba(219, 39, 119, 0.1) 100%)',
                   border: '1px solid rgba(236, 72, 153, 0.3)',

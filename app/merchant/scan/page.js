@@ -846,5 +846,3 @@ export default function MerchantScanPage() {
     </div>
   )
 }
-
-}

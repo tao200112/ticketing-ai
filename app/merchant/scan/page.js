@@ -81,7 +81,7 @@ export default function MerchantScanPage() {
         if (stream) {
           stream.getTracks().forEach(track => track.stop())
         }
-        setStream(null)
+        streamRef.current = null
         setIsScanning(false)
         setError('Video element not initialized. Please refresh the page and try again.')
         return
@@ -122,8 +122,8 @@ export default function MerchantScanPage() {
       
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop())
+        streamRef.current = null
       }
-      setStream(null)
       setIsScanning(false)
       addDebugLog(`❌ Failed to start camera: ${err.message || 'Unknown error'}`, 'error')
       
@@ -293,9 +293,85 @@ export default function MerchantScanPage() {
         return
       }
       
+      // 先验证票务信息（不核销）
+      const verifyResponse = await fetch('/api/tickets/verify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          qr_payload: qrData,
+          redeem: false
+        }),
+      })
+      
+      const verifyResult = await verifyResponse.json()
+      
+      if (verifyResponse.ok && verifyResult.success) {
+        const { ticket, event, validity } = verifyResult.data
+        
+        // 检查票务状态
+        const isUsed = ticket.status === 'used'
+        const isRefunded = ticket.status === 'refunded'
+        const isCancelled = ticket.status === 'cancelled'
+        const isValid = validity?.valid && !isUsed && !isRefunded && !isCancelled
+        
+        // 显示票务信息（无论是否已使用）
+        setScanResult({
+          qr_data: qrData, // 保存二维码数据用于核销
+          ticket_id: ticket.short_id || ticket.id,
+          holder_name: ticket.holder_name || 'Unknown',
+          holder_age: ticket.holder_age || null,
+          tier: ticket.tier || 'N/A',
+          status: ticket.status,
+          event_name: event?.title || 'Unknown Event',
+          event_venue: event?.venue_name || 'N/A',
+          valid_from: validity?.validFrom || validity?.valid_from || null,
+          valid_until: validity?.validUntil || validity?.valid_until || null,
+          is_valid: isValid,
+          is_used: isUsed,
+          used_at: ticket.used_at || null,
+          redeemed_at: ticket.redeemed_at || null,
+          can_redeem: isValid && !isUsed && !isRefunded && !isCancelled
+        })
+        setError('')
+      } else {
+        const errorCode = verifyResult.error || verifyResult.code
+        let errorMessage = verifyResult.message || 'Ticket verification failed'
+        
+        if (errorCode === 'INVALID_QR_FORMAT') {
+          errorMessage = 'This QR code is not a valid ticket QR code'
+        } else if (errorCode === 'TICKET_NOT_FOUND') {
+          errorMessage = 'Ticket not found in system'
+        }
+        
+        setError(errorMessage)
+        setScanResult(null)
+      }
+    } catch (err) {
+      setError(err.message || 'Ticket verification error, please try again')
+      console.error('Verification error:', err)
+      setScanResult(null)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const redeemTicket = async (qrData) => {
+    try {
+      setLoading(true)
+      setError('')
+      
+      const merchantUserStr = localStorage.getItem('merchantUser')
+      if (!merchantUserStr) {
+        setError('Please login first')
+        return
+      }
+      
       const merchantUser = JSON.parse(merchantUserStr)
       const userId = merchantUser.id
       
+      // 核销票务
       const response = await fetch('/api/merchant/redeem', {
         method: 'POST',
         headers: {
@@ -310,6 +386,7 @@ export default function MerchantScanPage() {
       const result = await response.json()
       
       if (response.ok && result.success) {
+        // 核销成功后，重新获取票务信息（此时status应该是'used'）
         const verifyResponse = await fetch('/api/tickets/verify', {
           method: 'POST',
           headers: {
@@ -326,52 +403,42 @@ export default function MerchantScanPage() {
         if (verifyResponse.ok && verifyResult.success) {
           const { ticket, event, validity } = verifyResult.data
           
-          let validityStatus = 'valid'
-          let validityMessage = validity?.message || 'Ticket verification completed'
-          
-          if (!validity?.valid || ticket.status === 'used' || ticket.status === 'refunded' || ticket.status === 'cancelled') {
-            validityStatus = 'invalid'
-            if (ticket.status === 'used') {
-              validityMessage = 'Ticket has already been redeemed'
-            } else if (validity?.status === 'expired') {
-              validityMessage = 'Ticket has expired'
-            } else if (ticket.status === 'refunded' || ticket.status === 'cancelled') {
-              validityMessage = 'Ticket has been cancelled or refunded'
-            }
-          }
-          
           setScanResult({
+            qr_data: qrData, // 保存二维码数据
             ticket_id: ticket.short_id || ticket.id,
+            holder_name: ticket.holder_name || 'Unknown',
+            holder_age: ticket.holder_age || null,
+            tier: ticket.tier || 'N/A',
             status: ticket.status,
-            redeemed_at: ticket.used_at || result.data.redeemed_at,
-            validity_status: validityStatus,
-            validity_message: validityMessage,
-            success: true
-          })
-        } else {
-          setScanResult({
-            ticket_id: result.data.ticket_id,
-            status: result.data.status,
-            redeemed_at: result.data.redeemed_at,
-            success: true
+            event_name: event?.title || 'Unknown Event',
+            event_venue: event?.venue_name || 'N/A',
+            valid_from: validity?.validFrom || validity?.valid_from || null,
+            valid_until: validity?.validUntil || validity?.valid_until || null,
+            is_valid: false,
+            is_used: true,
+            used_at: ticket.used_at || result.data.redeemed_at,
+            redeemed_at: ticket.redeemed_at || result.data.redeemed_at,
+            can_redeem: false
           })
         }
         setError('')
       } else {
         const errorCode = result.error || result.code
-        let errorMessage = result.message || 'Ticket verification failed'
+        let errorMessage = result.message || 'Ticket redemption failed'
         
-        if (errorCode === 'NOT_YOUR_MERCHANT_TICKET' || errorMessage.includes('Not your merchant')) {
+        if (errorCode === 'TICKET_ALREADY_USED') {
+          errorMessage = 'Ticket has already been redeemed'
+        } else if (errorCode === 'NOT_YOUR_MERCHANT_TICKET') {
           errorMessage = 'This ticket does not belong to your merchant'
+        } else if (errorCode === 'TICKET_CANNOT_BE_REDEEMED') {
+          errorMessage = 'Cannot redeem a cancelled or refunded ticket'
         }
         
         setError(errorMessage)
-        setScanResult(null)
       }
     } catch (err) {
-      setError(err.message || 'Ticket verification error, please try again')
-      console.error('Verification error:', err)
-      setScanResult(null)
+      setError(err.message || 'Ticket redemption error, please try again')
+      console.error('Redemption error:', err)
     } finally {
       setLoading(false)
     }
@@ -640,63 +707,144 @@ export default function MerchantScanPage() {
               color: 'white',
               marginBottom: '16px'
             }}>
-              Redemption Result
+              Ticket Information
             </h2>
             
+            {/* Ticket Status */}
             <div style={{
-              backgroundColor: scanResult.validity_status === 'invalid' 
+              backgroundColor: scanResult.is_used 
                 ? 'rgba(239, 68, 68, 0.1)' 
-                : 'rgba(16, 185, 129, 0.1)',
-              border: `1px solid ${scanResult.validity_status === 'invalid' ? '#ef4444' : '#10b981'}`,
+                : scanResult.is_valid 
+                ? 'rgba(16, 185, 129, 0.1)' 
+                : 'rgba(234, 179, 8, 0.1)',
+              border: `1px solid ${scanResult.is_used ? '#ef4444' : scanResult.is_valid ? '#10b981' : '#eab308'}`,
               borderRadius: '8px',
               padding: '16px',
               marginBottom: '16px'
             }}>
               <div style={{
-                color: scanResult.validity_status === 'invalid' ? '#ef4444' : '#10b981',
+                color: scanResult.is_used ? '#ef4444' : scanResult.is_valid ? '#10b981' : '#eab308',
                 fontWeight: '600',
-                marginBottom: '8px'
+                marginBottom: '8px',
+                fontSize: '1rem'
               }}>
-                {scanResult.validity_status === 'invalid' ? '✗ Ticket Invalid' : '✓ Ticket Redeemed Successfully'}
+                {scanResult.is_used ? '✗ Ticket Already Redeemed' : scanResult.is_valid ? '✓ Ticket Valid' : '⚠️ Ticket Invalid'}
               </div>
-              {scanResult.validity_message && (
-                <div style={{ 
-                  color: scanResult.validity_status === 'invalid' ? '#ef4444' : '#94a3b8', 
-                  fontSize: '0.875rem',
-                  marginBottom: '8px'
-                }}>
-                  {scanResult.validity_message}
-                </div>
-              )}
-              <div style={{ color: '#94a3b8', fontSize: '0.875rem' }}>
-                Ticket ID: {scanResult.ticket_id}
-              </div>
-              {scanResult.redeemed_at && (
-                <div style={{ color: '#94a3b8', fontSize: '0.875rem' }}>
-                  Redeemed At: {new Date(scanResult.redeemed_at).toLocaleString()}
+              {scanResult.is_used && scanResult.used_at && (
+                <div style={{ color: '#94a3b8', fontSize: '0.875rem', marginBottom: '8px' }}>
+                  Redeemed At: {new Date(scanResult.used_at).toLocaleString()}
                 </div>
               )}
             </div>
 
-            <button
-              onClick={resetScanner}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                background: 'rgba(55, 65, 81, 0.5)',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                fontSize: '1rem',
-                fontWeight: '600',
-                cursor: 'pointer'
-              }}
-            >
-              Continue Scanning
-            </button>
+            {/* Ticket Details */}
+            <div style={{
+              backgroundColor: 'rgba(30, 41, 59, 0.5)',
+              borderRadius: '8px',
+              padding: '16px',
+              marginBottom: '16px'
+            }}>
+              <div style={{ color: '#94a3b8', fontSize: '0.875rem', marginBottom: '12px', fontWeight: '500' }}>
+                Ticket Details
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#cbd5e1', fontSize: '0.875rem' }}>Ticket ID:</span>
+                  <span style={{ color: 'white', fontSize: '0.875rem', fontWeight: '500' }}>{scanResult.ticket_id}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#cbd5e1', fontSize: '0.875rem' }}>Holder Name:</span>
+                  <span style={{ color: 'white', fontSize: '0.875rem', fontWeight: '500' }}>{scanResult.holder_name}</span>
+                </div>
+                {scanResult.holder_age && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#cbd5e1', fontSize: '0.875rem' }}>Age:</span>
+                    <span style={{ color: 'white', fontSize: '0.875rem', fontWeight: '500' }}>{scanResult.holder_age}</span>
+                  </div>
+                )}
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#cbd5e1', fontSize: '0.875rem' }}>Tier:</span>
+                  <span style={{ color: 'white', fontSize: '0.875rem', fontWeight: '500' }}>{scanResult.tier}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#cbd5e1', fontSize: '0.875rem' }}>Event:</span>
+                  <span style={{ color: 'white', fontSize: '0.875rem', fontWeight: '500' }}>{scanResult.event_name}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#cbd5e1', fontSize: '0.875rem' }}>Venue:</span>
+                  <span style={{ color: 'white', fontSize: '0.875rem', fontWeight: '500' }}>{scanResult.event_venue}</span>
+                </div>
+                {scanResult.valid_from && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#cbd5e1', fontSize: '0.875rem' }}>Valid From:</span>
+                    <span style={{ color: 'white', fontSize: '0.875rem', fontWeight: '500' }}>
+                      {new Date(scanResult.valid_from).toLocaleString()}
+                    </span>
+                  </div>
+                )}
+                {scanResult.valid_until && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#cbd5e1', fontSize: '0.875rem' }}>Valid Until:</span>
+                    <span style={{ color: 'white', fontSize: '0.875rem', fontWeight: '500' }}>
+                      {new Date(scanResult.valid_until).toLocaleString()}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div style={{ display: 'flex', gap: '12px' }}>
+              {scanResult.can_redeem && (
+                <button
+                  onClick={() => {
+                    // 获取扫描的二维码数据
+                    const qrData = scanResult.qr_data || (scanResult.ticket_id ? `TKT.${scanResult.ticket_id}` : null)
+                    if (qrData) {
+                      redeemTicket(qrData)
+                    } else {
+                      setError('Cannot redeem: QR code data not available')
+                    }
+                  }}
+                  disabled={loading}
+                  style={{
+                    flex: 1,
+                    padding: '0.75rem',
+                    background: loading ? 'rgba(16, 185, 129, 0.5)' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '1rem',
+                    fontWeight: '600',
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    opacity: loading ? 0.6 : 1
+                  }}
+                >
+                  {loading ? 'Processing...' : 'Redeem Ticket'}
+                </button>
+              )}
+              <button
+                onClick={resetScanner}
+                style={{
+                  flex: scanResult.can_redeem ? 1 : 1,
+                  padding: '0.75rem',
+                  background: 'rgba(55, 65, 81, 0.5)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '1rem',
+                  fontWeight: '600',
+                  cursor: 'pointer'
+                }}
+              >
+                Continue Scanning
+              </button>
+            </div>
           </div>
         )}
       </div>
     </div>
   )
+}
+
 }

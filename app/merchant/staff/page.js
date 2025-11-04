@@ -576,10 +576,29 @@ export default function MerchantStaffPage() {
                   borderRadius: '8px',
                   fontSize: '1rem',
                   fontWeight: '600',
-                  cursor: 'pointer'
+                  cursor: 'pointer',
+                  marginBottom: '16px'
                 }}
               >
                 Stop Scanning
+              </button>
+              
+              {/* Debug Toggle Button */}
+              <button
+                onClick={() => setShowDebug(!showDebug)}
+                style={{
+                  width: '100%',
+                  padding: '0.5rem 1rem',
+                  fontSize: '0.875rem',
+                  backgroundColor: showDebug ? '#2563eb' : 'rgba(59, 130, 246, 0.2)',
+                  color: showDebug ? 'white' : '#bfdbfe',
+                  border: showDebug ? 'none' : '1px solid rgba(59, 130, 246, 0.3)',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontWeight: '500'
+                }}
+              >
+                {showDebug ? '🔽 Hide Debug' : '▶️ Show Debug'}
               </button>
             </div>
           )}

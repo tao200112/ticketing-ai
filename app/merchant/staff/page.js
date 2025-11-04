@@ -479,7 +479,7 @@ export default function MerchantStaffPage() {
           {!isScanning ? (
             <div style={{ textAlign: 'center' }}>
               <button
-                onClick={startScanning}
+                onClick={() => router.push('/merchant/scan')}
                 style={{
                   padding: '1rem 2rem',
                   background: 'linear-gradient(135deg, #ec4899 0%, #db2777 100%)',

@@ -334,19 +334,22 @@ export default function MerchantScanPage() {
           redeemed_at: ticket.redeemed_at || null,
           can_redeem: isValid && !isUsed && !isRefunded && !isCancelled
         })
+        // 验证成功时清除之前的错误
         setError('')
+        addDebugLog('✅ Ticket verified successfully', 'success')
       } else {
         const errorCode = verifyResult.error || verifyResult.code
         let errorMessage = verifyResult.message || 'Ticket verification failed'
         
         if (errorCode === 'INVALID_QR_FORMAT') {
-          errorMessage = 'This QR code is not a valid ticket QR code'
+          errorMessage = 'Invalid QR code format'
         } else if (errorCode === 'TICKET_NOT_FOUND') {
           errorMessage = 'Ticket not found in system'
         }
         
         setError(errorMessage)
         setScanResult(null)
+        addDebugLog(`❌ Verification failed: ${errorMessage}`, 'error')
       }
     } catch (err) {
       setError(err.message || 'Ticket verification error, please try again')
@@ -361,15 +364,19 @@ export default function MerchantScanPage() {
     try {
       setLoading(true)
       setError('')
+      addDebugLog('🔄 Starting ticket redemption...', 'info')
       
       const merchantUserStr = localStorage.getItem('merchantUser')
       if (!merchantUserStr) {
         setError('Please login first')
+        addDebugLog('❌ Not logged in', 'error')
         return
       }
       
       const merchantUser = JSON.parse(merchantUserStr)
       const userId = merchantUser.id
+      
+      addDebugLog(`📤 Sending redemption request for QR: ${qrData.substring(0, 30)}...`, 'info')
       
       // 核销票务
       const response = await fetch('/api/merchant/redeem', {
@@ -384,8 +391,10 @@ export default function MerchantScanPage() {
       })
       
       const result = await response.json()
+      addDebugLog(`📥 Redemption response: ${response.ok ? 'Success' : 'Failed'}`, response.ok ? 'success' : 'error')
       
       if (response.ok && result.success) {
+        addDebugLog('✅ Ticket redeemed successfully!', 'success')
         // 核销成功后，重新获取票务信息（此时status应该是'used'）
         const verifyResponse = await fetch('/api/tickets/verify', {
           method: 'POST',
@@ -435,9 +444,12 @@ export default function MerchantScanPage() {
         }
         
         setError(errorMessage)
+        addDebugLog(`❌ Redemption failed: ${errorMessage}`, 'error')
       }
     } catch (err) {
-      setError(err.message || 'Ticket redemption error, please try again')
+      const errorMsg = err.message || 'Ticket redemption error, please try again'
+      setError(errorMsg)
+      addDebugLog(`❌ Redemption error: ${errorMsg}`, 'error')
       console.error('Redemption error:', err)
     } finally {
       setLoading(false)
@@ -797,13 +809,14 @@ export default function MerchantScanPage() {
             <div style={{ display: 'flex', gap: '12px' }}>
               {scanResult.can_redeem && (
                 <button
-                  onClick={() => {
+                  onClick={async () => {
                     // 获取扫描的二维码数据
-                    const qrData = scanResult.qr_data || (scanResult.ticket_id ? `TKT.${scanResult.ticket_id}` : null)
+                    const qrData = scanResult.qr_data
                     if (qrData) {
-                      redeemTicket(qrData)
+                      await redeemTicket(qrData)
                     } else {
-                      setError('Cannot redeem: QR code data not available')
+                      setError('Cannot redeem: QR code data not available. Please scan again.')
+                      console.error('QR data missing:', scanResult)
                     }
                   }}
                   disabled={loading}
@@ -817,7 +830,16 @@ export default function MerchantScanPage() {
                     fontSize: '1rem',
                     fontWeight: '600',
                     cursor: loading ? 'not-allowed' : 'pointer',
-                    opacity: loading ? 0.6 : 1
+                    opacity: loading ? 0.6 : 1,
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!loading) {
+                      e.target.style.transform = 'scale(1.02)'
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.transform = 'scale(1)'
                   }}
                 >
                   {loading ? 'Processing...' : 'Redeem Ticket'}

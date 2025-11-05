@@ -476,17 +476,18 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
                     <input
                       type="email"
                       value={customerEmail}
-                      onChange={(e) => setCustomerEmail(e.target.value)}
-                      placeholder="Enter your email"
+                      readOnly
+                      placeholder="Account email (auto-filled)"
                       style={{
                         width: '100%',
                         padding: '12px 16px',
-                        backgroundColor: 'rgba(55, 65, 81, 0.5)',
+                        backgroundColor: 'rgba(55, 65, 81, 0.3)',
                         border: '1px solid rgba(255, 255, 255, 0.1)',
                         borderRadius: '8px',
-                        color: 'white',
+                        color: customerEmail ? 'white' : '#94a3b8',
                         fontSize: '1rem',
-                        outline: 'none'
+                        outline: 'none',
+                        cursor: 'not-allowed'
                       }}
                     />
                   </div>

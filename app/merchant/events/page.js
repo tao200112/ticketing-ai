@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import MerchantNavbar from '@/components/MerchantNavbar'
 
 export default function MerchantEventsPage() {
   const router = useRouter()
@@ -81,7 +82,7 @@ export default function MerchantEventsPage() {
 
   const handleEditEvent = async (eventId) => {
     // 简单的编辑功能：将活动状态改为 published 或 draft
-    if (confirm('确定要修改这个事件吗？')) {
+    if (confirm('Are you sure you want to modify this event?')) {
       try {
         // 获取当前事件信息
         const response = await fetch(`/api/events/${eventId}`)
@@ -120,7 +121,7 @@ export default function MerchantEventsPage() {
   }
 
   const handleDeleteEvent = async (eventId) => {
-    if (confirm('确定要删除这个事件吗？')) {
+    if (confirm('Are you sure you want to delete this event?')) {
       try {
         const response = await fetch(`/api/events/${eventId}`, {
           method: 'DELETE'
@@ -147,7 +148,13 @@ export default function MerchantEventsPage() {
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', backgroundColor: '#f9fafb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ 
+        minHeight: '100vh', 
+        background: 'linear-gradient(135deg, #0f172a 0%, #7c3aed 50%, #0f172a 100%)',
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center' 
+      }}>
         <div style={{ textAlign: 'center' }}>
           <div style={{
             width: '3rem',
@@ -158,7 +165,7 @@ export default function MerchantEventsPage() {
             animation: 'spin 1s linear infinite',
             margin: '0 auto 1rem auto'
           }}></div>
-          <p style={{ color: '#6b7280' }}>Loading events...</p>
+          <p style={{ color: 'rgba(255, 255, 255, 0.8)' }}>Loading events...</p>
         </div>
       </div>
     )
@@ -166,17 +173,23 @@ export default function MerchantEventsPage() {
 
   if (error) {
     return (
-      <div style={{ minHeight: '100vh', backgroundColor: '#f9fafb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ 
+        minHeight: '100vh', 
+        background: 'linear-gradient(135deg, #0f172a 0%, #7c3aed 50%, #0f172a 100%)',
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center' 
+      }}>
         <div style={{ textAlign: 'center' }}>
           <div style={{ color: '#ef4444', marginBottom: '1rem' }}>
             <svg style={{ width: '3rem', height: '3rem', margin: '0 auto' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
             </svg>
           </div>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#111827', marginBottom: '0.5rem' }}>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: 'white', marginBottom: '0.5rem' }}>
             Loading Failed
           </h2>
-          <p style={{ color: '#6b7280', marginBottom: '1.5rem' }}>{error}</p>
+          <p style={{ color: 'rgba(255, 255, 255, 0.8)', marginBottom: '1.5rem' }}>{error}</p>
           <button 
             onClick={loadEvents}
             style={{
@@ -196,14 +209,18 @@ export default function MerchantEventsPage() {
     )
   }
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#f9fafb' }}>
-      <div style={{ maxWidth: '80rem', margin: '0 auto', padding: '2rem' }}>
+    <div style={{ 
+      minHeight: '100vh', 
+      background: 'linear-gradient(135deg, #0f172a 0%, #7c3aed 50%, #0f172a 100%)'
+    }}>
+      <MerchantNavbar />
+      <div style={{ maxWidth: '80rem', margin: '0 auto', padding: '100px 2rem 2rem 2rem' }}>
         {/* Header */}
         <div style={{ marginBottom: '2rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
-              <h1 style={{ fontSize: '1.875rem', fontWeight: 'bold', color: '#111827', margin: 0 }}>My Events</h1>
-              <p style={{ color: '#4b5563', marginTop: '0.5rem', margin: '0.5rem 0 0 0' }}>Manage your events and track performance</p>
+              <h1 style={{ fontSize: '1.875rem', fontWeight: 'bold', color: 'white', margin: 0 }}>My Events</h1>
+              <p style={{ color: 'rgba(255, 255, 255, 0.7)', marginTop: '0.5rem', margin: '0.5rem 0 0 0' }}>Manage your events and track performance</p>
             </div>
             <div style={{ display: 'flex', gap: '1rem' }}>
               <button
@@ -275,10 +292,10 @@ export default function MerchantEventsPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
             </div>
-            <h3 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#111827', marginBottom: '0.5rem' }}>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: '600', color: 'white', marginBottom: '0.5rem' }}>
               No events yet
             </h3>
-            <p style={{ color: '#6b7280', marginBottom: '2rem' }}>
+            <p style={{ color: 'rgba(255, 255, 255, 0.7)', marginBottom: '2rem' }}>
               Create your first event to start selling tickets
             </p>
             <button
@@ -303,47 +320,50 @@ export default function MerchantEventsPage() {
           <div style={{ display: 'grid', gap: '2rem' }}>
             {events.map((event) => (
               <div key={event.id} style={{
-                backgroundColor: 'white',
+                background: 'rgba(255, 255, 255, 0.05)',
+                backdropFilter: 'blur(12px)',
                 borderRadius: '0.5rem',
-                boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                border: '1px solid #e5e7eb',
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
                 overflow: 'hidden'
               }}>
                 <div style={{ padding: '2rem' }}>
                   <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-                    <h3 style={{ fontSize: '1.5rem', fontWeight: '600', color: '#111827', marginBottom: '0.5rem' }}>
+                    <h3 style={{ fontSize: '1.5rem', fontWeight: '600', color: 'white', marginBottom: '0.5rem' }}>
                       {event.title}
                     </h3>
-                    <p style={{ color: '#6b7280' }}>
-                      {new Date(event.startTime).toLocaleDateString('en-US', { 
-                        year: 'numeric', 
-                        month: 'long', 
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })} • {event.location}
+                    <p style={{ color: 'rgba(255, 255, 255, 0.7)' }}>
+                      {event.startTime || event.start_at ? (
+                        new Date(event.startTime || event.start_at).toLocaleDateString('en-US', { 
+                          year: 'numeric', 
+                          month: 'long', 
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })
+                      ) : 'Date TBD'} • {event.location || event.venue_name || event.address || 'Location TBD'}
                     </p>
                   </div>
 
                   <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '2rem' }}>
                       <div>
-                        <p style={{ fontSize: '1.875rem', fontWeight: 'bold', color: '#111827', margin: 0 }}>
+                        <p style={{ fontSize: '1.875rem', fontWeight: 'bold', color: 'white', margin: 0 }}>
                           {event.ticketsSold || 0}
                         </p>
-                        <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: '0.25rem 0 0 0' }}>Tickets Sold</p>
+                        <p style={{ fontSize: '0.875rem', color: 'rgba(255, 255, 255, 0.7)', margin: '0.25rem 0 0 0' }}>Tickets Sold</p>
                       </div>
                       <div>
-                        <p style={{ fontSize: '1.875rem', fontWeight: 'bold', color: '#111827', margin: 0 }}>
+                        <p style={{ fontSize: '1.875rem', fontWeight: 'bold', color: 'white', margin: 0 }}>
                           {event.totalTickets || 0}
                         </p>
-                        <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: '0.25rem 0 0 0' }}>Total Tickets</p>
+                        <p style={{ fontSize: '0.875rem', color: 'rgba(255, 255, 255, 0.7)', margin: '0.25rem 0 0 0' }}>Total Tickets</p>
                       </div>
                       <div>
-                        <p style={{ fontSize: '1.875rem', fontWeight: 'bold', color: '#059669', margin: 0 }}>
+                        <p style={{ fontSize: '1.875rem', fontWeight: 'bold', color: '#22c55e', margin: 0 }}>
                           ${event.revenue || 0}
                         </p>
-                        <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: '0.25rem 0 0 0' }}>Revenue</p>
+                        <p style={{ fontSize: '0.875rem', color: 'rgba(255, 255, 255, 0.7)', margin: '0.25rem 0 0 0' }}>Revenue</p>
                       </div>
                     </div>
                   </div>

@@ -34,7 +34,8 @@ export async function GET() {
           id,
           name,
           amount_cents,
-          inventory
+          inventory,
+          sold_count
         )
       `)
       .eq('status', 'published')
@@ -56,7 +57,8 @@ export async function GET() {
             id,
             name,
             amount_cents,
-            inventory
+            inventory,
+            sold_count
           )
         `)
         .order('created_at', { ascending: false })
@@ -82,6 +84,62 @@ export async function GET() {
         return isValidTitle
       })
       logger.info(`Filtered events count: ${events.length}`)
+    }
+
+    // 为每个活动添加票务统计数据
+    if (events && events.length > 0) {
+      const eventsWithStats = await Promise.all(events.map(async (event) => {
+        // 计算总票数（从prices表的inventory字段）
+        const totalTickets = event.prices?.reduce((sum, price) => sum + (price.inventory || 0), 0) || 0
+        
+        // 计算已售票数（优先从tickets表计算，回退到prices表的sold_count）
+        const { data: tickets, error: ticketsError } = await supabase
+          .from('tickets')
+          .select('order_id')
+          .eq('event_id', event.id)
+        
+        // 从tickets表计算已售票数（更准确）
+        let ticketsSold = tickets?.length || 0
+        
+        // 如果tickets表没有数据，回退到prices表的sold_count
+        if (ticketsError || !tickets || tickets.length === 0) {
+          ticketsSold = event.prices?.reduce((sum, price) => sum + (price.sold_count || 0), 0) || 0
+        }
+        
+        // 计算总收入（通过tickets表连接orders表）
+        let revenue = 0
+        if (tickets && tickets.length > 0) {
+          // 获取所有唯一的订单ID
+          const orderIds = [...new Set(tickets.map(t => t.order_id).filter(Boolean))]
+          
+          // 获取所有已支付订单的总金额
+          if (orderIds.length > 0) {
+            const { data: orders } = await supabase
+              .from('orders')
+              .select('total_amount_cents')
+              .in('id', orderIds)
+              .eq('status', 'paid')
+            
+            revenue = orders?.reduce((sum, order) => sum + (order.total_amount_cents || 0), 0) || 0
+          }
+        }
+        
+        return {
+          ...event,
+          // 兼容性字段映射
+          startTime: event.start_at,
+          location: event.venue_name || event.address,
+          // 票务统计数据
+          totalTickets,
+          ticketsSold,
+          revenue: (revenue / 100).toFixed(2)
+        }
+      }))
+      
+      return NextResponse.json({
+        success: true,
+        data: eventsWithStats
+      })
     }
 
     return NextResponse.json({
@@ -125,7 +183,7 @@ export async function POST(request) {
     if (!title || !description || !startTime || !endTime || !location) {
       throw ErrorHandler.validationError(
         'MISSING_FIELDS',
-        '缺少必需字段'
+        'Missing required fields'
       )
     }
 
@@ -180,7 +238,7 @@ export async function POST(request) {
     return NextResponse.json({
       success: true,
       data: event,
-      message: '活动创建成功'
+      message: 'Event created successfully'
     })
 
   } catch (error) {

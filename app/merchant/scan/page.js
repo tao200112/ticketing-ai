@@ -296,6 +296,8 @@ export default function MerchantScanPage() {
         return
       }
       
+      const merchantUser = JSON.parse(merchantUserStr)
+      
       // 先验证票务信息（不核销）
       const verifyResponse = await fetch('/api/tickets/verify', {
         method: 'POST',
@@ -313,13 +315,49 @@ export default function MerchantScanPage() {
       if (verifyResponse.ok && verifyResult.success) {
         const { ticket, event, validity } = verifyResult.data
         
+        // 检查商家权限（检查票务是否属于当前商家）
+        let isOwnMerchantTicket = true
+        let merchantError = null
+        
+        if (event?.merchant_id) {
+          // 检查当前用户是否是该商家的成员或拥有者
+          const merchantId = event.merchant_id
+          const currentMerchantId = merchantUser.merchant_id || merchantUser.merchantId
+          
+          // 如果当前用户有merchant_id，检查是否匹配
+          if (currentMerchantId && currentMerchantId !== merchantId) {
+            isOwnMerchantTicket = false
+            merchantError = '此票属于其他商家，您无权核销此票'
+          }
+        }
+        
         // 检查票务状态
         const isUsed = ticket.status === 'used'
         const isRefunded = ticket.status === 'refunded'
         const isCancelled = ticket.status === 'cancelled'
-        const isValid = validity?.valid && !isUsed && !isRefunded && !isCancelled
         
-        // 显示票务信息（无论是否已使用）
+        // 检查有效期
+        const isExpired = validity?.status === 'expired'
+        const isNotYetValid = validity?.status === 'not_yet_valid'
+        
+        // 综合判断是否有效
+        const isValid = validity?.valid && !isUsed && !isRefunded && !isCancelled && isOwnMerchantTicket && !isExpired && !isNotYetValid
+        
+        // 生成错误原因
+        let errorReason = null
+        if (!isOwnMerchantTicket) {
+          errorReason = '此票属于其他商家'
+        } else if (isUsed) {
+          errorReason = '此票已核销'
+        } else if (isRefunded || isCancelled) {
+          errorReason = `此票已${isRefunded ? '退款' : '取消'}`
+        } else if (isExpired) {
+          errorReason = '此票已过期'
+        } else if (isNotYetValid) {
+          errorReason = '此票尚未生效'
+        }
+        
+        // 显示票务信息（无论是否有效，都显示详细信息）
         setScanResult({
           qr_data: qrData, // 保存二维码数据用于核销
           ticket_id: ticket.short_id || ticket.id,
@@ -329,25 +367,33 @@ export default function MerchantScanPage() {
           status: ticket.status,
           event_name: event?.title || 'Unknown Event',
           event_venue: event?.venue_name || 'N/A',
-          valid_from: validity?.validFrom || validity?.valid_from || null,
-          valid_until: validity?.validUntil || validity?.valid_until || null,
+          valid_from: validity?.validFrom || validity?.valid_from || ticket.validity_start_time || null,
+          valid_until: validity?.validUntil || validity?.valid_until || ticket.validity_end_time || null,
           is_valid: isValid,
           is_used: isUsed,
           used_at: ticket.used_at || null,
           redeemed_at: ticket.redeemed_at || null,
-          can_redeem: isValid && !isUsed && !isRefunded && !isCancelled
+          can_redeem: isValid && !isUsed && !isRefunded && !isCancelled && isOwnMerchantTicket,
+          error_reason: errorReason,
+          validity_message: validity?.message || null
         })
-        // 验证成功时清除之前的错误
-        setError('')
-        addDebugLog('✅ Ticket verified successfully', 'success')
+        
+        // 如果有错误原因，显示错误信息
+        if (errorReason) {
+          setError(errorReason)
+          addDebugLog(`⚠️ Ticket verification: ${errorReason}`, 'error')
+        } else {
+          setError('')
+          addDebugLog('✅ Ticket verified successfully - Ready to redeem', 'success')
+        }
       } else {
         const errorCode = verifyResult.error || verifyResult.code
         let errorMessage = verifyResult.message || 'Ticket verification failed'
         
         if (errorCode === 'INVALID_QR_FORMAT') {
-          errorMessage = 'Invalid QR code format'
+          errorMessage = '二维码格式无效'
         } else if (errorCode === 'TICKET_NOT_FOUND') {
-          errorMessage = 'Ticket not found in system'
+          errorMessage = '票务未找到'
         }
         
         setError(errorMessage)
@@ -355,9 +401,10 @@ export default function MerchantScanPage() {
         addDebugLog(`❌ Verification failed: ${errorMessage}`, 'error')
       }
     } catch (err) {
-      setError(err.message || 'Ticket verification error, please try again')
+      setError(err.message || '票务验证错误，请重试')
       console.error('Verification error:', err)
       setScanResult(null)
+      addDebugLog(`❌ Verification error: ${err.message}`, 'error')
     } finally {
       setLoading(false)
     }
@@ -723,7 +770,7 @@ export default function MerchantScanPage() {
               color: 'white',
               marginBottom: '16px'
             }}>
-              Ticket Information
+              票务信息
             </h2>
             
             {/* Ticket Status */}
@@ -744,11 +791,21 @@ export default function MerchantScanPage() {
                 marginBottom: '8px',
                 fontSize: '1rem'
               }}>
-                {scanResult.is_used ? '✗ Ticket Already Redeemed' : scanResult.is_valid ? '✓ Ticket Valid' : '⚠️ Ticket Invalid'}
+                {scanResult.is_used ? '✗ 票已核销' : scanResult.is_valid ? '✓ 票务有效' : '⚠️ 票务无效'}
               </div>
+              {scanResult.error_reason && (
+                <div style={{ color: '#ef4444', fontSize: '0.875rem', marginBottom: '8px', fontWeight: '500' }}>
+                  {scanResult.error_reason}
+                </div>
+              )}
+              {scanResult.validity_message && !scanResult.is_valid && (
+                <div style={{ color: '#94a3b8', fontSize: '0.875rem', marginBottom: '8px' }}>
+                  {scanResult.validity_message}
+                </div>
+              )}
               {scanResult.is_used && scanResult.used_at && (
                 <div style={{ color: '#94a3b8', fontSize: '0.875rem', marginBottom: '8px' }}>
-                  Redeemed At: {new Date(scanResult.used_at).toLocaleString()}
+                  核销时间: {new Date(scanResult.used_at).toLocaleString('zh-CN')}
                 </div>
               )}
             </div>
@@ -761,48 +818,48 @@ export default function MerchantScanPage() {
               marginBottom: '16px'
             }}>
               <div style={{ color: '#94a3b8', fontSize: '0.875rem', marginBottom: '12px', fontWeight: '500' }}>
-                Ticket Details
+                票务详情
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: '#cbd5e1', fontSize: '0.875rem' }}>Ticket ID:</span>
+                  <span style={{ color: '#cbd5e1', fontSize: '0.875rem' }}>票务ID:</span>
                   <span style={{ color: 'white', fontSize: '0.875rem', fontWeight: '500' }}>{scanResult.ticket_id}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: '#cbd5e1', fontSize: '0.875rem' }}>Holder Name:</span>
+                  <span style={{ color: '#cbd5e1', fontSize: '0.875rem' }}>持票人姓名:</span>
                   <span style={{ color: 'white', fontSize: '0.875rem', fontWeight: '500' }}>{scanResult.holder_name}</span>
                 </div>
-                {scanResult.holder_age && (
+                {scanResult.holder_age !== null && scanResult.holder_age !== undefined && (
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#cbd5e1', fontSize: '0.875rem' }}>Age:</span>
-                    <span style={{ color: 'white', fontSize: '0.875rem', fontWeight: '500' }}>{scanResult.holder_age}</span>
+                    <span style={{ color: '#cbd5e1', fontSize: '0.875rem' }}>年龄:</span>
+                    <span style={{ color: 'white', fontSize: '0.875rem', fontWeight: '500' }}>{scanResult.holder_age} 岁</span>
                   </div>
                 )}
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: '#cbd5e1', fontSize: '0.875rem' }}>Tier:</span>
+                  <span style={{ color: '#cbd5e1', fontSize: '0.875rem' }}>票种等级:</span>
                   <span style={{ color: 'white', fontSize: '0.875rem', fontWeight: '500' }}>{scanResult.tier}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: '#cbd5e1', fontSize: '0.875rem' }}>Event:</span>
+                  <span style={{ color: '#cbd5e1', fontSize: '0.875rem' }}>活动名称:</span>
                   <span style={{ color: 'white', fontSize: '0.875rem', fontWeight: '500' }}>{scanResult.event_name}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: '#cbd5e1', fontSize: '0.875rem' }}>Venue:</span>
+                  <span style={{ color: '#cbd5e1', fontSize: '0.875rem' }}>活动场地:</span>
                   <span style={{ color: 'white', fontSize: '0.875rem', fontWeight: '500' }}>{scanResult.event_venue}</span>
                 </div>
                 {scanResult.valid_from && (
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#cbd5e1', fontSize: '0.875rem' }}>Valid From:</span>
+                    <span style={{ color: '#cbd5e1', fontSize: '0.875rem' }}>生效时间:</span>
                     <span style={{ color: 'white', fontSize: '0.875rem', fontWeight: '500' }}>
-                      {new Date(scanResult.valid_from).toLocaleString()}
+                      {new Date(scanResult.valid_from).toLocaleString('zh-CN')}
                     </span>
                   </div>
                 )}
                 {scanResult.valid_until && (
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#cbd5e1', fontSize: '0.875rem' }}>Valid Until:</span>
+                    <span style={{ color: '#cbd5e1', fontSize: '0.875rem' }}>失效时间:</span>
                     <span style={{ color: 'white', fontSize: '0.875rem', fontWeight: '500' }}>
-                      {new Date(scanResult.valid_until).toLocaleString()}
+                      {new Date(scanResult.valid_until).toLocaleString('zh-CN')}
                     </span>
                   </div>
                 )}
@@ -846,7 +903,7 @@ export default function MerchantScanPage() {
                     e.target.style.transform = 'scale(1)'
                   }}
                 >
-                  {loading ? 'Processing...' : 'Redeem Ticket'}
+                  {loading ? '处理中...' : '核销票务'}
                 </button>
               )}
               <button
@@ -863,7 +920,7 @@ export default function MerchantScanPage() {
                   cursor: 'pointer'
                 }}
               >
-                Continue Scanning
+                继续扫描
               </button>
             </div>
           </div>
@@ -872,3 +929,5 @@ export default function MerchantScanPage() {
     </div>
   )
 }
+
+

@@ -105,11 +105,11 @@ export async function POST(request) {
 
       ticket = ticketData
 
-      // Then get event data if event_id exists
+      // Then get event data if event_id exists (include merchant info for permission checking)
       if (ticket.event_id) {
         const { data: eventData, error: eventError } = await supabase
           .from('events')
-          .select('id, title, start_at, end_at, venue_name')
+          .select('id, title, start_at, end_at, venue_name, merchant_id')
           .eq('id', ticket.event_id)
           .single()
         
@@ -300,7 +300,8 @@ export async function POST(request) {
         title: event.title,
         start_at: event.start_at,
         end_at: event.end_at,
-        venue_name: event.venue_name
+        venue_name: event.venue_name,
+        merchant_id: event.merchant_id // Include merchant_id for permission checking
       } : null,
       validity: {
         valid: isValid,

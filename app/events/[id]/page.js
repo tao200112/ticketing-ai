@@ -626,13 +626,13 @@ export default function EventDetailPage() {
                           marginBottom: '8px',
                           fontSize: '1rem'
                         }}>
-                          重要提示：入场需要验证身份证明
+                          Important Notice: ID Verification Required for Entry
                         </div>
                         <div style={{ marginBottom: '4px' }}>
-                          • 入场时需要出示有效身份证明（ID）进行核验
+                          • You must present a valid ID for verification at entry
                         </div>
                         <div style={{ marginBottom: '4px' }}>
-                          • 购票时填写的<strong style={{ color: '#fecaca' }}>姓名和年龄必须与身份证件上的信息完全一致</strong>
+                          • The <strong style={{ color: '#fecaca' }}>name and age</strong> you provide when purchasing must <strong style={{ color: '#fecaca' }}>exactly match</strong> your ID document
                         </div>
                         <div style={{ 
                           color: '#fee2e2', 
@@ -640,7 +640,7 @@ export default function EventDetailPage() {
                           marginTop: '8px',
                           fontSize: '0.9375rem'
                         }}>
-                          ⚠️ 如信息不符，票务将作废且不予退款
+                          ⚠️ If information does not match, the ticket will be voided with no refund
                         </div>
                       </div>
                     </div>

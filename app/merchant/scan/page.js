@@ -327,7 +327,7 @@ export default function MerchantScanPage() {
           // 如果当前用户有merchant_id，检查是否匹配
           if (currentMerchantId && currentMerchantId !== merchantId) {
             isOwnMerchantTicket = false
-            merchantError = '此票属于其他商家，您无权核销此票'
+            merchantError = 'This ticket belongs to another merchant. You do not have permission to redeem it.'
           }
         }
         
@@ -345,17 +345,17 @@ export default function MerchantScanPage() {
         
         // 生成错误原因
         let errorReason = null
-        if (!isOwnMerchantTicket) {
-          errorReason = '此票属于其他商家'
-        } else if (isUsed) {
-          errorReason = '此票已核销'
-        } else if (isRefunded || isCancelled) {
-          errorReason = `此票已${isRefunded ? '退款' : '取消'}`
-        } else if (isExpired) {
-          errorReason = '此票已过期'
-        } else if (isNotYetValid) {
-          errorReason = '此票尚未生效'
-        }
+                 if (!isOwnMerchantTicket) {
+           errorReason = 'This ticket belongs to another merchant'
+         } else if (isUsed) {
+           errorReason = 'This ticket has already been redeemed'
+         } else if (isRefunded || isCancelled) {
+           errorReason = `This ticket has been ${isRefunded ? 'refunded' : 'cancelled'}`
+         } else if (isExpired) {
+           errorReason = 'This ticket has expired'
+         } else if (isNotYetValid) {
+           errorReason = 'This ticket is not yet valid'
+         }
         
         // 显示票务信息（无论是否有效，都显示详细信息）
         setScanResult({
@@ -390,18 +390,18 @@ export default function MerchantScanPage() {
         const errorCode = verifyResult.error || verifyResult.code
         let errorMessage = verifyResult.message || 'Ticket verification failed'
         
-        if (errorCode === 'INVALID_QR_FORMAT') {
-          errorMessage = '二维码格式无效'
-        } else if (errorCode === 'TICKET_NOT_FOUND') {
-          errorMessage = '票务未找到'
-        }
+                  if (errorCode === 'INVALID_QR_FORMAT') {
+            errorMessage = 'Invalid QR code format'
+          } else if (errorCode === 'TICKET_NOT_FOUND') {
+            errorMessage = 'Ticket not found'
+          }
         
         setError(errorMessage)
         setScanResult(null)
         addDebugLog(`❌ Verification failed: ${errorMessage}`, 'error')
       }
     } catch (err) {
-      setError(err.message || '票务验证错误，请重试')
+              setError(err.message || 'Ticket verification error, please try again')
       console.error('Verification error:', err)
       setScanResult(null)
       addDebugLog(`❌ Verification error: ${err.message}`, 'error')
@@ -719,7 +719,7 @@ export default function MerchantScanPage() {
               color: 'white',
               marginBottom: '16px'
             }}>
-              票务信息
+              Ticket Information
             </h2>
             
             {/* Ticket Status */}
@@ -740,7 +740,7 @@ export default function MerchantScanPage() {
                 marginBottom: '8px',
                 fontSize: '1rem'
               }}>
-                {scanResult.is_used ? '✗ 票已核销' : scanResult.is_valid ? '✓ 票务有效' : '⚠️ 票务无效'}
+                {scanResult.is_used ? '❌ Ticket Already Redeemed' : scanResult.is_valid ? '✅ Ticket Valid' : '⚠️ Ticket Invalid'}
               </div>
               {scanResult.error_reason && (
                 <div style={{ color: '#ef4444', fontSize: '0.875rem', marginBottom: '8px', fontWeight: '500' }}>
@@ -754,7 +754,7 @@ export default function MerchantScanPage() {
               )}
               {scanResult.is_used && scanResult.used_at && (
                 <div style={{ color: '#94a3b8', fontSize: '0.875rem', marginBottom: '8px' }}>
-                  核销时间: {new Date(scanResult.used_at).toLocaleString('zh-CN')}
+                                     Redeemed Time: {new Date(scanResult.used_at).toLocaleString('en-US')}
                 </div>
               )}
             </div>
@@ -767,49 +767,47 @@ export default function MerchantScanPage() {
               marginBottom: '16px'
             }}>
               <div style={{ color: '#94a3b8', fontSize: '0.875rem', marginBottom: '12px', fontWeight: '500' }}>
-                票务详情
+                Ticket Details
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: '#cbd5e1', fontSize: '0.875rem' }}>票务ID:</span>
-                  <span style={{ color: 'white', fontSize: '0.875rem', fontWeight: '500' }}>{scanResult.ticket_id}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: '#cbd5e1', fontSize: '0.875rem' }}>持票人姓名:</span>
-                  <span style={{ color: 'white', fontSize: '0.875rem', fontWeight: '500' }}>{scanResult.holder_name}</span>
-                </div>
-                {scanResult.holder_age !== null && scanResult.holder_age !== undefined && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#cbd5e1', fontSize: '0.875rem' }}>年龄:</span>
-                    <span style={{ color: 'white', fontSize: '0.875rem', fontWeight: '500' }}>{scanResult.holder_age} 岁</span>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#cbd5e1', fontSize: '0.875rem' }}>Ticket ID:</span>
+                    <span style={{ color: 'white', fontSize: '0.875rem', fontWeight: '500' }}>{scanResult.ticket_id}</span>
                   </div>
-                )}
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: '#cbd5e1', fontSize: '0.875rem' }}>票种等级:</span>
-                  <span style={{ color: 'white', fontSize: '0.875rem', fontWeight: '500' }}>{scanResult.tier}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: '#cbd5e1', fontSize: '0.875rem' }}>活动名称:</span>
-                  <span style={{ color: 'white', fontSize: '0.875rem', fontWeight: '500' }}>{scanResult.event_name}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: '#cbd5e1', fontSize: '0.875rem' }}>活动场地:</span>
-                  <span style={{ color: 'white', fontSize: '0.875rem', fontWeight: '500' }}>{scanResult.event_venue}</span>
-                </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#cbd5e1', fontSize: '0.875rem' }}>Holder Name:</span>
+                    <span style={{ color: 'white', fontSize: '0.875rem', fontWeight: '500' }}>{scanResult.holder_name || 'N/A'}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#cbd5e1', fontSize: '0.875rem' }}>Age:</span>
+                    <span style={{ color: 'white', fontSize: '0.875rem', fontWeight: '500' }}>{scanResult.holder_age !== null && scanResult.holder_age !== undefined ? scanResult.holder_age : 'N/A'}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#cbd5e1', fontSize: '0.875rem' }}>Ticket Type:</span>
+                    <span style={{ color: 'white', fontSize: '0.875rem', fontWeight: '500' }}>{scanResult.tier || 'N/A'}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#cbd5e1', fontSize: '0.875rem' }}>Event Name:</span>
+                    <span style={{ color: 'white', fontSize: '0.875rem', fontWeight: '500' }}>{scanResult.event_name || 'N/A'}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#cbd5e1', fontSize: '0.875rem' }}>Venue:</span>
+                    <span style={{ color: 'white', fontSize: '0.875rem', fontWeight: '500' }}>{scanResult.event_venue || 'N/A'}</span>
+                  </div>
                 {scanResult.valid_from && (
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#cbd5e1', fontSize: '0.875rem' }}>生效时间:</span>
-                    <span style={{ color: 'white', fontSize: '0.875rem', fontWeight: '500' }}>
-                      {new Date(scanResult.valid_from).toLocaleString('zh-CN')}
-                    </span>
-                  </div>
-                )}
-                {scanResult.valid_until && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#cbd5e1', fontSize: '0.875rem' }}>失效时间:</span>
-                    <span style={{ color: 'white', fontSize: '0.875rem', fontWeight: '500' }}>
-                      {new Date(scanResult.valid_until).toLocaleString('zh-CN')}
-                    </span>
+                                         <span style={{ color: '#cbd5e1', fontSize: '0.875rem' }}>Valid From:</span>
+                     <span style={{ color: 'white', fontSize: '0.875rem', fontWeight: '500' }}>
+                       {new Date(scanResult.valid_from).toLocaleString('en-US')}
+                     </span>
+                   </div>
+                 )}
+                 {scanResult.valid_until && (
+                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                     <span style={{ color: '#cbd5e1', fontSize: '0.875rem' }}>Valid Until:</span>
+                     <span style={{ color: 'white', fontSize: '0.875rem', fontWeight: '500' }}>
+                       {new Date(scanResult.valid_until).toLocaleString('en-US')}
+                     </span>
                   </div>
                 )}
               </div>
@@ -852,7 +850,7 @@ export default function MerchantScanPage() {
                     e.target.style.transform = 'scale(1)'
                   }}
                 >
-                  {loading ? '处理中...' : '核销票务'}
+                                     {loading ? 'Processing...' : 'Redeem Ticket'}
                 </button>
               )}
               <button
@@ -869,7 +867,7 @@ export default function MerchantScanPage() {
                   cursor: 'pointer'
                 }}
               >
-                继续扫描
+                Continue Scanning
               </button>
             </div>
           </div>

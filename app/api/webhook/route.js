@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import Stripe from 'stripe'
+import { generateShortTicketId } from '@/lib/ticket-utils'
 
 // 安全地初始化Stripe
 const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY, {
@@ -20,7 +21,12 @@ export async function POST(request) {
   const body = await request.text()
   const sig = request.headers.get('stripe-signature') || ''
 
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || 'whsec_JVzc3itvZMUN7l3Ig3A4MatQfB0XCqlr'
+  // 检查 webhook 密钥配置
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
+  if (!webhookSecret) {
+    console.error('❌ STRIPE_WEBHOOK_SECRET 未配置')
+    return NextResponse.json({ error: 'Webhook secret not configured' }, { status: 500 })
+  }
 
   let event
 
@@ -101,13 +107,67 @@ export async function POST(request) {
         if (!eventId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(eventId)) {
           console.log('⚠️ 使用默认活动ID，因为event_id无效:', eventId)
           // 获取第一个活动作为默认
-          const { data: defaultEvent } = await supabase
+          const { data: defaultEvent, error: defaultEventError } = await supabase
             .from('events')
             .select('id')
             .limit(1)
             .single()
           
+          if (defaultEventError || !defaultEvent) {
+            console.warn('⚠️ 获取默认活动失败，使用回退ID:', defaultEventError)
+          }
+          
           eventId = defaultEvent?.id || '45091d37-7252-43c7-93c8-a7033d28af31'
+        }
+        
+        // Get event to determine validity window
+        let validityStartTime = null
+        let validityEndTime = null
+        
+        if (eventId) {
+          const { data: eventData, error: eventDataError } = await supabase
+            .from('events')
+            .select('start_at, end_at')
+            .eq('id', eventId)
+            .single()
+          
+          if (eventDataError) {
+            console.warn('⚠️ 获取活动时间失败:', eventDataError)
+          } else if (eventData) {
+            // Set validity window based on event times
+            validityStartTime = eventData.start_at
+            validityEndTime = eventData.end_at
+          }
+        }
+
+        // Get user information if available
+        let holderName = session.customer_email
+        let holderAge = null
+        
+        if (session.metadata?.user_id) {
+          const { data: userData, error: userDataError } = await supabase
+            .from('users')
+            .select('name, age')
+            .eq('id', session.metadata.user_id)
+            .single()
+          
+          if (userDataError) {
+            console.warn('⚠️ 获取用户信息失败:', userDataError)
+          } else if (userData) {
+            holderName = userData.name || session.metadata?.customer_name || session.customer_email
+            holderAge = userData.age
+          }
+        } else if (session.metadata?.customer_name) {
+          holderName = session.metadata.customer_name
+        }
+
+        // 获取年龄（优先从metadata，其次从用户数据）
+        let ticketHolderAge = holderAge
+        if (session.metadata?.customer_age) {
+          const ageFromMetadata = parseInt(session.metadata.customer_age)
+          if (!isNaN(ageFromMetadata) && ageFromMetadata > 0) {
+            ticketHolderAge = ageFromMetadata
+          }
         }
         
         const { data: ticket, error: ticketError } = await supabase
@@ -117,9 +177,13 @@ export async function POST(request) {
             event_id: eventId,
             tier: session.metadata?.price_name || 'general',
             holder_email: session.customer_email,
+            holder_name: holderName,
+            holder_age: ticketHolderAge,
             user_id: session.metadata?.user_id || null,
             status: 'unused',
-            short_id: shortId
+            short_id: shortId,
+            validity_start_time: validityStartTime,
+            validity_end_time: validityEndTime
           })
           .select()
           .single()
@@ -145,13 +209,4 @@ export async function POST(request) {
   }
 
   return NextResponse.json({ received: true })
-}
-
-function generateShortTicketId() {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-  let result = ''
-  for (let i = 0; i < 8; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length))
-  }
-  return result
 }

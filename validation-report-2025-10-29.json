@@ -1,0 +1,9 @@
+{
+  "branchSetup": true,
+  "envConfig": true,
+  "sentrySetup": true,
+  "errorCodes": true,
+  "dbSnapshot": true,
+  "rollbackScripts": true,
+  "overall": true
+}

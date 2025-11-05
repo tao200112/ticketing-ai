@@ -2,63 +2,140 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import MerchantNavbar from '@/components/MerchantNavbar'
+import jsQR from 'jsqr'
 
 export default function MerchantScanPage() {
   const router = useRouter()
   const [isScanning, setIsScanning] = useState(false)
-  const [hasCameraPermission, setHasCameraPermission] = useState(null)
-  const [qrCode, setQrCode] = useState('')
-  const [manualInput, setManualInput] = useState('')
-  const [toast, setToast] = useState(null)
   const [scanResult, setScanResult] = useState(null)
-  const [scanHistory, setScanHistory] = useState([])
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [userRole, setUserRole] = useState(null)
+  const [debugInfo, setDebugInfo] = useState([])
+  const [showDebug, setShowDebug] = useState(false) // 默认隐藏调试面板
   
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
   const streamRef = useRef(null)
   const scanIntervalRef = useRef(null)
-  const toastTimeoutRef = useRef(null)
+
+  // 添加调试日志函数
+  const addDebugLog = (message, type = 'info') => {
+    const timestamp = new Date().toLocaleTimeString()
+    const logEntry = { timestamp, message, type }
+    console.log(`[${timestamp}] ${message}`)
+    setDebugInfo(prev => [...prev.slice(-19), logEntry])
+  }
 
   useEffect(() => {
-    checkCameraPermission()
+    const checkMerchantAuth = () => {
+      const token = localStorage.getItem('merchantToken')
+      const user = localStorage.getItem('merchantUser')
+      
+      if (!token || !user) {
+        router.push('/merchant/auth/login')
+        return
+      }
+      
+      const parsedUser = JSON.parse(user)
+      const role = parsedUser.merchant_role || 'boss'
+      setUserRole(role)
+    }
+    
+    checkMerchantAuth()
+    
     return () => {
       stopScanning()
-      // 清理toast定时器
-      if (toastTimeoutRef.current) {
-        clearTimeout(toastTimeoutRef.current)
-      }
     }
-  }, [])
-
-  const checkCameraPermission = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'environment' }
-      })
-      setHasCameraPermission(true)
-      stream.getTracks().forEach(track => track.stop())
-    } catch (error) {
-      console.log('Camera permission check failed:', error)
-      setHasCameraPermission(false)
-    }
-  }
+  }, [router])
 
   const startScanning = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
+      setError('')
+      addDebugLog('🎥 Starting camera...', 'info')
+      
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setError('Camera access is not supported in this browser')
+        addDebugLog('❌ Camera API not supported', 'error')
+        return
+      }
+
+      setIsScanning(true)
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'environment' }
       })
       
       streamRef.current = stream
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream
-        videoRef.current.play()
-        setIsScanning(true)
-        showToast('Camera started successfully', 'success')
+      
+      let attempts = 0
+      const maxAttempts = 20
+      while (!videoRef.current && attempts < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, 100))
+        attempts++
       }
-    } catch (error) {
-      console.error('Failed to start camera:', error)
-      showToast('Unable to access camera, please check permissions', 'error')
+      
+      if (!videoRef.current) {
+        if (stream) {
+          stream.getTracks().forEach(track => track.stop())
+        }
+        streamRef.current = null
+        setIsScanning(false)
+        setError('Video element not initialized. Please refresh the page and try again.')
+        return
+      }
+      
+      const video = videoRef.current
+      video.srcObject = stream
+      
+      await new Promise((resolve, reject) => {
+        const onLoadedMetadata = () => {
+          video.removeEventListener('loadedmetadata', onLoadedMetadata)
+          video.removeEventListener('error', onError)
+          clearTimeout(timeoutId)
+          resolve()
+        }
+        
+        const onError = (err) => {
+          video.removeEventListener('loadedmetadata', onLoadedMetadata)
+          video.removeEventListener('error', onError)
+          clearTimeout(timeoutId)
+          reject(new Error('Video failed to load'))
+        }
+        
+        video.addEventListener('loadedmetadata', onLoadedMetadata)
+        video.addEventListener('error', onError)
+        
+        const timeoutId = setTimeout(() => {
+          video.removeEventListener('loadedmetadata', onLoadedMetadata)
+          video.removeEventListener('error', onError)
+          reject(new Error('Video load timeout'))
+        }, 5000)
+      })
+      
+      await video.play()
+      addDebugLog('✅ Video started, QR detection will begin automatically', 'success')
+    } catch (err) {
+      console.error('Camera error:', err)
+      
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop())
+        streamRef.current = null
+      }
+      setIsScanning(false)
+      addDebugLog(`❌ Failed to start camera: ${err.message || 'Unknown error'}`, 'error')
+      
+      if (err.name === 'NotAllowedError') {
+        setError('Camera access denied. Please allow camera permission and try again.')
+      } else if (err.name === 'NotFoundError') {
+        setError('No camera found. Please connect a camera device.')
+      } else if (err.name === 'NotReadableError') {
+        setError('Camera is already in use by another application.')
+      } else {
+        setError(`Unable to access camera: ${err.message || 'Unknown error'}`)
+      }
     }
   }
 
@@ -72,508 +149,737 @@ export default function MerchantScanPage() {
       scanIntervalRef.current = null
     }
     setIsScanning(false)
+    if (videoRef.current) {
+      videoRef.current.srcObject = null
+    }
   }
 
-  const handleManualSubmit = () => {
-    if (!manualInput.trim()) {
-      showToast('Please enter ticket number or QR code content', 'error')
+  // Auto-scan QR codes when camera is active
+  useEffect(() => {
+    if (!isScanning) {
+      if (scanIntervalRef.current) {
+        clearInterval(scanIntervalRef.current)
+        scanIntervalRef.current = null
+      }
       return
     }
     
-    setScanResult({
-      code: manualInput,
-      timestamp: new Date().toISOString(),
-      type: 'manual'
-    })
-    
-    const newHistory = {
-      id: Date.now(),
-      code: manualInput,
-      timestamp: new Date().toISOString(),
-      type: 'manual',
-      status: 'success'
-    }
-    setScanHistory(prev => [newHistory, ...prev.slice(0, 9)])
-    
-    showToast('Manual input successful!', 'success')
-  }
-
-  const verifyTicket = async (code) => {
-    try {
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
-      const isValid = Math.random() > 0.3
-      
-      if (isValid) {
-        showToast('Ticket verification successful!', 'success')
-        return { valid: true, message: 'Ticket is valid' }
-      } else {
-        showToast('Ticket verification failed!', 'error')
-        return { valid: false, message: 'Ticket is invalid or already used' }
+    const checkRefs = () => {
+      if (!videoRef.current || !canvasRef.current) {
+        addDebugLog('⏳ Waiting for video/canvas elements...', 'info')
+        setTimeout(checkRefs, 200)
+        return
       }
-    } catch (error) {
-      showToast('Error occurred during verification', 'error')
-      return { valid: false, message: 'Verification failed' }
-    }
-  }
+      
+      if (!isScanning) {
+        return
+      }
+      
+      const hasVideo = !!videoRef.current
+      const hasCanvas = !!canvasRef.current
+      const videoReady = videoRef.current?.readyState
+      const videoSize = videoRef.current ? `${videoRef.current.videoWidth}x${videoRef.current.videoHeight}` : 'none'
+      
+      addDebugLog('🔍 Starting QR detection...', 'info')
+      addDebugLog(`📊 Status: Video=${hasVideo}, Canvas=${hasCanvas}`, 'info')
+      addDebugLog(`📐 Video size: ${videoSize}, ReadyState: ${videoReady}`, 'info')
+      
+      let frameCount = 0
+      let lastUpdateTime = Date.now()
+      
+      const scanLoop = () => {
+        if (!isScanning || !videoRef.current || !canvasRef.current) {
+          if (scanIntervalRef.current) {
+            clearInterval(scanIntervalRef.current)
+            scanIntervalRef.current = null
+          }
+          return
+        }
+        
+        frameCount++
+        const now = Date.now()
+        
+        try {
+          const video = videoRef.current
+          const canvas = canvasRef.current
 
-  const showToast = (message, type = 'info') => {
-    // 清理之前的定时器
-    if (toastTimeoutRef.current) {
-      clearTimeout(toastTimeoutRef.current)
+          if (now - lastUpdateTime > 1000) {
+            const videoReady = video.readyState === video.HAVE_ENOUGH_DATA ? 'Yes' : 'No'
+            const videoSize = video.videoWidth > 0 && video.videoHeight > 0 
+              ? `${video.videoWidth}x${video.videoHeight}` 
+              : 'Not set'
+            addDebugLog(`🔄 Frame ${frameCount} | Video: ${videoReady} | Size: ${videoSize}`, 'info')
+            lastUpdateTime = now
+          }
+
+          if (video.readyState !== video.HAVE_ENOUGH_DATA) {
+            return
+          }
+
+          if (video.videoWidth === 0 || video.videoHeight === 0) {
+            return
+          }
+
+          const context = canvas.getContext('2d')
+          canvas.width = video.videoWidth
+          canvas.height = video.videoHeight
+          context.drawImage(video, 0, 0, canvas.width, canvas.height)
+          
+          const maxSize = 640
+          let imageData, scanWidth, scanHeight
+          
+          if (canvas.width > maxSize || canvas.height > maxSize) {
+            const scale = Math.min(maxSize / canvas.width, maxSize / canvas.height)
+            scanWidth = Math.floor(canvas.width * scale)
+            scanHeight = Math.floor(canvas.height * scale)
+            
+            const tempCanvas = document.createElement('canvas')
+            tempCanvas.width = scanWidth
+            tempCanvas.height = scanHeight
+            const tempContext = tempCanvas.getContext('2d')
+            tempContext.drawImage(video, 0, 0, scanWidth, scanHeight)
+            imageData = tempContext.getImageData(0, 0, scanWidth, scanHeight)
+          } else {
+            scanWidth = canvas.width
+            scanHeight = canvas.height
+            imageData = context.getImageData(0, 0, canvas.width, canvas.height)
+          }
+          
+          const code = jsQR(imageData.data, imageData.width, imageData.height, {
+            inversionAttempts: 'attemptBoth'
+          })
+
+          if (code && code.data) {
+            const codePreview = code.data.substring(0, 50) + (code.data.length > 50 ? '...' : '')
+            addDebugLog(`✅ QR Code detected: ${codePreview}`, 'success')
+            
+            if (scanIntervalRef.current) {
+              clearInterval(scanIntervalRef.current)
+              scanIntervalRef.current = null
+            }
+            stopScanning()
+            // 清除之前的错误信息
+            setError('')
+            // 扫描成功后自动验证票务信息
+            verifyTicket(code.data)
+          }
+        } catch (err) {
+          console.error('Scan loop error:', err)
+          if (frameCount % 25 === 0) {
+            addDebugLog(`⚠️ Error: ${err.message || 'Unknown'}`, 'error')
+          }
+        }
+      }
+
+      scanIntervalRef.current = setInterval(scanLoop, 200)
+      scanLoop()
     }
     
-    setToast({ message, type })
-    toastTimeoutRef.current = setTimeout(() => setToast(null), 3000)
+    checkRefs()
+    
+    return () => {
+      if (scanIntervalRef.current) {
+        clearInterval(scanIntervalRef.current)
+        scanIntervalRef.current = null
+      }
+    }
+  }, [isScanning])
+
+  const verifyTicket = async (qrData) => {
+    try {
+      setLoading(true)
+      setError('')
+      
+      const merchantUserStr = localStorage.getItem('merchantUser')
+      if (!merchantUserStr) {
+        setError('Please login first')
+        return
+      }
+      
+      const merchantUser = JSON.parse(merchantUserStr)
+      
+      // 先验证票务信息（不核销）
+      const verifyResponse = await fetch('/api/tickets/verify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          qr_payload: qrData,
+          redeem: false
+        }),
+      })
+      
+      const verifyResult = await verifyResponse.json()
+      
+      if (verifyResponse.ok && verifyResult.success) {
+        const { ticket, event, validity } = verifyResult.data
+        
+        // 检查商家权限（检查票务是否属于当前商家）
+        let isOwnMerchantTicket = true
+        let merchantError = null
+        
+        if (event?.merchant_id) {
+          // 检查当前用户是否是该商家的成员或拥有者
+          const merchantId = event.merchant_id
+          const currentMerchantId = merchantUser.merchant_id || merchantUser.merchantId
+          
+          // 如果当前用户有merchant_id，检查是否匹配
+          if (currentMerchantId && currentMerchantId !== merchantId) {
+            isOwnMerchantTicket = false
+            merchantError = '此票属于其他商家，您无权核销此票'
+          }
+        }
+        
+        // 检查票务状态
+        const isUsed = ticket.status === 'used'
+        const isRefunded = ticket.status === 'refunded'
+        const isCancelled = ticket.status === 'cancelled'
+        
+        // 检查有效期
+        const isExpired = validity?.status === 'expired'
+        const isNotYetValid = validity?.status === 'not_yet_valid'
+        
+        // 综合判断是否有效
+        const isValid = validity?.valid && !isUsed && !isRefunded && !isCancelled && isOwnMerchantTicket && !isExpired && !isNotYetValid
+        
+        // 生成错误原因
+        let errorReason = null
+        if (!isOwnMerchantTicket) {
+          errorReason = '此票属于其他商家'
+        } else if (isUsed) {
+          errorReason = '此票已核销'
+        } else if (isRefunded || isCancelled) {
+          errorReason = `此票已${isRefunded ? '退款' : '取消'}`
+        } else if (isExpired) {
+          errorReason = '此票已过期'
+        } else if (isNotYetValid) {
+          errorReason = '此票尚未生效'
+        }
+        
+        // 显示票务信息（无论是否有效，都显示详细信息）
+        setScanResult({
+          qr_data: qrData, // 保存二维码数据用于核销
+          ticket_id: ticket.short_id || ticket.id,
+          holder_name: ticket.holder_name || 'Unknown',
+          holder_age: ticket.holder_age || null,
+          tier: ticket.tier || 'N/A',
+          status: ticket.status,
+          event_name: event?.title || 'Unknown Event',
+          event_venue: event?.venue_name || 'N/A',
+          valid_from: validity?.validFrom || validity?.valid_from || ticket.validity_start_time || null,
+          valid_until: validity?.validUntil || validity?.valid_until || ticket.validity_end_time || null,
+          is_valid: isValid,
+          is_used: isUsed,
+          used_at: ticket.used_at || null,
+          redeemed_at: ticket.redeemed_at || null,
+          can_redeem: isValid && !isUsed && !isRefunded && !isCancelled && isOwnMerchantTicket,
+          error_reason: errorReason,
+          validity_message: validity?.message || null
+        })
+        
+        // 如果有错误原因，显示错误信息
+        if (errorReason) {
+          setError(errorReason)
+          addDebugLog(`⚠️ Ticket verification: ${errorReason}`, 'error')
+        } else {
+          setError('')
+          addDebugLog('✅ Ticket verified successfully - Ready to redeem', 'success')
+        }
+      } else {
+        const errorCode = verifyResult.error || verifyResult.code
+        let errorMessage = verifyResult.message || 'Ticket verification failed'
+        
+        if (errorCode === 'INVALID_QR_FORMAT') {
+          errorMessage = '二维码格式无效'
+        } else if (errorCode === 'TICKET_NOT_FOUND') {
+          errorMessage = '票务未找到'
+        }
+        
+        setError(errorMessage)
+        setScanResult(null)
+        addDebugLog(`❌ Verification failed: ${errorMessage}`, 'error')
+      }
+    } catch (err) {
+      setError(err.message || '票务验证错误，请重试')
+      console.error('Verification error:', err)
+      setScanResult(null)
+      addDebugLog(`❌ Verification error: ${err.message}`, 'error')
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const clearResult = () => {
+  const redeemTicket = async (qrData) => {
+    try {
+      setLoading(true)
+      setError('')
+      addDebugLog('🔄 Starting ticket redemption...', 'info')
+      
+      const merchantUserStr = localStorage.getItem('merchantUser')
+      if (!merchantUserStr) {
+        setError('Please login first')
+        addDebugLog('❌ Not logged in', 'error')
+        return
+      }
+      
+      const merchantUser = JSON.parse(merchantUserStr)
+      const userId = merchantUser.id
+      
+      addDebugLog(`📤 Sending redemption request for QR: ${qrData.substring(0, 30)}...`, 'info')
+      
+      // 核销票务
+      const response = await fetch('/api/merchant/redeem', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          qr_payload: qrData,
+          user_id: userId
+        }),
+      })
+      
+      const result = await response.json()
+      addDebugLog(`📥 Redemption response: ${response.ok ? 'Success' : 'Failed'}`, response.ok ? 'success' : 'error')
+      
+      if (response.ok && result.success) {
+        addDebugLog('✅ Ticket redeemed successfully!', 'success')
+        // 核销成功后，重新获取票务信息（此时status应该是'used'）
+        const verifyResponse = await fetch('/api/tickets/verify', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            qr_payload: qrData,
+            redeem: false
+          }),
+        })
+        
+        const verifyResult = await verifyResponse.json()
+        
+        if (verifyResponse.ok && verifyResult.success) {
+          const { ticket, event, validity } = verifyResult.data
+          
+          setScanResult({
+            qr_data: qrData, // 保存二维码数据
+            ticket_id: ticket.short_id || ticket.id,
+            holder_name: ticket.holder_name || 'Unknown',
+            holder_age: ticket.holder_age || null,
+            tier: ticket.tier || 'N/A',
+            status: ticket.status, // 应该是 'used'
+            event_name: event?.title || 'Unknown Event',
+            event_venue: event?.venue_name || 'N/A',
+            valid_from: validity?.validFrom || validity?.valid_from || null,
+            valid_until: validity?.validUntil || validity?.valid_until || null,
+            is_valid: false,
+            is_used: true, // 已使用
+            used_at: ticket.used_at || result.data?.redeemed_at || new Date().toISOString(),
+            redeemed_at: ticket.redeemed_at || result.data?.redeemed_at || new Date().toISOString(),
+            can_redeem: false
+          })
+          addDebugLog(`✅ Ticket status updated: ${ticket.status}`, 'success')
+        }
+        setError('')
+      } else {
+        const errorCode = result.error || result.code
+        let errorMessage = result.message || 'Ticket redemption failed'
+        
+        if (errorCode === 'TICKET_ALREADY_USED') {
+          errorMessage = 'Ticket has already been redeemed'
+        } else if (errorCode === 'NOT_YOUR_MERCHANT_TICKET') {
+          errorMessage = 'This ticket does not belong to your merchant'
+        } else if (errorCode === 'TICKET_CANNOT_BE_REDEEMED') {
+          errorMessage = 'Cannot redeem a cancelled or refunded ticket'
+        }
+        
+        setError(errorMessage)
+        addDebugLog(`❌ Redemption failed: ${errorMessage}`, 'error')
+      }
+    } catch (err) {
+      const errorMsg = err.message || 'Ticket redemption error, please try again'
+      setError(errorMsg)
+      addDebugLog(`❌ Redemption error: ${errorMsg}`, 'error')
+      console.error('Redemption error:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const resetScanner = () => {
     setScanResult(null)
-    setQrCode('')
-    setManualInput('')
+    setError('')
+    setDebugInfo([])
+    stopScanning()
   }
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#f9fafb' }}>
-      {/* Navigation Bar */}
-      <div style={{
-        backgroundColor: 'white',
-        borderBottom: '1px solid #e5e7eb',
-        position: 'sticky',
-        top: 0,
-        zIndex: 50
-      }}>
-        <div style={{ maxWidth: '56rem', margin: '0 auto', padding: '1rem 1.5rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-              <button
-                onClick={() => router.back()}
-                style={{
-                  padding: '0.5rem',
-                  borderRadius: '0.5rem',
-                  border: 'none',
-                  backgroundColor: 'transparent',
-                  cursor: 'pointer',
-                  transition: 'background-color 0.2s'
-                }}
-                onMouseEnter={(e) => e.target.style.backgroundColor = '#f3f4f6'}
-                onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
-              >
-                <svg style={{ width: '1.25rem', height: '1.25rem', color: '#4b5563' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-              </button>
-              <div>
-                <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#111827', margin: 0 }}>Ticket Scanning</h1>
-                <p style={{ color: '#6b7280', fontSize: '0.875rem', margin: 0 }}>Scan QR code to verify tickets</p>
-              </div>
-            </div>
-            
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <div style={{
-                width: '0.5rem',
-                height: '0.5rem',
-                backgroundColor: '#10b981',
-                borderRadius: '50%',
-                animation: 'pulse 2s infinite'
-              }}></div>
-              <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>Online</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div style={{ maxWidth: '56rem', margin: '0 auto', padding: '1.5rem' }}>
-        {/* Scanning Area */}
-        <div style={{
-          backgroundColor: 'white',
-          borderRadius: '0.5rem',
-          border: '1px solid #e5e7eb',
-          padding: '2rem',
-          marginBottom: '2rem',
-          boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+    <div style={{
+      minHeight: '100vh',
+      background: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)',
+      paddingTop: '80px'
+    }}>
+      <MerchantNavbar userRole={userRole} />
+      
+      <div style={{ maxWidth: '800px', margin: '0 auto', padding: '32px' }}>
+        <h1 style={{
+          fontSize: '2rem',
+          fontWeight: 'bold',
+          color: 'white',
+          marginBottom: '24px',
+          textAlign: 'center'
         }}>
-          <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#111827', marginBottom: '0.5rem' }}>Scan QR Code</h2>
-            <p style={{ color: '#6b7280' }}>Point the camera at the QR code to scan</p>
-          </div>
+          Ticket Scanner
+        </h1>
 
-          {/* Camera Area */}
-          <div style={{
-            position: 'relative',
-            backgroundColor: '#111827',
-            borderRadius: '0.5rem',
-            overflow: 'hidden',
-            marginBottom: '1.5rem'
-          }}>
-            <video
-              ref={videoRef}
-              style={{
-                width: '100%',
-                height: '16rem',
-                objectFit: 'cover',
-                display: isScanning ? 'block' : 'none'
-              }}
-              playsInline
-              muted
-            />
-            
-            {!isScanning && (
-              <div style={{ height: '16rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{
-                    width: '4rem',
-                    height: '4rem',
-                    backgroundColor: '#f3f4f6',
-                    borderRadius: '50%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    margin: '0 auto 1rem auto'
-                  }}>
-                    <svg style={{ width: '2rem', height: '2rem', color: '#9ca3af' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                  </div>
-                  <p style={{ color: '#6b7280' }}>Click to start scanning</p>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Control Buttons */}
-          <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
-            {!isScanning ? (
+        {/* Scanner Area */}
+        <div style={{
+          background: 'rgba(15, 23, 42, 0.6)',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          borderRadius: '16px',
+          padding: '24px',
+          marginBottom: '24px'
+        }}>
+          {!isScanning ? (
+            <div style={{ textAlign: 'center' }}>
               <button
                 onClick={startScanning}
-                disabled={hasCameraPermission === false}
                 style={{
-                  padding: '0.75rem 2rem',
-                  borderRadius: '0.5rem',
-                  fontWeight: '500',
+                  padding: '1rem 2rem',
+                  background: 'linear-gradient(135deg, #ec4899 0%, #db2777 100%)',
+                  color: 'white',
                   border: 'none',
-                  cursor: hasCameraPermission === false ? 'not-allowed' : 'pointer',
-                  transition: 'all 0.3s',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  backgroundColor: hasCameraPermission === false ? '#fef2f2' : '#2563eb',
-                  color: hasCameraPermission === false ? '#f87171' : 'white'
-                }}
-                onMouseEnter={(e) => {
-                  if (hasCameraPermission !== false) {
-                    e.target.style.backgroundColor = '#1d4ed8'
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (hasCameraPermission !== false) {
-                    e.target.style.backgroundColor = '#2563eb'
-                  }
+                  borderRadius: '8px',
+                  fontSize: '1rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  marginBottom: '16px'
                 }}
               >
-                <svg style={{ width: '1.25rem', height: '1.25rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
                 Start Scanning
               </button>
-            ) : (
+            </div>
+          ) : (
+            <div>
+              <div style={{ position: 'relative', marginBottom: '16px' }}>
+                <video
+                  ref={videoRef}
+                  style={{
+                    width: '100%',
+                    maxWidth: '600px',
+                    borderRadius: '8px',
+                    display: 'block',
+                    backgroundColor: '#000',
+                    minHeight: '300px'
+                  }}
+                  playsInline
+                  autoPlay
+                  muted
+                  onLoadedMetadata={() => {
+                    if (videoRef.current) {
+                      videoRef.current.play().catch(err => {
+                        console.error('Auto-play failed:', err)
+                      })
+                    }
+                  }}
+                  onPlay={() => {
+                    addDebugLog('▶️ Video started playing', 'success')
+                    addDebugLog('🔍 Camera active. Scanning for QR codes...', 'info')
+                  }}
+                />
+                <div style={{
+                  position: 'absolute',
+                  top: '10px',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  background: 'rgba(0, 0, 0, 0.7)',
+                  color: 'white',
+                  padding: '8px 16px',
+                  borderRadius: '20px',
+                  fontSize: '0.875rem',
+                  fontWeight: '500'
+                }}>
+                  🔍 Scanning...
+                </div>
+              </div>
+              <canvas 
+                ref={canvasRef} 
+                style={{ display: 'none' }}
+              />
               <button
                 onClick={stopScanning}
                 style={{
-                  padding: '0.75rem 2rem',
-                  backgroundColor: '#fef2f2',
-                  color: '#dc2626',
-                  borderRadius: '0.5rem',
-                  fontWeight: '500',
+                  width: '100%',
+                  padding: '0.75rem',
+                  background: '#ef4444',
+                  color: 'white',
                   border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '1rem',
+                  fontWeight: '600',
                   cursor: 'pointer',
-                  transition: 'all 0.3s',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem'
+                  marginBottom: '16px'
                 }}
-                onMouseEnter={(e) => e.target.style.backgroundColor = '#fee2e2'}
-                onMouseLeave={(e) => e.target.style.backgroundColor = '#fef2f2'}
               >
-                <svg style={{ width: '1.25rem', height: '1.25rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
                 Stop Scanning
               </button>
-            )}
-          </div>
+            </div>
+          )}
 
-          {/* Permission Warning */}
-          {hasCameraPermission === false && (
+          {error && (
             <div style={{
-              marginTop: '1rem',
-              padding: '1rem',
-              backgroundColor: '#fef2f2',
-              border: '1px solid #fecaca',
-              borderRadius: '0.5rem'
+              marginTop: '16px',
+              padding: '12px',
+              background: 'rgba(239, 68, 68, 0.1)',
+              border: '1px solid #ef4444',
+              borderRadius: '8px',
+              color: '#ef4444'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#dc2626' }}>
-                <svg style={{ width: '1.25rem', height: '1.25rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                </svg>
-                <span style={{ fontSize: '0.875rem' }}>Unable to access camera, please check browser permission settings</span>
+              {error}
+            </div>
+          )}
+          
+          {/* Debug Panel */}
+          {showDebug && (
+            <div style={{
+              backgroundColor: '#1e293b',
+              borderRadius: '8px',
+              border: '1px solid #334155',
+              padding: '16px',
+              marginTop: '16px',
+              maxHeight: '300px',
+              overflowY: 'auto'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                <h3 style={{ fontSize: '1rem', fontWeight: '600', color: '#f1f5f9', margin: 0 }}>Debug Information</h3>
+                <button
+                  onClick={() => setDebugInfo([])}
+                  style={{
+                    padding: '0.25rem 0.75rem',
+                    fontSize: '0.75rem',
+                    backgroundColor: '#475569',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '0.25rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Clear
+                </button>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontFamily: 'monospace', fontSize: '0.75rem' }}>
+                {debugInfo.length === 0 ? (
+                  <div style={{ color: '#94a3b8', fontStyle: 'italic' }}>No debug information yet. Start scanning to see logs.</div>
+                ) : (
+                  debugInfo.map((log, index) => (
+                    <div 
+                      key={index}
+                      style={{
+                        padding: '0.5rem',
+                        backgroundColor: log.type === 'error' ? 'rgba(239, 68, 68, 0.1)' : 
+                                         log.type === 'success' ? 'rgba(16, 185, 129, 0.1)' : 
+                                         'rgba(59, 130, 246, 0.1)',
+                        borderRadius: '0.25rem',
+                        borderLeft: `3px solid ${
+                          log.type === 'error' ? '#ef4444' : 
+                          log.type === 'success' ? '#10b981' : 
+                          '#3b82f6'
+                        }`
+                      }}
+                    >
+                      <span style={{ color: '#94a3b8' }}>[{log.timestamp}]</span>{' '}
+                      <span style={{ 
+                        color: log.type === 'error' ? '#fca5a5' : 
+                               log.type === 'success' ? '#6ee7b7' : 
+                               '#bfdbfe'
+                      }}>
+                        {log.message}
+                      </span>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           )}
         </div>
 
-        {/* Manual Input Area */}
-        <div style={{
-          backgroundColor: 'white',
-          borderRadius: '0.5rem',
-          border: '1px solid #e5e7eb',
-          padding: '2rem',
-          marginBottom: '2rem',
-          boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
-        }}>
-          <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#111827', marginBottom: '0.5rem' }}>Manual Input</h2>
-            <p style={{ color: '#6b7280' }}>If scanning is not possible, enter ticket number manually</p>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div>
-              <input
-                type="text"
-                value={manualInput}
-                onChange={(e) => setManualInput(e.target.value)}
-                placeholder="Enter ticket number or QR code content"
-                style={{
-                  width: '100%',
-                  padding: '0.75rem 1rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '0.5rem',
-                  color: '#111827',
-                  fontSize: '1rem',
-                  outline: 'none'
-                }}
-                onFocus={(e) => {
-                  e.target.style.borderColor = '#2563eb'
-                  e.target.style.boxShadow = '0 0 0 3px rgba(37, 99, 235, 0.1)'
-                }}
-                onBlur={(e) => {
-                  e.target.style.borderColor = '#d1d5db'
-                  e.target.style.boxShadow = 'none'
-                }}
-              />
-            </div>
-            
-            <button
-              onClick={handleManualSubmit}
-              disabled={!manualInput.trim()}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                borderRadius: '0.5rem',
-                fontWeight: '500',
-                border: 'none',
-                cursor: !manualInput.trim() ? 'not-allowed' : 'pointer',
-                transition: 'all 0.3s',
-                backgroundColor: !manualInput.trim() ? '#f3f4f6' : '#2563eb',
-                color: !manualInput.trim() ? '#9ca3af' : 'white'
-              }}
-              onMouseEnter={(e) => {
-                if (manualInput.trim()) {
-                  e.target.style.backgroundColor = '#1d4ed8'
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (manualInput.trim()) {
-                  e.target.style.backgroundColor = '#2563eb'
-                }
-              }}
-            >
-              Confirm Input
-            </button>
-          </div>
-        </div>
-
         {/* Scan Result */}
         {scanResult && (
           <div style={{
-            backgroundColor: 'white',
-            borderRadius: '0.5rem',
-            border: '1px solid #e5e7eb',
-            padding: '2rem',
-            marginBottom: '2rem',
-            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+            background: 'rgba(15, 23, 42, 0.6)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            borderRadius: '16px',
+            padding: '24px',
+            marginBottom: '24px'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#111827' }}>Scan Result</h2>
-              <button
-                onClick={clearResult}
-                style={{
-                  color: '#9ca3af',
-                  border: 'none',
-                  backgroundColor: 'transparent',
-                  cursor: 'pointer',
-                  transition: 'color 0.2s'
-                }}
-                onMouseEnter={(e) => e.target.style.color = '#4b5563'}
-                onMouseLeave={(e) => e.target.style.color = '#9ca3af'}
-              >
-                <svg style={{ width: '1.25rem', height: '1.25rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div style={{ backgroundColor: '#f9fafb', borderRadius: '0.5rem', padding: '1rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                  <svg style={{ width: '1rem', height: '1rem', color: '#6b7280' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>Ticket Code</span>
-                </div>
-                <p style={{ color: '#111827', fontFamily: 'monospace', fontSize: '0.875rem', wordBreak: 'break-all', margin: 0 }}>
-                  {scanResult.code}
-                </p>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
-                <button
-                  onClick={() => verifyTicket(scanResult.code)}
-                  style={{
-                    padding: '0.75rem',
-                    backgroundColor: '#059669',
-                    color: 'white',
-                    borderRadius: '0.5rem',
-                    fontWeight: '500',
-                    border: 'none',
-                    cursor: 'pointer',
-                    transition: 'all 0.3s',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '0.5rem'
-                  }}
-                  onMouseEnter={(e) => e.target.style.backgroundColor = '#047857'}
-                  onMouseLeave={(e) => e.target.style.backgroundColor = '#059669'}
-                >
-                  <svg style={{ width: '1.25rem', height: '1.25rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  Verify Ticket
-                </button>
-                
-                <button
-                  onClick={() => navigator.clipboard.writeText(scanResult.code)}
-                  style={{
-                    padding: '0.75rem',
-                    backgroundColor: '#f3f4f6',
-                    color: '#374151',
-                    borderRadius: '0.5rem',
-                    fontWeight: '500',
-                    border: 'none',
-                    cursor: 'pointer',
-                    transition: 'all 0.3s',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '0.5rem'
-                  }}
-                  onMouseEnter={(e) => e.target.style.backgroundColor = '#e5e7eb'}
-                  onMouseLeave={(e) => e.target.style.backgroundColor = '#f3f4f6'}
-                >
-                  <svg style={{ width: '1.25rem', height: '1.25rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                  </svg>
-                  Copy Code
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Scan History */}
-        {scanHistory.length > 0 && (
-          <div style={{
-            backgroundColor: 'white',
-            borderRadius: '0.5rem',
-            border: '1px solid #e5e7eb',
-            padding: '2rem',
-            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
-          }}>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#111827', marginBottom: '1.5rem' }}>Recent Scans</h2>
+            <h2 style={{
+              fontSize: '1.25rem',
+              fontWeight: 'bold',
+              color: 'white',
+              marginBottom: '16px'
+            }}>
+              票务信息
+            </h2>
             
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {scanHistory.slice(0, 5).map((item) => (
-                <div key={item.id} style={{
-                  backgroundColor: '#f9fafb',
-                  borderRadius: '0.5rem',
-                  padding: '1rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    <div style={{
-                      width: '0.5rem',
-                      height: '0.5rem',
-                      borderRadius: '50%',
-                      backgroundColor: item.status === 'success' ? '#10b981' : '#ef4444'
-                    }}></div>
-                    <div>
-                      <p style={{ color: '#111827', fontFamily: 'monospace', fontSize: '0.875rem', margin: 0 }}>
-                        {item.code}
-                      </p>
-                      <p style={{ color: '#6b7280', fontSize: '0.75rem', margin: 0 }}>
-                        {new Date(item.timestamp).toLocaleString('en-US')} • {item.type === 'qr' ? 'Scan' : 'Manual'}
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <button
-                    onClick={() => navigator.clipboard.writeText(item.code)}
-                    style={{
-                      padding: '0.5rem',
-                      color: '#9ca3af',
-                      border: 'none',
-                      backgroundColor: 'transparent',
-                      cursor: 'pointer',
-                      transition: 'color 0.2s'
-                    }}
-                    onMouseEnter={(e) => e.target.style.color = '#4b5563'}
-                    onMouseLeave={(e) => e.target.style.color = '#9ca3af'}
-                  >
-                    <svg style={{ width: '1rem', height: '1rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                    </svg>
-                  </button>
+            {/* Ticket Status */}
+            <div style={{
+              backgroundColor: scanResult.is_used 
+                ? 'rgba(239, 68, 68, 0.1)' 
+                : scanResult.is_valid 
+                ? 'rgba(16, 185, 129, 0.1)' 
+                : 'rgba(234, 179, 8, 0.1)',
+              border: `1px solid ${scanResult.is_used ? '#ef4444' : scanResult.is_valid ? '#10b981' : '#eab308'}`,
+              borderRadius: '8px',
+              padding: '16px',
+              marginBottom: '16px'
+            }}>
+              <div style={{
+                color: scanResult.is_used ? '#ef4444' : scanResult.is_valid ? '#10b981' : '#eab308',
+                fontWeight: '600',
+                marginBottom: '8px',
+                fontSize: '1rem'
+              }}>
+                {scanResult.is_used ? '✗ 票已核销' : scanResult.is_valid ? '✓ 票务有效' : '⚠️ 票务无效'}
+              </div>
+              {scanResult.error_reason && (
+                <div style={{ color: '#ef4444', fontSize: '0.875rem', marginBottom: '8px', fontWeight: '500' }}>
+                  {scanResult.error_reason}
                 </div>
-              ))}
+              )}
+              {scanResult.validity_message && !scanResult.is_valid && (
+                <div style={{ color: '#94a3b8', fontSize: '0.875rem', marginBottom: '8px' }}>
+                  {scanResult.validity_message}
+                </div>
+              )}
+              {scanResult.is_used && scanResult.used_at && (
+                <div style={{ color: '#94a3b8', fontSize: '0.875rem', marginBottom: '8px' }}>
+                  核销时间: {new Date(scanResult.used_at).toLocaleString('zh-CN')}
+                </div>
+              )}
+            </div>
+
+            {/* Ticket Details */}
+            <div style={{
+              backgroundColor: 'rgba(30, 41, 59, 0.5)',
+              borderRadius: '8px',
+              padding: '16px',
+              marginBottom: '16px'
+            }}>
+              <div style={{ color: '#94a3b8', fontSize: '0.875rem', marginBottom: '12px', fontWeight: '500' }}>
+                票务详情
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#cbd5e1', fontSize: '0.875rem' }}>票务ID:</span>
+                  <span style={{ color: 'white', fontSize: '0.875rem', fontWeight: '500' }}>{scanResult.ticket_id}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#cbd5e1', fontSize: '0.875rem' }}>持票人姓名:</span>
+                  <span style={{ color: 'white', fontSize: '0.875rem', fontWeight: '500' }}>{scanResult.holder_name}</span>
+                </div>
+                {scanResult.holder_age !== null && scanResult.holder_age !== undefined && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#cbd5e1', fontSize: '0.875rem' }}>年龄:</span>
+                    <span style={{ color: 'white', fontSize: '0.875rem', fontWeight: '500' }}>{scanResult.holder_age} 岁</span>
+                  </div>
+                )}
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#cbd5e1', fontSize: '0.875rem' }}>票种等级:</span>
+                  <span style={{ color: 'white', fontSize: '0.875rem', fontWeight: '500' }}>{scanResult.tier}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#cbd5e1', fontSize: '0.875rem' }}>活动名称:</span>
+                  <span style={{ color: 'white', fontSize: '0.875rem', fontWeight: '500' }}>{scanResult.event_name}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#cbd5e1', fontSize: '0.875rem' }}>活动场地:</span>
+                  <span style={{ color: 'white', fontSize: '0.875rem', fontWeight: '500' }}>{scanResult.event_venue}</span>
+                </div>
+                {scanResult.valid_from && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#cbd5e1', fontSize: '0.875rem' }}>生效时间:</span>
+                    <span style={{ color: 'white', fontSize: '0.875rem', fontWeight: '500' }}>
+                      {new Date(scanResult.valid_from).toLocaleString('zh-CN')}
+                    </span>
+                  </div>
+                )}
+                {scanResult.valid_until && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#cbd5e1', fontSize: '0.875rem' }}>失效时间:</span>
+                    <span style={{ color: 'white', fontSize: '0.875rem', fontWeight: '500' }}>
+                      {new Date(scanResult.valid_until).toLocaleString('zh-CN')}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div style={{ display: 'flex', gap: '12px' }}>
+              {scanResult.can_redeem && (
+                <button
+                  onClick={async () => {
+                    // 获取扫描的二维码数据
+                    const qrData = scanResult.qr_data
+                    if (qrData) {
+                      await redeemTicket(qrData)
+                    } else {
+                      setError('Cannot redeem: QR code data not available. Please scan again.')
+                      console.error('QR data missing:', scanResult)
+                    }
+                  }}
+                  disabled={loading}
+                  style={{
+                    flex: 1,
+                    padding: '0.75rem',
+                    background: loading ? 'rgba(16, 185, 129, 0.5)' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '1rem',
+                    fontWeight: '600',
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    opacity: loading ? 0.6 : 1,
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!loading) {
+                      e.target.style.transform = 'scale(1.02)'
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.transform = 'scale(1)'
+                  }}
+                >
+                  {loading ? '处理中...' : '核销票务'}
+                </button>
+              )}
+              <button
+                onClick={resetScanner}
+                style={{
+                  flex: scanResult.can_redeem ? 1 : 1,
+                  padding: '0.75rem',
+                  background: 'rgba(55, 65, 81, 0.5)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '1rem',
+                  fontWeight: '600',
+                  cursor: 'pointer'
+                }}
+              >
+                继续扫描
+              </button>
             </div>
           </div>
         )}
       </div>
-
-      {/* Toast Notification */}
-      {toast && (
-        <div style={{ position: 'fixed', bottom: '1.5rem', right: '1.5rem', zIndex: 50 }}>
-          <div style={{
-            padding: '0.75rem 1.5rem',
-            borderRadius: '0.5rem',
-            fontWeight: '500',
-            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
-            backgroundColor: toast.type === 'success' ? '#dcfce7' : toast.type === 'error' ? '#fef2f2' : '#dbeafe',
-            color: toast.type === 'success' ? '#166534' : toast.type === 'error' ? '#991b1b' : '#1e40af',
-            border: toast.type === 'success' ? '1px solid #bbf7d0' : toast.type === 'error' ? '1px solid #fecaca' : '1px solid #bfdbfe'
-          }}>
-            {toast.message}
-          </div>
-        </div>
-      )}
-
-      {/* Hidden canvas for QR code recognition */}
-      <canvas ref={canvasRef} style={{ display: 'none' }} />
     </div>
   )
 }
+
+
+
+
+

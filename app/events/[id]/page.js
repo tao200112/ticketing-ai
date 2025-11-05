@@ -17,6 +17,7 @@ export default function EventDetailPage() {
   const [selectedPrice, setSelectedPrice] = useState(null)
   const [customerEmail, setCustomerEmail] = useState('')
   const [customerName, setCustomerName] = useState('')
+  const [customerAge, setCustomerAge] = useState('')
   const [selectedDate, setSelectedDate] = useState('')
 
   useEffect(() => {
@@ -51,6 +52,18 @@ export default function EventDetailPage() {
 
   const loadUserData = () => {
     try {
+      // 优先使用 userSession（与登录系统一致）
+      const userSession = localStorage.getItem('userSession')
+      if (userSession) {
+        const user = JSON.parse(userSession)
+        if (user?.id) {
+          setCustomerEmail(user.email || '')
+          setCustomerName(user.name || '')
+          return
+        }
+      }
+      
+      // 回退到 userData（兼容旧版本）
       const userData = localStorage.getItem('userData')
       if (userData) {
         const user = JSON.parse(userData)
@@ -79,6 +92,11 @@ export default function EventDetailPage() {
       setError('Please fill in email and name')
       return
     }
+    
+    if (!customerAge || parseInt(customerAge) < 1 || parseInt(customerAge) > 120) {
+      setError('Please enter a valid age (1-120)')
+      return
+    }
 
     setLoading(true)
     setError('')
@@ -95,7 +113,8 @@ export default function EventDetailPage() {
           price_id: selectedPrice,
           quantity: quantity,
           customer_email: customerEmail,
-          customer_name: customerName
+          customer_name: customerName,
+          customer_age: parseInt(customerAge)
         }),
       })
 
@@ -519,20 +538,51 @@ export default function EventDetailPage() {
                       <input
                         type="email"
                         value={customerEmail}
-                        onChange={(e) => setCustomerEmail(e.target.value)}
-                        placeholder="Enter your email"
+                        readOnly
+                        placeholder="Account email (auto-filled)"
                         style={{
                           width: '100%',
                           padding: '12px 16px',
-                          backgroundColor: 'rgba(55, 65, 81, 0.5)',
+                          backgroundColor: 'rgba(55, 65, 81, 0.3)',
                           border: '1px solid rgba(255, 255, 255, 0.1)',
                           borderRadius: '8px',
-                          color: 'white',
+                          color: customerEmail ? 'white' : '#94a3b8',
                           fontSize: '1rem',
-                          outline: 'none'
+                          outline: 'none',
+                          cursor: 'not-allowed'
                         }}
                       />
                     </div>
+                  </div>
+                  
+                  <div style={{ marginBottom: '16px' }}>
+                    <label style={{
+                      display: 'block',
+                      color: 'white',
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      marginBottom: '8px'
+                    }}>
+                      Age *
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="120"
+                      value={customerAge}
+                      onChange={(e) => setCustomerAge(e.target.value)}
+                      placeholder="Enter your age"
+                      style={{
+                        width: '100%',
+                        padding: '12px 16px',
+                        backgroundColor: 'rgba(55, 65, 81, 0.5)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        borderRadius: '8px',
+                        color: 'white',
+                        fontSize: '1rem',
+                        outline: 'none'
+                      }}
+                    />
                   </div>
                   
                   {/* 客户信息备注 */}

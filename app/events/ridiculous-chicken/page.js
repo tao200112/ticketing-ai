@@ -19,6 +19,18 @@ export default function RidiculousChickenEvent() {
 
   const loadUserData = () => {
     try {
+      // 优先使用 userSession（与登录系统一致）
+      const userSession = localStorage.getItem('userSession')
+      if (userSession) {
+        const user = JSON.parse(userSession)
+        if (user?.id) {
+          setCustomerEmail(user.email || '')
+          setCustomerName(user.name || '')
+          return
+        }
+      }
+      
+      // 回退到 userData（兼容旧版本）
       const userData = localStorage.getItem('userData')
       if (userData) {
         const user = JSON.parse(userData)
@@ -447,17 +459,18 @@ export default function RidiculousChickenEvent() {
                 <input
                   type="email"
                   value={customerEmail}
-                  onChange={(e) => setCustomerEmail(e.target.value)}
-                  placeholder="Enter your email"
+                  readOnly
+                  placeholder="Account email (auto-filled)"
                   style={{
                     width: '100%',
                     padding: '12px 16px',
-                    backgroundColor: 'rgba(55, 65, 81, 0.5)',
+                    backgroundColor: 'rgba(55, 65, 81, 0.3)',
                     border: '1px solid rgba(255, 255, 255, 0.1)',
                     borderRadius: '8px',
-                    color: 'white',
+                    color: customerEmail ? 'white' : '#94a3b8',
                     fontSize: '1rem',
-                    outline: 'none'
+                    outline: 'none',
+                    cursor: 'not-allowed'
                   }}
                 />
               </div>

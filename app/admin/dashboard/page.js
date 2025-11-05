@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import EventCreationForm from '../../../components/EventCreationForm'
-import NavbarPartyTix from '../../../components/NavbarPartyTix'
+import AdminNavbar from '@/components/AdminNavbar'
 
 export const dynamic = 'force-dynamic'
 
@@ -337,13 +337,14 @@ export default function AdminDashboard() {
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #0f172a 0%, #7c3aed 50%, #0f172a 100%)'
+      background: 'linear-gradient(135deg, #0f172a 0%, #7c3aed 50%, #0f172a 100%)',
+      paddingTop: '80px'
     }}>
-      <NavbarPartyTix />
+      <AdminNavbar />
       <div style={{
         maxWidth: '1200px',
         margin: '0 auto',
-        padding: '100px 24px 40px 24px'
+        padding: '24px'
       }}>
         {/* Header */}
         <div style={{
@@ -721,11 +722,47 @@ export default function AdminDashboard() {
                         <p style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '14px', marginBottom: '8px' }}>
                           {event.description}
                         </p>
-                        <div style={{ display: 'flex', gap: '16px', fontSize: '12px', color: 'rgba(255, 255, 255, 0.6)' }}>
-                          <span>📍 {event.location}</span>
-                          <span>📅 {new Date(event.start_date).toLocaleDateString()}</span>
+                        <div style={{ display: 'flex', gap: '16px', fontSize: '12px', color: 'rgba(255, 255, 255, 0.6)', marginBottom: '8px', flexWrap: 'wrap' }}>
+                          <span>📍 {event.venue_name || event.location || 'N/A'}</span>
+                          <span>📅 {event.start_at ? new Date(event.start_at).toLocaleDateString() : 'Invalid Date'}</span>
                           <span>👥 {event.max_attendees || 'Unlimited'}</span>
                         </div>
+                        {event.merchants && (
+                          <div style={{ 
+                            display: 'inline-flex', 
+                            alignItems: 'center', 
+                            gap: '6px',
+                            fontSize: '12px', 
+                            color: 'rgba(139, 92, 246, 0.9)',
+                            background: 'rgba(139, 92, 246, 0.1)',
+                            padding: '4px 10px',
+                            borderRadius: '6px',
+                            border: '1px solid rgba(139, 92, 246, 0.2)'
+                          }}>
+                            <span>🏪</span>
+                            <span style={{ fontWeight: '500' }}>
+                              商家: {event.merchants.name || 'Unknown Merchant'}
+                            </span>
+                          </div>
+                        )}
+                        {!event.merchants && event.merchant_id && (
+                          <div style={{ 
+                            display: 'inline-flex', 
+                            alignItems: 'center', 
+                            gap: '6px',
+                            fontSize: '12px', 
+                            color: 'rgba(139, 92, 246, 0.9)',
+                            background: 'rgba(139, 92, 246, 0.1)',
+                            padding: '4px 10px',
+                            borderRadius: '6px',
+                            border: '1px solid rgba(139, 92, 246, 0.2)'
+                          }}>
+                            <span>🏪</span>
+                            <span style={{ fontWeight: '500' }}>
+                              商家ID: {event.merchant_id.substring(0, 8)}...
+                            </span>
+                          </div>
+                        )}
                       </div>
                       <div style={{ display: 'flex', gap: '8px' }}>
                         <button

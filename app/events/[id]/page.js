@@ -59,6 +59,10 @@ export default function EventDetailPage() {
         if (user?.id) {
           setCustomerEmail(user.email || '')
           setCustomerName(user.name || '')
+          // 自动填写年龄，如果用户信息中有年龄字段
+          if (user.age) {
+            setCustomerAge(String(user.age))
+          }
           return
         }
       }
@@ -70,6 +74,10 @@ export default function EventDetailPage() {
         if (user.isLoggedIn) {
           setCustomerEmail(user.email || '')
           setCustomerName(user.name || '')
+          // 自动填写年龄，如果用户信息中有年龄字段
+          if (user.age) {
+            setCustomerAge(String(user.age))
+          }
         }
       }
     } catch (error) {
@@ -585,37 +593,54 @@ export default function EventDetailPage() {
                     />
                   </div>
                   
-                  {/* 客户信息备注 */}
+                  {/* 重要提示信息 */}
                   <div style={{
-                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                    border: '1px solid rgba(59, 130, 246, 0.3)',
+                    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                    border: '2px solid #ef4444',
                     borderRadius: '8px',
-                    padding: '12px 16px',
-                    marginTop: '12px'
+                    padding: '16px',
+                    marginTop: '16px'
                   }}>
                     <div style={{
                       display: 'flex',
                       alignItems: 'flex-start',
-                      gap: '8px'
+                      gap: '12px'
                     }}>
                       <div style={{
-                        color: '#60a5fa',
-                        fontSize: '1rem',
-                        marginTop: '2px'
+                        color: '#ef4444',
+                        fontSize: '1.25rem',
+                        marginTop: '2px',
+                        fontWeight: 'bold'
                       }}>
-                        ℹ️
+                        ⚠️
                       </div>
                       <div style={{
-                        color: '#e0e7ff',
-                        fontSize: '0.875rem',
-                        lineHeight: '1.4'
+                        color: '#fca5a5',
+                        fontSize: '0.9375rem',
+                        lineHeight: '1.6',
+                        fontWeight: '500'
                       }}>
-                        <div style={{ fontWeight: '500', marginBottom: '4px' }}>
-                          Please provide accurate information
+                        <div style={{ 
+                          color: '#fecaca', 
+                          fontWeight: 'bold', 
+                          marginBottom: '8px',
+                          fontSize: '1rem'
+                        }}>
+                          重要提示：入场需要验证身份证明
                         </div>
-                        <div>
-                          Your name and ID will be verified at the entrance. 
-                          Please ensure all information is correct and matches your official identification.
+                        <div style={{ marginBottom: '4px' }}>
+                          • 入场时需要出示有效身份证明（ID）进行核验
+                        </div>
+                        <div style={{ marginBottom: '4px' }}>
+                          • 购票时填写的<strong style={{ color: '#fecaca' }}>姓名和年龄必须与身份证件上的信息完全一致</strong>
+                        </div>
+                        <div style={{ 
+                          color: '#fee2e2', 
+                          fontWeight: 'bold',
+                          marginTop: '8px',
+                          fontSize: '0.9375rem'
+                        }}>
+                          ⚠️ 如信息不符，票务将作废且不予退款
                         </div>
                       </div>
                     </div>

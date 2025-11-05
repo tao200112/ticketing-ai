@@ -89,8 +89,13 @@ export async function GET() {
     // 为每个活动添加票务统计数据
     if (events && events.length > 0) {
       const eventsWithStats = await Promise.all(events.map(async (event) => {
-        // 计算总票数（从prices表的inventory字段）
-        const totalTickets = event.prices?.reduce((sum, price) => sum + (price.inventory || 0), 0) || 0
+        // 计算总票数（从prices表的inventory字段，null表示无限）
+        const totalTickets = event.prices?.reduce((sum, price) => {
+          if (price.inventory === null || price.inventory === undefined) {
+            return sum // 无限库存不计入总数
+          }
+          return sum + price.inventory
+        }, 0) || 0
         
         // 计算已售票数（优先从tickets表计算，回退到prices表的sold_count）
         const { data: tickets, error: ticketsError } = await supabase
@@ -218,7 +223,7 @@ export async function POST(request) {
         event_id: event.id,
         name: price.name,
         amount_cents: price.amount_cents,
-        inventory: price.inventory || 0,
+        inventory: price.inventory !== null && price.inventory !== undefined ? price.inventory : null, // null表示无限库存
         limit_per_user: price.limit_per_user || 4,
         is_active: true
       }))

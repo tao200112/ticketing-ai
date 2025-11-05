@@ -96,7 +96,8 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
       return
     }
 
-    if (selectedPrice.inventory && selectedPrice.inventory < quantity) {
+    // 只在有库存限制时检查库存（inventory为null表示无限）
+    if (selectedPrice.inventory !== null && selectedPrice.inventory !== undefined && selectedPrice.inventory < quantity) {
       setPaymentError('Insufficient ticket inventory')
       return
     }

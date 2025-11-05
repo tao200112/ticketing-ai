@@ -16,7 +16,7 @@ export async function POST(request) {
     if (!stripe) {
       throw ErrorHandler.configurationError(
         'STRIPE_NOT_CONFIGURED',
-        '支付服务未配置'
+        'Payment service not configured'
       )
     }
 
@@ -34,7 +34,7 @@ export async function POST(request) {
     if (!event_id || !price_id) {
       throw ErrorHandler.validationError(
         'MISSING_FIELDS',
-        '缺少必需字段'
+        'Missing required fields'
       )
     }
     
@@ -43,7 +43,7 @@ export async function POST(request) {
     if (isNaN(quantityNum) || quantityNum < 1 || quantityNum > 10) {
       throw ErrorHandler.validationError(
         'INVALID_QUANTITY',
-        '数量必须在1-10之间'
+        'Quantity must be between 1 and 10'
       )
     }
 
@@ -54,7 +54,7 @@ export async function POST(request) {
     if (!eventResult.success || !eventResult.data) {
       throw ErrorHandler.notFoundError(
         'EVENT_NOT_FOUND',
-        '活动不存在'
+        'Event not found'
       )
     }
 
@@ -64,15 +64,15 @@ export async function POST(request) {
     if (!price) {
       throw ErrorHandler.notFoundError(
         'PRICE_NOT_FOUND',
-        '票种不存在'
+        'Ticket type not found'
       )
     }
     
-    // 验证库存
-    if (price.inventory !== null && price.inventory < quantityNum) {
+    // 验证库存（只在有库存限制时检查，null表示无限）
+    if (price.inventory !== null && price.inventory !== undefined && price.inventory < quantityNum) {
       throw ErrorHandler.validationError(
         'INSUFFICIENT_INVENTORY',
-        '库存不足'
+        'Insufficient inventory'
       )
     }
 
@@ -80,7 +80,7 @@ export async function POST(request) {
     if (!price.amount_cents || price.amount_cents <= 0) {
       throw ErrorHandler.validationError(
         'INVALID_PRICE',
-        '价格无效'
+        'Invalid price'
       )
     }
 

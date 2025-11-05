@@ -172,7 +172,7 @@ export async function PUT(request, { params }) {
         event_id: id,
         name: price.name,
         amount_cents: price.amount_cents,
-        inventory: price.inventory || 0,
+        inventory: price.inventory !== null && price.inventory !== undefined ? price.inventory : null, // null表示无限库存
         limit_per_user: price.limit_per_user || 4,
         is_active: true
       }))

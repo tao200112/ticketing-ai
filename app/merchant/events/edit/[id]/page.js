@@ -70,7 +70,7 @@ export default function EditEventPage() {
           id: price.id,
           name: price.name || '',
           amount_cents: price.amount_cents ? (price.amount_cents / 100).toFixed(2) : '0.00',
-          inventory: price.inventory || 0,
+          inventory: price.inventory !== null && price.inventory !== undefined ? price.inventory : '', // null或undefined显示为空字符串（无限）
           limit_per_user: price.limit_per_user || 4
         })) || [{ name: '', amount_cents: '', inventory: '', limit_per_user: '' }]
       }
@@ -95,8 +95,8 @@ export default function EditEventPage() {
         return
       }
 
-      // 验证价格设置
-      const validPrices = eventData.prices.filter(price => price.name && price.amount_cents && price.inventory)
+      // 验证价格设置（库存是可选的，留空表示无限）
+      const validPrices = eventData.prices.filter(price => price.name && price.amount_cents)
       if (validPrices.length === 0) {
         setError('Please set at least one valid ticket type')
         return
@@ -125,7 +125,7 @@ export default function EditEventPage() {
           prices: validPrices.map(price => ({
             name: price.name,
             amount_cents: Math.round(parseFloat(price.amount_cents) * 100), // 将美元转换为分存储
-            inventory: parseInt(price.inventory),
+            inventory: price.inventory && price.inventory.trim() !== '' ? parseInt(price.inventory) : null, // null表示无限库存
             limit_per_user: price.limit_per_user ? parseInt(price.limit_per_user) : 4
           }))
         })
@@ -529,13 +529,13 @@ export default function EditEventPage() {
                       
                       <div>
                         <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
-                          Stock Quantity *
+                          Stock Quantity (Leave empty for unlimited)
                         </label>
                         <input
                           type="number"
                           value={price.inventory}
                           onChange={(e) => updatePriceData(index, 'inventory', e.target.value)}
-                          placeholder="0"
+                          placeholder="Unlimited"
                           min="0"
                           style={{
                             width: '100%',

@@ -90,6 +90,5 @@ SELECT
   o.customer_name as order_customer_name
 FROM tickets t
 LEFT JOIN orders o ON t.order_id = o.id
-WHERE (t.holder_name IS NULL OR t.holder_name = '')
-   OR t.holder_age IS NULL
+WHERE ((t.holder_name IS NULL OR t.holder_name = '') OR t.holder_age IS NULL)
 ORDER BY t.created_at DESC;

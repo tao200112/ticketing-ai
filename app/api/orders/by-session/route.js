@@ -166,10 +166,12 @@ export async function GET(request) {
       }, { status: 500 })
     }
 
-    console.log('✅ 找到票据:', tickets.length)
+    // 确保tickets是数组
+    const ticketsArray = Array.isArray(tickets) ? tickets : []
+    console.log('✅ 找到票据:', ticketsArray.length)
 
     // 获取活动信息（从票据中获取 event_id）
-    const eventId = tickets[0]?.event_id
+    const eventId = ticketsArray[0]?.event_id
     let event = null
     
     if (eventId) {
@@ -187,7 +189,7 @@ export async function GET(request) {
     }
 
     // 为每个票据生成 qr_payload
-    const ticketsWithQR = tickets.map(ticket => {
+    const ticketsWithQR = ticketsArray.map(ticket => {
       const qrData = {
         ticket_id: ticket.id,
         short_id: ticket.short_id,

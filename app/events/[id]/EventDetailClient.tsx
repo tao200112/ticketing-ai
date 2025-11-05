@@ -18,6 +18,7 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
   const [selectedPriceIndex, setSelectedPriceIndex] = useState(0)
   const [customerEmail, setCustomerEmail] = useState('')
   const [customerName, setCustomerName] = useState('')
+  const [customerAge, setCustomerAge] = useState('')
   const [ticketValidityDate, setTicketValidityDate] = useState('')
   const [paymentLoading, setPaymentLoading] = useState(false)
   const [paymentError, setPaymentError] = useState('')
@@ -75,6 +76,11 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
       setPaymentError('Please fill in email and name')
       return
     }
+    
+    if (!customerAge || parseInt(customerAge) < 1 || parseInt(customerAge) > 120) {
+      setPaymentError('Please enter a valid age (1-120)')
+      return
+    }
 
     if (!ticketValidityDate) {
       setPaymentError('Please select ticket validity date')
@@ -126,6 +132,7 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
           quantity: quantity,
           customerEmail: customerEmail,
           customerName: customerName,
+          customerAge: parseInt(customerAge),
           userId: user?.id,
           userToken: user?.token ?? 'local-token',
           ticketValidityDate: ticketValidityDate,
@@ -149,6 +156,7 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
               totalAmount: selectedPrice.amount * quantity,
               customerEmail: customerEmail,
               customerName: customerName,
+              customerAge: parseInt(customerAge),
               ticketValidityDate: ticketValidityDate,
               ticketValidityStart: validityStartTime.toISOString(),
               ticketValidityEnd: validityEndTime.toISOString()
@@ -482,6 +490,36 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
                       }}
                     />
                   </div>
+                </div>
+                
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{
+                    display: 'block',
+                    color: 'white',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    marginBottom: '8px'
+                  }}>
+                    Age *
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="120"
+                    value={customerAge}
+                    onChange={(e) => setCustomerAge(e.target.value)}
+                    placeholder="Enter your age"
+                    style={{
+                      width: '100%',
+                      padding: '12px 16px',
+                      backgroundColor: 'rgba(55, 65, 81, 0.5)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '8px',
+                      color: 'white',
+                      fontSize: '1rem',
+                      outline: 'none'
+                    }}
+                  />
                 </div>
               </div>
 

@@ -161,6 +161,15 @@ export async function POST(request) {
           holderName = session.metadata.customer_name
         }
 
+        // 获取年龄（优先从metadata，其次从用户数据）
+        let ticketHolderAge = holderAge
+        if (session.metadata?.customer_age) {
+          const ageFromMetadata = parseInt(session.metadata.customer_age)
+          if (!isNaN(ageFromMetadata) && ageFromMetadata > 0) {
+            ticketHolderAge = ageFromMetadata
+          }
+        }
+        
         const { data: ticket, error: ticketError } = await supabase
           .from('tickets')
           .insert({
@@ -169,7 +178,7 @@ export async function POST(request) {
             tier: session.metadata?.price_name || 'general',
             holder_email: session.customer_email,
             holder_name: holderName,
-            holder_age: holderAge,
+            holder_age: ticketHolderAge,
             user_id: session.metadata?.user_id || null,
             status: 'unused',
             short_id: shortId,

@@ -21,7 +21,9 @@ export async function POST(request) {
     }
 
     const body = await request.json()
-    const { event_id, price_id, quantity = 1, customer_email, customer_name, userId } = body
+    const { event_id, price_id, quantity = 1, customer_email, customer_name, customer_age, customerAge, userId } = body
+    // 支持两种字段名：customer_age 或 customerAge
+    const age = customer_age || customerAge
 
     logger.info('Received checkout request', { 
       eventId: event_id, 
@@ -108,6 +110,7 @@ export async function POST(request) {
         price_name: price.name,
         quantity: quantityNum.toString(),
         customer_name: customer_name || '',
+        customer_age: age ? age.toString() : '',
         user_id: userId || '',
       },
     })

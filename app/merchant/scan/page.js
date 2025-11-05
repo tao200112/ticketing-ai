@@ -13,7 +13,7 @@ export default function MerchantScanPage() {
   const [loading, setLoading] = useState(false)
   const [userRole, setUserRole] = useState(null)
   const [debugInfo, setDebugInfo] = useState([])
-  const [showDebug, setShowDebug] = useState(true)
+  const [showDebug, setShowDebug] = useState(false) // 默认隐藏调试面板
   
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
@@ -559,39 +559,6 @@ export default function MerchantScanPage() {
               >
                 Start Scanning
               </button>
-              <div style={{ 
-                fontSize: '0.875rem', 
-                color: '#94a3b8', 
-                marginTop: '16px',
-                padding: '12px',
-                background: 'rgba(59, 130, 246, 0.1)',
-                borderRadius: '8px'
-              }}>
-                <div style={{ marginBottom: '8px', fontWeight: '500' }}>📱 Scanning Tips:</div>
-                <div style={{ fontSize: '0.75rem', textAlign: 'left', paddingLeft: '8px', lineHeight: '1.6' }}>
-                  • Ensure good lighting conditions<br/>
-                  • Hold QR code steady in frame<br/>
-                  • Keep camera 10-30cm from QR code<br/>
-                  • Make sure entire QR code is visible
-                </div>
-              </div>
-              {/* Debug Toggle Button */}
-              <button
-                onClick={() => setShowDebug(!showDebug)}
-                style={{
-                  marginTop: '16px',
-                  padding: '0.5rem 1rem',
-                  fontSize: '0.875rem',
-                  backgroundColor: showDebug ? '#2563eb' : 'rgba(59, 130, 246, 0.2)',
-                  color: showDebug ? 'white' : '#bfdbfe',
-                  border: showDebug ? 'none' : '1px solid rgba(59, 130, 246, 0.3)',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontWeight: '500'
-                }}
-              >
-                {showDebug ? '🔽 Hide Debug' : '▶️ Show Debug'}
-              </button>
             </div>
           ) : (
             <div>
@@ -656,24 +623,6 @@ export default function MerchantScanPage() {
                 }}
               >
                 Stop Scanning
-              </button>
-              
-              {/* Debug Toggle Button */}
-              <button
-                onClick={() => setShowDebug(!showDebug)}
-                style={{
-                  width: '100%',
-                  padding: '0.5rem 1rem',
-                  fontSize: '0.875rem',
-                  backgroundColor: showDebug ? '#2563eb' : 'rgba(59, 130, 246, 0.2)',
-                  color: showDebug ? 'white' : '#bfdbfe',
-                  border: showDebug ? 'none' : '1px solid rgba(59, 130, 246, 0.3)',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontWeight: '500'
-                }}
-              >
-                {showDebug ? '🔽 Hide Debug' : '▶️ Show Debug'}
               </button>
             </div>
           )}
@@ -929,5 +878,8 @@ export default function MerchantScanPage() {
     </div>
   )
 }
+
+
+
 
 

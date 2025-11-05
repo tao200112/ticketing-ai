@@ -30,12 +30,13 @@ export async function POST(request) {
 
     const supabase = createSupabaseClient()
 
-    // 验证邀请码
+    // 验证邀请码（必须是活跃且未使用的）
     const { data: inviteCodeData, error: inviteError } = await supabase
       .from('admin_invite_codes')
       .select('*')
       .eq('code', inviteCode)
       .eq('is_active', true)
+      .is('used_by', null) // 确保邀请码未被使用
       .single()
 
     if (inviteError || !inviteCodeData) {
@@ -169,12 +170,13 @@ export async function POST(request) {
       throw ErrorHandler.fromSupabaseError(merchantError, 'MERCHANT_CREATION_FAILED')
     }
 
-    // 标记邀请码为已使用
+    // 标记邀请码为已使用（一次性使用，设置is_active为false）
     const { error: updateInviteError } = await supabase
       .from('admin_invite_codes')
       .update({
         used_by: finalUserId,
-        used_at: new Date().toISOString()
+        used_at: new Date().toISOString(),
+        is_active: false // 标记为不活跃，防止再次使用
       })
       .eq('id', inviteCodeData.id)
 

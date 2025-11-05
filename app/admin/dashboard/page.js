@@ -1190,22 +1190,31 @@ export default function AdminDashboard() {
                         <h3 style={{ color: 'white', fontSize: '16px', marginBottom: '4px' }}>
                           {inviteCode.code}
                         </h3>
-                        <div style={{ display: 'flex', gap: '16px', fontSize: '12px', color: 'rgba(255, 255, 255, 0.6)' }}>
+                        <div style={{ display: 'flex', gap: '16px', fontSize: '12px', color: 'rgba(255, 255, 255, 0.6)', flexWrap: 'wrap' }}>
                           <span>📅 Created: {new Date(inviteCode.created_at).toLocaleDateString()}</span>
                           <span>⏰ Expires: {new Date(inviteCode.expires_at).toLocaleDateString()}</span>
-                          <span>👤 Used by: {inviteCode.used_by ? inviteCode.used_by.substring(0, 8) + '...' : 'Not used'}</span>
+                          {inviteCode.used_by ? (
+                            <>
+                              <span>👤 Used by: {inviteCode.used_by.substring(0, 8)}...</span>
+                              {inviteCode.used_at && (
+                                <span>📆 Used at: {new Date(inviteCode.used_at).toLocaleDateString()}</span>
+                              )}
+                            </>
+                          ) : (
+                            <span>👤 Used by: Not used</span>
+                          )}
                         </div>
                       </div>
                       <div style={{ display: 'flex', gap: '8px' }}>
                         <span style={{
-                          background: inviteCode.is_active ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)',
-                          color: inviteCode.is_active ? '#22c55e' : '#ef4444',
+                          background: inviteCode.used_by ? 'rgba(34, 197, 94, 0.2)' : 'rgba(34, 211, 238, 0.2)',
+                          color: inviteCode.used_by ? '#22c55e' : '#22D3EE',
                           padding: '4px 8px',
                           borderRadius: '4px',
                           fontSize: '12px',
-                          textTransform: 'capitalize'
+                          fontWeight: '500'
                         }}>
-                          {inviteCode.is_active ? 'Active' : 'Inactive'}
+                          {inviteCode.used_by ? 'Used' : 'Unused'}
                         </span>
                       </div>
                     </div>

@@ -26,45 +26,63 @@ export default function EditEventPage() {
       const userData = JSON.parse(user)
       setMerchantUser(userData)
       
-      // 直接在这里加载事件数据，避免时序问题
-      try {
-        const events = JSON.parse(localStorage.getItem('merchantEvents') || '[]')
-        const event = events.find(e => e.id === params.id)
-        
-        if (!event) {
-          setError('事件不存在')
-          setLoading(false)
-          return
-        }
-        
-        // 检查权限：只能编辑自己的事件
-        if (event.merchantId !== userData.id) {
-          setError('您没有权限编辑此事件')
-          setLoading(false)
-          return
-        }
-        
-        // 转换价格：分转美元显示
-        const eventWithConvertedPrices = {
-          ...event,
-          prices: event.prices.map(price => ({
-            ...price,
-            amount_cents: (price.amount_cents / 100).toFixed(2) // 将分转换为美元显示
-          }))
-        }
-        
-        setEventData(eventWithConvertedPrices)
-        setLoading(false)
-      } catch (err) {
-        setError('加载事件失败')
-        console.error('加载事件错误:', err)
-        setLoading(false)
-      }
+      // 从API加载事件数据
+      loadEventData(params.id, userData)
     }
     
     checkMerchantAuth()
   }, [params.id, router])
 
+  const loadEventData = async (eventId, user) => {
+    try {
+      setLoading(true)
+      setError('')
+      
+      // 从API获取事件数据
+      const response = await fetch(`/api/events/${eventId}`)
+      const result = await response.json()
+      
+      if (!result.success || !result.data) {
+        setError('Event not found')
+        setLoading(false)
+        return
+      }
+      
+      const event = result.data
+      
+      // 检查权限：只能编辑自己的事件
+      const merchantId = user.merchant_id || user.merchant?.id
+      if (merchantId && event.merchant_id !== merchantId) {
+        setError('You do not have permission to edit this event')
+        setLoading(false)
+        return
+      }
+      
+      // 转换数据格式以适配表单
+      const formattedEvent = {
+        title: event.title || '',
+        description: event.description || '',
+        startTime: event.start_at || event.startTime || '',
+        endTime: event.end_at || event.endTime || '',
+        location: event.venue_name || event.address || event.location || '',
+        posterPreview: event.poster_url || null,
+        prices: event.prices?.map(price => ({
+          id: price.id,
+          name: price.name || '',
+          amount_cents: price.amount_cents ? (price.amount_cents / 100).toFixed(2) : '0.00',
+          inventory: price.inventory || 0,
+          limit_per_user: price.limit_per_user || 4
+        })) || [{ name: '', amount_cents: '', inventory: '', limit_per_user: '' }]
+      }
+      
+      setEventData(formattedEvent)
+      setLoading(false)
+    } catch (err) {
+      setError('Failed to load event')
+      console.error('Error loading event:', err)
+      setLoading(false)
+    }
+  }
 
   const handleSave = async () => {
     setIsSubmitting(true)
@@ -73,60 +91,59 @@ export default function EditEventPage() {
     try {
       // 验证必填字段
       if (!eventData.title || !eventData.description || !eventData.startTime || !eventData.endTime || !eventData.location) {
-        setError('请填写所有必填字段')
+        setError('Please fill in all required fields')
         return
       }
 
       // 验证价格设置
       const validPrices = eventData.prices.filter(price => price.name && price.amount_cents && price.inventory)
       if (validPrices.length === 0) {
-        setError('请至少设置一个有效的票种')
+        setError('Please set at least one valid ticket type')
         return
       }
 
       // 验证价格是否符合 Stripe 最小金额要求
       const invalidPrices = validPrices.filter(price => parseFloat(price.amount_cents) < 0.50)
       if (invalidPrices.length > 0) {
-        setError('所有票种价格必须至少为 $0.50（Stripe 最小金额要求）')
+        setError('All ticket prices must be at least $0.50 (Stripe minimum requirement)')
         return
       }
 
-      // 更新事件
-      const events = JSON.parse(localStorage.getItem('merchantEvents') || '[]')
-      const eventIndex = events.findIndex(e => e.id === params.id)
-      
-      if (eventIndex === -1) {
-        setError('事件不存在')
+      // 调用API更新事件
+      const response = await fetch(`/api/events/${params.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: eventData.title,
+          description: eventData.description,
+          startTime: eventData.startTime,
+          endTime: eventData.endTime,
+          location: eventData.location,
+          poster_url: eventData.posterPreview,
+          prices: validPrices.map(price => ({
+            name: price.name,
+            amount_cents: Math.round(parseFloat(price.amount_cents) * 100), // 将美元转换为分存储
+            inventory: parseInt(price.inventory),
+            limit_per_user: price.limit_per_user ? parseInt(price.limit_per_user) : 4
+          }))
+        })
+      })
+
+      const result = await response.json()
+
+      if (!result.success) {
+        setError(result.message || 'Failed to update event')
         return
       }
 
-      // 转换价格：美元转分存储
-      const updatedEventData = {
-        ...eventData,
-        prices: eventData.prices.map(price => ({
-          ...price,
-          amount_cents: Math.round(parseFloat(price.amount_cents) * 100) // 将美元转换为分存储
-        })),
-        updatedAt: new Date().toISOString()
-      }
-
-      events[eventIndex] = {
-        ...events[eventIndex],
-        ...updatedEventData
-      }
-
-      localStorage.setItem('merchantEvents', JSON.stringify(events))
-      
-      // 触发localStorage事件，通知其他页面更新
-      window.dispatchEvent(new Event('storage'))
-      
-      // 模拟网络延迟
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      console.log('✅ Event updated successfully:', result.data)
       
       router.push('/merchant/events')
     } catch (err) {
-      setError('保存事件失败，请重试')
-      console.error('保存事件错误:', err)
+      setError('Failed to save event, please try again')
+      console.error('Error saving event:', err)
     } finally {
       setIsSubmitting(false)
     }

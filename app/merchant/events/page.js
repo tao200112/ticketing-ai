@@ -80,44 +80,9 @@ export default function MerchantEventsPage() {
     }
   }
 
-  const handleEditEvent = async (eventId) => {
-    // 简单的编辑功能：将活动状态改为 published 或 draft
-    if (confirm('Are you sure you want to modify this event?')) {
-      try {
-        // 获取当前事件信息
-        const response = await fetch(`/api/events/${eventId}`)
-        const result = await response.json()
-        
-        if (result.success && result.data) {
-          const event = result.data
-          // 切换状态
-          const newStatus = event.status === 'published' ? 'draft' : 'published'
-          
-          // 更新事件
-          const updateResponse = await fetch(`/api/events/${eventId}`, {
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              ...event,
-              status: newStatus
-            })
-          })
-          
-          const updateResult = await updateResponse.json()
-          
-          if (updateResult.success) {
-            loadEvents()
-          } else {
-            setError(updateResult.message || 'Failed to update event')
-          }
-        }
-      } catch (err) {
-          setError('Failed to edit event')
-          console.error('Error editing event:', err)
-      }
-    }
+  const handleEditEvent = (eventId) => {
+    // 跳转到编辑页面
+    router.push(`/merchant/events/edit/${eventId}`)
   }
 
   const handleDeleteEvent = async (eventId) => {
@@ -373,19 +338,26 @@ export default function MerchantEventsPage() {
                       onClick={() => handleEditEvent(event.id)}
                       style={{
                         flex: 1,
-                        backgroundColor: event.status === 'published' ? '#10b981' : '#2563eb',
+                        backgroundColor: '#2563eb',
                         color: 'white',
                         padding: '0.75rem 1.5rem',
                         borderRadius: '0.5rem',
                         fontWeight: '500',
                         border: 'none',
                         cursor: 'pointer',
-                        transition: 'background-color 0.2s'
+                        transition: 'background-color 0.2s',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.5rem'
                       }}
-                      onMouseEnter={(e) => e.target.style.backgroundColor = event.status === 'published' ? '#059669' : '#1d4ed8'}
-                      onMouseLeave={(e) => e.target.style.backgroundColor = event.status === 'published' ? '#10b981' : '#2563eb'}
+                      onMouseEnter={(e) => e.target.style.backgroundColor = '#1d4ed8'}
+                      onMouseLeave={(e) => e.target.style.backgroundColor = '#2563eb'}
                     >
-                      {event.status === 'published' ? 'Published (Click to set as draft)' : 'Draft (Click to publish)'}
+                      <svg style={{ width: '1.25rem', height: '1.25rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                      Edit
                     </button>
                     <button 
                       onClick={() => handleDeleteEvent(event.id)}

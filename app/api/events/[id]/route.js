@@ -49,7 +49,7 @@ export async function GET(request, { params }) {
     if (error || !event) {
       throw ErrorHandler.notFoundError(
         'EVENT_NOT_FOUND',
-        '活动不存在'
+        'Event not found'
       )
     }
 
@@ -125,7 +125,7 @@ export async function PUT(request, { params }) {
       return NextResponse.json({ 
         success: true, 
         data: updatedEvent, 
-        message: '默认活动更新成功（注意：这是虚拟活动，不会保存到数据库）' 
+        message: 'Default event updated successfully (Note: This is a virtual event and will not be saved to the database)' 
       })
     }
 
@@ -149,7 +149,7 @@ export async function PUT(request, { params }) {
         address: location,
         venue_name: location,
         poster_url: poster_url || null,
-        status: status
+        ...(status && { status })
       })
       .eq('id', id)
       .select()
@@ -188,7 +188,7 @@ export async function PUT(request, { params }) {
     }
 
     logger.success('Event updated successfully', { eventId: event.id })
-    return NextResponse.json({ success: true, data: event, message: '活动更新成功' })
+    return NextResponse.json({ success: true, data: event, message: 'Event updated successfully' })
 
   } catch (error) {
     return handleApiError(error, request, logger)

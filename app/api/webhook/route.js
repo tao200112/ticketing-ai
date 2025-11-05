@@ -66,6 +66,26 @@ export async function POST(request) {
         return NextResponse.json({ received: true })
       }
 
+      // 获取客户年龄（从 metadata 或用户数据）
+      let customerAge = null
+      if (session.metadata?.customer_age) {
+        const ageFromMetadata = parseInt(session.metadata.customer_age)
+        if (!isNaN(ageFromMetadata) && ageFromMetadata > 0) {
+          customerAge = ageFromMetadata
+        }
+      } else if (session.metadata?.user_id) {
+        // 如果metadata中没有年龄，尝试从用户数据获取
+        const { data: userData } = await supabase
+          .from('users')
+          .select('age')
+          .eq('id', session.metadata.user_id)
+          .single()
+        
+        if (userData?.age) {
+          customerAge = userData.age
+        }
+      }
+
       // 创建订单
       const { data: order, error: orderError } = await supabase
         .from('orders')
@@ -73,6 +93,7 @@ export async function POST(request) {
           stripe_session_id: session.id,
           customer_email: session.customer_email,
           customer_name: session.metadata?.customer_name || session.customer_email,
+          customer_age: customerAge,
           total_amount_cents: session.amount_total,
           currency: session.currency.toUpperCase(),
           status: 'paid',

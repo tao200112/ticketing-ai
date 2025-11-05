@@ -120,13 +120,13 @@ export async function POST(request) {
         }
       }
 
-      // Get order data if order_id exists
-      if (ticket.order_id) {
-        const { data: orderData, error: orderError } = await supabase
-          .from('orders')
-          .select('id, customer_name, customer_email')
-          .eq('id', ticket.order_id)
-          .single()
+              // Get order data if order_id exists
+        if (ticket.order_id) {
+          const { data: orderData, error: orderError } = await supabase
+            .from('orders')
+            .select('id, customer_name, customer_email, customer_age')
+            .eq('id', ticket.order_id)
+            .single()
         
         if (!orderError && orderData) {
           order = orderData
@@ -213,9 +213,13 @@ export async function POST(request) {
       expiryInfo.status = 'cancelled'
     }
 
-    // Get holder information (from ticket or order)
-    const holderName = ticket.holder_name || order?.customer_name || 'Unknown'
-    const holderAge = ticket.holder_age || null
+          // Get holder information (from ticket or order)
+      const holderName = ticket.holder_name || order?.customer_name || 'Unknown'
+      const holderAge = ticket.holder_age !== null && ticket.holder_age !== undefined 
+        ? ticket.holder_age 
+        : (order?.customer_age !== null && order?.customer_age !== undefined 
+            ? order.customer_age 
+            : null)
 
     // Update verification tracking or redeem ticket
     const updateData = {

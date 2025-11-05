@@ -72,8 +72,8 @@ export default function MerchantEventsPage() {
         setEvents([])
       }
     } catch (err) {
-      setError('加载事件失败')
-      console.error('加载事件错误:', err)
+        setError('Failed to load events')
+        console.error('Error loading events:', err)
     } finally {
       setLoading(false)
     }
@@ -109,12 +109,12 @@ export default function MerchantEventsPage() {
           if (updateResult.success) {
             loadEvents()
           } else {
-            setError(updateResult.message || '更新事件失败')
+            setError(updateResult.message || 'Failed to update event')
           }
         }
       } catch (err) {
-        setError('编辑事件失败')
-        console.error('编辑事件错误:', err)
+          setError('Failed to edit event')
+          console.error('Error editing event:', err)
       }
     }
   }
@@ -132,11 +132,11 @@ export default function MerchantEventsPage() {
           // 重新加载活动列表
           loadEvents()
         } else {
-          setError(result.message || '删除事件失败')
+          setError(result.message || 'Failed to delete event')
         }
       } catch (err) {
-        setError('删除事件失败')
-        console.error('删除事件错误:', err)
+        setError('Failed to delete event')
+        console.error('Error deleting event:', err)
       }
     }
   }
@@ -158,7 +158,7 @@ export default function MerchantEventsPage() {
             animation: 'spin 1s linear infinite',
             margin: '0 auto 1rem auto'
           }}></div>
-          <p style={{ color: '#6b7280' }}>加载事件中...</p>
+          <p style={{ color: '#6b7280' }}>Loading events...</p>
         </div>
       </div>
     )
@@ -174,7 +174,7 @@ export default function MerchantEventsPage() {
             </svg>
           </div>
           <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#111827', marginBottom: '0.5rem' }}>
-            加载失败
+            Loading Failed
           </h2>
           <p style={{ color: '#6b7280', marginBottom: '1.5rem' }}>{error}</p>
           <button 
@@ -189,7 +189,7 @@ export default function MerchantEventsPage() {
               cursor: 'pointer'
             }}
           >
-            重试
+            Retry
           </button>
         </div>
       </div>
@@ -276,10 +276,10 @@ export default function MerchantEventsPage() {
               </svg>
             </div>
             <h3 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#111827', marginBottom: '0.5rem' }}>
-              还没有事件
+              No events yet
             </h3>
             <p style={{ color: '#6b7280', marginBottom: '2rem' }}>
-              创建您的第一个事件来开始售票
+              Create your first event to start selling tickets
             </p>
             <button
               onClick={() => router.push('/merchant/events/new')}
@@ -296,7 +296,7 @@ export default function MerchantEventsPage() {
               onMouseEnter={(e) => e.target.style.backgroundColor = '#1d4ed8'}
               onMouseLeave={(e) => e.target.style.backgroundColor = '#2563eb'}
             >
-              创建事件
+              Create Event
             </button>
           </div>
         ) : (
@@ -315,7 +315,7 @@ export default function MerchantEventsPage() {
                       {event.title}
                     </h3>
                     <p style={{ color: '#6b7280' }}>
-                      {new Date(event.startTime).toLocaleDateString('zh-CN', { 
+                      {new Date(event.startTime).toLocaleDateString('en-US', { 
                         year: 'numeric', 
                         month: 'long', 
                         day: 'numeric',
@@ -365,7 +365,7 @@ export default function MerchantEventsPage() {
                       onMouseEnter={(e) => e.target.style.backgroundColor = event.status === 'published' ? '#059669' : '#1d4ed8'}
                       onMouseLeave={(e) => e.target.style.backgroundColor = event.status === 'published' ? '#10b981' : '#2563eb'}
                     >
-                      {event.status === 'published' ? '发布中 (点击设为草稿)' : '草稿 (点击发布)'}
+                      {event.status === 'published' ? 'Published (Click to set as draft)' : 'Draft (Click to publish)'}
                     </button>
                     <button 
                       onClick={() => handleDeleteEvent(event.id)}

@@ -103,21 +103,21 @@ export default function NewEventWizardPage() {
     try {
       // 验证必填字段
       if (!eventData.title || !eventData.description || !eventData.startTime || !eventData.endTime || !eventData.location) {
-        setError('请填写所有必填字段')
+        setError('Please fill in all required fields')
         return
       }
 
       // 验证价格设置
       const validPrices = eventData.prices.filter(price => price.name && price.amount_cents && price.inventory)
       if (validPrices.length === 0) {
-        setError('请至少设置一个有效的票种')
+        setError('Please set at least one valid ticket type')
         return
       }
 
       // 验证价格是否符合 Stripe 最小金额要求
       const invalidPrices = validPrices.filter(price => parseFloat(price.amount_cents) < 0.50)
       if (invalidPrices.length > 0) {
-        setError('所有票种价格必须至少为 $0.50（Stripe 最小金额要求）')
+        setError('All ticket prices must be at least $0.50 (Stripe minimum requirement)')
         return
       }
 
@@ -148,16 +148,16 @@ export default function NewEventWizardPage() {
       const result = await response.json()
 
       if (!result.success) {
-        setError(result.message || '创建活动失败')
+        setError(result.message || 'Failed to create event')
         return
       }
 
-      console.log('✅ 活动创建成功:', result.data)
+      console.log('✅ Event created successfully:', result.data)
       
       router.push('/merchant/events')
     } catch (err) {
-      setError('创建事件失败，请重试')
-      console.error('创建事件错误:', err)
+      setError('Failed to create event, please try again')
+      console.error('Error creating event:', err)
     } finally {
       setIsSubmitting(false)
     }
@@ -170,14 +170,19 @@ export default function NewEventWizardPage() {
   ]
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#f9fafb' }}>
+    <div style={{ 
+      minHeight: '100vh', 
+      background: 'linear-gradient(135deg, #0f172a 0%, #7c3aed 50%, #0f172a 100%)'
+    }}>
       {/* Navigation Bar */}
       <div style={{
-        backgroundColor: 'white',
-        borderBottom: '1px solid #e5e7eb',
+        background: 'rgba(15, 23, 42, 0.8)',
+        backdropFilter: 'blur(12px)',
+        borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
         position: 'sticky',
         top: 0,
-        zIndex: 50
+        zIndex: 50,
+        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.3)'
       }}>
         <div style={{ maxWidth: '56rem', margin: '0 auto', padding: '1rem 1.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -200,17 +205,17 @@ export default function NewEventWizardPage() {
                 </svg>
               </button>
               <div>
-                <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#111827', margin: 0 }}>Create Event</h1>
-                <p style={{ color: '#6b7280', fontSize: '0.875rem', margin: 0 }}>Set up your event details</p>
+                <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'white', margin: 0 }}>Create Event</h1>
+                <p style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '0.875rem', margin: 0 }}>Set up your event details</p>
               </div>
             </div>
             
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>Step {currentStep} / 3</span>
-              <div style={{ width: '8rem', backgroundColor: '#e5e7eb', borderRadius: '9999px', height: '0.5rem' }}>
+              <span style={{ fontSize: '0.875rem', color: 'rgba(255, 255, 255, 0.7)' }}>Step {currentStep} / 3</span>
+              <div style={{ width: '8rem', backgroundColor: 'rgba(255, 255, 255, 0.2)', borderRadius: '9999px', height: '0.5rem' }}>
                 <div 
                   style={{
-                    backgroundColor: '#2563eb',
+                    backgroundColor: '#7c3aed',
                     height: '0.5rem',
                     borderRadius: '9999px',
                     transition: 'all 0.3s',
@@ -238,9 +243,9 @@ export default function NewEventWizardPage() {
                   borderRadius: '50%',
                   border: '2px solid',
                   transition: 'all 0.3s',
-                  backgroundColor: currentStep >= step.number ? '#2563eb' : 'transparent',
-                  borderColor: currentStep >= step.number ? '#2563eb' : '#d1d5db',
-                  color: currentStep >= step.number ? 'white' : '#9ca3af'
+                  backgroundColor: currentStep >= step.number ? '#7c3aed' : 'rgba(255, 255, 255, 0.1)',
+                  borderColor: currentStep >= step.number ? '#7c3aed' : 'rgba(255, 255, 255, 0.3)',
+                  color: currentStep >= step.number ? 'white' : 'rgba(255, 255, 255, 0.6)'
                 }}>
                   {currentStep > step.number ? (
                     <svg style={{ width: '1.25rem', height: '1.25rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -254,12 +259,12 @@ export default function NewEventWizardPage() {
                   <p style={{
                     fontSize: '0.875rem',
                     fontWeight: '500',
-                    color: currentStep >= step.number ? '#111827' : '#9ca3af',
+                    color: currentStep >= step.number ? 'white' : 'rgba(255, 255, 255, 0.6)',
                     margin: 0
                   }}>
                     {step.title}
                   </p>
-                  <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: 0 }}>{step.description}</p>
+                  <p style={{ fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.5)', margin: 0 }}>{step.description}</p>
                 </div>
                 {index < steps.length - 1 && (
                   <div style={{
@@ -267,7 +272,7 @@ export default function NewEventWizardPage() {
                     height: '0.125rem',
                     margin: '0 1rem',
                     transition: 'all 0.3s',
-                    backgroundColor: currentStep > step.number ? '#2563eb' : '#d1d5db'
+                    backgroundColor: currentStep > step.number ? '#7c3aed' : 'rgba(255, 255, 255, 0.3)'
                   }} />
                 )}
               </div>
@@ -277,19 +282,21 @@ export default function NewEventWizardPage() {
 
         {/* Form Content */}
         <div style={{
-          backgroundColor: 'white',
+          background: 'rgba(255, 255, 255, 0.05)',
+          backdropFilter: 'blur(12px)',
           borderRadius: '0.5rem',
-          border: '1px solid #e5e7eb',
-          padding: '2rem'
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          padding: '2rem',
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)'
         }}>
           {currentStep === 1 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
               <div>
-                <h2 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#111827', marginBottom: '1.5rem' }}>Event Basic Information</h2>
+                <h2 style={{ fontSize: '1.25rem', fontWeight: '600', color: 'white', marginBottom: '1.5rem' }}>Event Basic Information</h2>
                 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                    <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: 'rgba(255, 255, 255, 0.9)', marginBottom: '0.5rem' }}>
                       Event Title *
                     </label>
                     <input
@@ -300,25 +307,26 @@ export default function NewEventWizardPage() {
                       style={{
                         width: '100%',
                         padding: '0.75rem 1rem',
-                        border: '1px solid #d1d5db',
+                        border: '1px solid rgba(255, 255, 255, 0.2)',
                         borderRadius: '0.5rem',
-                        color: '#111827',
+                        color: 'white',
+                        backgroundColor: 'rgba(255, 255, 255, 0.05)',
                         fontSize: '1rem',
                         outline: 'none'
                       }}
                       onFocus={(e) => {
-                        e.target.style.borderColor = '#2563eb'
-                        e.target.style.boxShadow = '0 0 0 3px rgba(37, 99, 235, 0.1)'
+                        e.target.style.borderColor = '#7c3aed'
+                        e.target.style.boxShadow = '0 0 0 3px rgba(124, 58, 237, 0.2)'
                       }}
                       onBlur={(e) => {
-                        e.target.style.borderColor = '#d1d5db'
+                        e.target.style.borderColor = 'rgba(255, 255, 255, 0.2)'
                         e.target.style.boxShadow = 'none'
                       }}
                     />
                   </div>
 
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                    <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: 'rgba(255, 255, 255, 0.9)', marginBottom: '0.5rem' }}>
                       Event Description *
                     </label>
                     <textarea
@@ -329,19 +337,20 @@ export default function NewEventWizardPage() {
                       style={{
                         width: '100%',
                         padding: '0.75rem 1rem',
-                        border: '1px solid #d1d5db',
+                        border: '1px solid rgba(255, 255, 255, 0.2)',
                         borderRadius: '0.5rem',
-                        color: '#111827',
+                        color: 'white',
+                        backgroundColor: 'rgba(255, 255, 255, 0.05)',
                         fontSize: '1rem',
                         outline: 'none',
                         resize: 'none'
                       }}
                       onFocus={(e) => {
-                        e.target.style.borderColor = '#2563eb'
-                        e.target.style.boxShadow = '0 0 0 3px rgba(37, 99, 235, 0.1)'
+                        e.target.style.borderColor = '#7c3aed'
+                        e.target.style.boxShadow = '0 0 0 3px rgba(124, 58, 237, 0.2)'
                       }}
                       onBlur={(e) => {
-                        e.target.style.borderColor = '#d1d5db'
+                        e.target.style.borderColor = 'rgba(255, 255, 255, 0.2)'
                         e.target.style.boxShadow = 'none'
                       }}
                     />
@@ -349,7 +358,7 @@ export default function NewEventWizardPage() {
 
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1.5rem' }}>
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                      <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: 'rgba(255, 255, 255, 0.9)', marginBottom: '0.5rem' }}>
                         Start Time *
                       </label>
                       <input
@@ -359,7 +368,7 @@ export default function NewEventWizardPage() {
                         style={{
                           width: '100%',
                           padding: '0.75rem 1rem',
-                          border: '1px solid #d1d5db',
+                          border: '1px solid rgba(255, 255, 255, 0.2)',
                           borderRadius: '0.5rem',
                           color: '#111827',
                           fontSize: '1rem',
@@ -377,7 +386,7 @@ export default function NewEventWizardPage() {
                     </div>
 
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                      <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: 'rgba(255, 255, 255, 0.9)', marginBottom: '0.5rem' }}>
                         End Time *
                       </label>
                       <input
@@ -387,7 +396,7 @@ export default function NewEventWizardPage() {
                         style={{
                           width: '100%',
                           padding: '0.75rem 1rem',
-                          border: '1px solid #d1d5db',
+                          border: '1px solid rgba(255, 255, 255, 0.2)',
                           borderRadius: '0.5rem',
                           color: '#111827',
                           fontSize: '1rem',
@@ -406,7 +415,7 @@ export default function NewEventWizardPage() {
                   </div>
 
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                    <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: 'rgba(255, 255, 255, 0.9)', marginBottom: '0.5rem' }}>
                       Event Location *
                     </label>
                     <input
@@ -417,18 +426,19 @@ export default function NewEventWizardPage() {
                       style={{
                         width: '100%',
                         padding: '0.75rem 1rem',
-                        border: '1px solid #d1d5db',
+                        border: '1px solid rgba(255, 255, 255, 0.2)',
                         borderRadius: '0.5rem',
-                        color: '#111827',
+                        color: 'white',
+                        backgroundColor: 'rgba(255, 255, 255, 0.05)',
                         fontSize: '1rem',
                         outline: 'none'
                       }}
                       onFocus={(e) => {
-                        e.target.style.borderColor = '#2563eb'
-                        e.target.style.boxShadow = '0 0 0 3px rgba(37, 99, 235, 0.1)'
+                        e.target.style.borderColor = '#7c3aed'
+                        e.target.style.boxShadow = '0 0 0 3px rgba(124, 58, 237, 0.2)'
                       }}
                       onBlur={(e) => {
-                        e.target.style.borderColor = '#d1d5db'
+                        e.target.style.borderColor = 'rgba(255, 255, 255, 0.2)'
                         e.target.style.boxShadow = 'none'
                       }}
                     />
@@ -441,11 +451,11 @@ export default function NewEventWizardPage() {
           {currentStep === 2 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
               <div>
-                <h2 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#111827', marginBottom: '1.5rem' }}>Event Poster</h2>
+                <h2 style={{ fontSize: '1.25rem', fontWeight: '600', color: 'white', marginBottom: '1.5rem' }}>Event Poster</h2>
                 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                    <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: 'rgba(255, 255, 255, 0.9)', marginBottom: '0.5rem' }}>
                       Upload Poster Image
                     </label>
                     <div style={{
@@ -456,8 +466,8 @@ export default function NewEventWizardPage() {
                       transition: 'border-color 0.2s',
                       position: 'relative'
                     }}
-                    onMouseEnter={(e) => e.target.style.borderColor = '#9ca3af'}
-                    onMouseLeave={(e) => e.target.style.borderColor = '#d1d5db'}>
+                    onMouseEnter={(e) => e.target.style.borderColor = 'rgba(255, 255, 255, 0.5)'}
+                    onMouseLeave={(e) => e.target.style.borderColor = 'rgba(255, 255, 255, 0.3)'}>
                       {eventData.posterPreview ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                           <img
@@ -503,8 +513,8 @@ export default function NewEventWizardPage() {
                             </svg>
                           </div>
                           <div>
-                            <p style={{ color: '#111827', fontWeight: '500', margin: 0 }}>Click to upload poster</p>
-                            <p style={{ color: '#6b7280', fontSize: '0.875rem', margin: 0 }}>Supports JPG, PNG format, recommended size 1200x630</p>
+                            <p style={{ color: 'white', fontWeight: '500', margin: 0 }}>Click to upload poster</p>
+                            <p style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '0.875rem', margin: 0 }}>Supports JPG, PNG format, recommended size 1200x630</p>
                           </div>
                         </div>
                       )}
@@ -531,18 +541,18 @@ export default function NewEventWizardPage() {
           {currentStep === 3 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
               <div>
-                <h2 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#111827', marginBottom: '1.5rem' }}>Ticket Settings</h2>
+                <h2 style={{ fontSize: '1.25rem', fontWeight: '600', color: 'white', marginBottom: '1.5rem' }}>Ticket Settings</h2>
                 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                   {eventData.prices.map((price, index) => (
                     <div key={index} style={{
-                      backgroundColor: '#f9fafb',
+                      background: 'rgba(255, 255, 255, 0.05)',
                       borderRadius: '0.5rem',
                       padding: '1.5rem',
-                      border: '1px solid #e5e7eb'
+                      border: '1px solid rgba(255, 255, 255, 0.1)'
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-                        <h3 style={{ fontSize: '1.125rem', fontWeight: '500', color: '#111827', margin: 0 }}>Ticket Type {index + 1}</h3>
+                        <h3 style={{ fontSize: '1.125rem', fontWeight: '500', color: 'white', margin: 0 }}>Ticket Type {index + 1}</h3>
                         {eventData.prices.length > 1 && (
                           <button
                             onClick={() => removePrice(index)}
@@ -565,7 +575,7 @@ export default function NewEventWizardPage() {
                       
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
                         <div>
-                          <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                          <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: 'rgba(255, 255, 255, 0.9)', marginBottom: '0.5rem' }}>
                             Ticket Name *
                           </label>
                           <input
@@ -576,25 +586,26 @@ export default function NewEventWizardPage() {
                             style={{
                               width: '100%',
                               padding: '0.75rem 1rem',
-                              border: '1px solid #d1d5db',
+                              border: '1px solid rgba(255, 255, 255, 0.2)',
                               borderRadius: '0.5rem',
-                              color: '#111827',
+                              color: 'white',
+                              backgroundColor: 'rgba(255, 255, 255, 0.05)',
                               fontSize: '1rem',
                               outline: 'none'
                             }}
                             onFocus={(e) => {
-                              e.target.style.borderColor = '#2563eb'
-                              e.target.style.boxShadow = '0 0 0 3px rgba(37, 99, 235, 0.1)'
+                              e.target.style.borderColor = '#7c3aed'
+                              e.target.style.boxShadow = '0 0 0 3px rgba(124, 58, 237, 0.2)'
                             }}
                             onBlur={(e) => {
-                              e.target.style.borderColor = '#d1d5db'
+                              e.target.style.borderColor = 'rgba(255, 255, 255, 0.2)'
                               e.target.style.boxShadow = 'none'
                             }}
                           />
                         </div>
                         
                         <div>
-                          <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                          <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: 'rgba(255, 255, 255, 0.9)', marginBottom: '0.5rem' }}>
                             Price ($) * (Minimum: $0.50)
                           </label>
                           <input
@@ -607,25 +618,26 @@ export default function NewEventWizardPage() {
                             style={{
                               width: '100%',
                               padding: '0.75rem 1rem',
-                              border: '1px solid #d1d5db',
+                              border: '1px solid rgba(255, 255, 255, 0.2)',
                               borderRadius: '0.5rem',
-                              color: '#111827',
+                              color: 'white',
+                              backgroundColor: 'rgba(255, 255, 255, 0.05)',
                               fontSize: '1rem',
                               outline: 'none'
                             }}
                             onFocus={(e) => {
-                              e.target.style.borderColor = '#2563eb'
-                              e.target.style.boxShadow = '0 0 0 3px rgba(37, 99, 235, 0.1)'
+                              e.target.style.borderColor = '#7c3aed'
+                              e.target.style.boxShadow = '0 0 0 3px rgba(124, 58, 237, 0.2)'
                             }}
                             onBlur={(e) => {
-                              e.target.style.borderColor = '#d1d5db'
+                              e.target.style.borderColor = 'rgba(255, 255, 255, 0.2)'
                               e.target.style.boxShadow = 'none'
                             }}
                           />
                         </div>
                         
                         <div>
-                          <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                          <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: 'rgba(255, 255, 255, 0.9)', marginBottom: '0.5rem' }}>
                             Stock Quantity *
                           </label>
                           <input
@@ -637,25 +649,26 @@ export default function NewEventWizardPage() {
                             style={{
                               width: '100%',
                               padding: '0.75rem 1rem',
-                              border: '1px solid #d1d5db',
+                              border: '1px solid rgba(255, 255, 255, 0.2)',
                               borderRadius: '0.5rem',
-                              color: '#111827',
+                              color: 'white',
+                              backgroundColor: 'rgba(255, 255, 255, 0.05)',
                               fontSize: '1rem',
                               outline: 'none'
                             }}
                             onFocus={(e) => {
-                              e.target.style.borderColor = '#2563eb'
-                              e.target.style.boxShadow = '0 0 0 3px rgba(37, 99, 235, 0.1)'
+                              e.target.style.borderColor = '#7c3aed'
+                              e.target.style.boxShadow = '0 0 0 3px rgba(124, 58, 237, 0.2)'
                             }}
                             onBlur={(e) => {
-                              e.target.style.borderColor = '#d1d5db'
+                              e.target.style.borderColor = 'rgba(255, 255, 255, 0.2)'
                               e.target.style.boxShadow = 'none'
                             }}
                           />
                         </div>
                         
                         <div>
-                          <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                          <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: 'rgba(255, 255, 255, 0.9)', marginBottom: '0.5rem' }}>
                             Limit per Person
                           </label>
                           <input
@@ -667,18 +680,19 @@ export default function NewEventWizardPage() {
                             style={{
                               width: '100%',
                               padding: '0.75rem 1rem',
-                              border: '1px solid #d1d5db',
+                              border: '1px solid rgba(255, 255, 255, 0.2)',
                               borderRadius: '0.5rem',
-                              color: '#111827',
+                              color: 'white',
+                              backgroundColor: 'rgba(255, 255, 255, 0.05)',
                               fontSize: '1rem',
                               outline: 'none'
                             }}
                             onFocus={(e) => {
-                              e.target.style.borderColor = '#2563eb'
-                              e.target.style.boxShadow = '0 0 0 3px rgba(37, 99, 235, 0.1)'
+                              e.target.style.borderColor = '#7c3aed'
+                              e.target.style.boxShadow = '0 0 0 3px rgba(124, 58, 237, 0.2)'
                             }}
                             onBlur={(e) => {
-                              e.target.style.borderColor = '#d1d5db'
+                              e.target.style.borderColor = 'rgba(255, 255, 255, 0.2)'
                               e.target.style.boxShadow = 'none'
                             }}
                           />
@@ -694,7 +708,7 @@ export default function NewEventWizardPage() {
                       padding: '1rem',
                       border: '2px dashed #d1d5db',
                       borderRadius: '0.5rem',
-                      color: '#6b7280',
+                      color: 'rgba(255, 255, 255, 0.7)',
                       backgroundColor: 'transparent',
                       cursor: 'pointer',
                       transition: 'all 0.3s',
@@ -704,11 +718,11 @@ export default function NewEventWizardPage() {
                       gap: '0.5rem'
                     }}
                     onMouseEnter={(e) => {
-                      e.target.style.borderColor = '#9ca3af'
-                      e.target.style.backgroundColor = '#f9fafb'
+                      e.target.style.borderColor = 'rgba(255, 255, 255, 0.5)'
+                      e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)'
                     }}
                     onMouseLeave={(e) => {
-                      e.target.style.borderColor = '#d1d5db'
+                      e.target.style.borderColor = 'rgba(255, 255, 255, 0.3)'
                       e.target.style.backgroundColor = 'transparent'
                     }}
                   >
@@ -725,8 +739,8 @@ export default function NewEventWizardPage() {
           {/* Error Message */}
           {error && (
             <div style={{
-              backgroundColor: '#fef2f2',
-              border: '1px solid #fecaca',
+              backgroundColor: 'rgba(239, 68, 68, 0.2)',
+              border: '1px solid rgba(239, 68, 68, 0.4)',
               borderRadius: '0.5rem',
               padding: '1rem',
               marginBottom: '1.5rem'
@@ -735,7 +749,7 @@ export default function NewEventWizardPage() {
                 <svg style={{ width: '1.25rem', height: '1.25rem', color: '#ef4444' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
                 </svg>
-                <span style={{ color: '#b91c1c' }}>{error}</span>
+                <span style={{ color: '#fee2e2' }}>{error}</span>
               </div>
             </div>
           )}
@@ -758,17 +772,17 @@ export default function NewEventWizardPage() {
                 border: 'none',
                 cursor: currentStep === 1 ? 'not-allowed' : 'pointer',
                 transition: 'all 0.3s',
-                backgroundColor: currentStep === 1 ? '#f3f4f6' : '#f3f4f6',
-                color: currentStep === 1 ? '#9ca3af' : '#374151'
+                backgroundColor: currentStep === 1 ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.1)',
+                color: currentStep === 1 ? 'rgba(255, 255, 255, 0.5)' : 'rgba(255, 255, 255, 0.9)'
               }}
               onMouseEnter={(e) => {
                 if (currentStep !== 1) {
-                  e.target.style.backgroundColor = '#e5e7eb'
+                  e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.2)'
                 }
               }}
               onMouseLeave={(e) => {
                 if (currentStep !== 1) {
-                  e.target.style.backgroundColor = '#f3f4f6'
+                  e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)'
                 }
               }}
             >
@@ -781,15 +795,15 @@ export default function NewEventWizardPage() {
                 style={{
                   padding: '0.75rem 1.5rem',
                   backgroundColor: '#f3f4f6',
-                  color: '#374151',
+                  color: 'rgba(255, 255, 255, 0.9)',
                   borderRadius: '0.5rem',
                   fontWeight: '500',
                   border: 'none',
                   cursor: 'pointer',
                   transition: 'all 0.3s'
                 }}
-                onMouseEnter={(e) => e.target.style.backgroundColor = '#e5e7eb'}
-                onMouseLeave={(e) => e.target.style.backgroundColor = '#f3f4f6'}
+                onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.2)'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)'}
               >
                 Cancel
               </button>
@@ -799,16 +813,16 @@ export default function NewEventWizardPage() {
                   onClick={nextStep}
                   style={{
                     padding: '0.75rem 1.5rem',
-                    backgroundColor: '#2563eb',
-                    color: 'white',
+                  backgroundColor: '#7c3aed',
+                  color: 'white',
                     borderRadius: '0.5rem',
                     fontWeight: '500',
                     border: 'none',
                     cursor: 'pointer',
                     transition: 'all 0.3s'
                   }}
-                  onMouseEnter={(e) => e.target.style.backgroundColor = '#1d4ed8'}
-                  onMouseLeave={(e) => e.target.style.backgroundColor = '#2563eb'}
+                  onMouseEnter={(e) => e.target.style.backgroundColor = '#6d28d9'}
+                  onMouseLeave={(e) => e.target.style.backgroundColor = '#7c3aed'}
                 >
                   Next
                 </button>
@@ -818,12 +832,12 @@ export default function NewEventWizardPage() {
                   disabled={isSubmitting}
                   style={{
                     padding: '0.75rem 1.5rem',
-                    borderRadius: 'Snapshot.5rem',
+                      borderRadius: '0.5rem',
                     fontWeight: '500',
                     border: 'none',
                     cursor: isSubmitting ? 'not-allowed' : 'pointer',
                     transition: 'all 0.3s',
-                    backgroundColor: isSubmitting ? '#f3f4f6' : '#2563eb',
+                    backgroundColor: isSubmitting ? 'rgba(255, 255, 255, 0.1)' : '#7c3aed',
                     color: isSubmitting ? '#9ca3af' : 'white',
                     display: 'flex',
                     alignItems: 'center',
@@ -831,12 +845,12 @@ export default function NewEventWizardPage() {
                   }}
                   onMouseEnter={(e) => {
                     if (!isSubmitting) {
-                      e.target.style.backgroundColor = '#1d4ed8'
+                      e.target.style.backgroundColor = '#6d28d9'
                     }
                   }}
                   onMouseLeave={(e) => {
                     if (!isSubmitting) {
-                      e.target.style.backgroundColor = '#2563eb'
+                      e.target.style.backgroundColor = '#7c3aed'
                     }
                   }}
                 >

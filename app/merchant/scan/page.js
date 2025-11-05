@@ -312,10 +312,18 @@ export default function MerchantScanPage() {
       
       const verifyResult = await verifyResponse.json()
       
-      if (verifyResponse.ok && verifyResult.success) {
-        const { ticket, event, validity } = verifyResult.data
-        
-        // 检查商家权限（检查票务是否属于当前商家）
+              if (verifyResponse.ok && verifyResult.success) {
+          const { ticket, event, validity } = verifyResult.data
+          
+          // Debug: Log received ticket data
+          console.log('🔍 Ticket verification response:', {
+            holder_name: ticket.holder_name,
+            holder_age: ticket.holder_age,
+            full_ticket: ticket
+          })
+          addDebugLog(`📋 Ticket holder_name: ${ticket.holder_name || 'NULL'}, holder_age: ${ticket.holder_age ?? 'NULL'}`, 'info')
+          
+          // 检查商家权限（检查票务是否属于当前商家）
         let isOwnMerchantTicket = true
         let merchantError = null
         
@@ -461,6 +469,14 @@ export default function MerchantScanPage() {
         
         if (verifyResponse.ok && verifyResult.success) {
           const { ticket, event, validity } = verifyResult.data
+          
+          // Debug: Log received ticket data after redemption
+          console.log('🔍 Ticket data after redemption:', {
+            holder_name: ticket.holder_name,
+            holder_age: ticket.holder_age,
+            full_ticket: ticket
+          })
+          addDebugLog(`📋 After redemption - holder_name: ${ticket.holder_name || 'NULL'}, holder_age: ${ticket.holder_age ?? 'NULL'}`, 'info')
           
           setScanResult({
             qr_data: qrData, // 保存二维码数据

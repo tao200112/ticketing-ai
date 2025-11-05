@@ -214,12 +214,33 @@ export async function POST(request) {
     }
 
           // Get holder information (from ticket or order)
-      const holderName = ticket.holder_name || order?.customer_name || 'Unknown'
-      const holderAge = ticket.holder_age !== null && ticket.holder_age !== undefined 
-        ? ticket.holder_age 
-        : (order?.customer_age !== null && order?.customer_age !== undefined 
-            ? order.customer_age 
-            : null)
+      // Log debug info to help diagnose issues
+      logger.info('Holder info lookup', {
+        ticket_holder_name: ticket.holder_name,
+        ticket_holder_age: ticket.holder_age,
+        order_customer_name: order?.customer_name,
+        order_customer_age: order?.customer_age,
+        order_id: ticket.order_id
+      })
+      
+      // Handle holder_name: prefer ticket, then order, then 'Unknown'
+      // Also check for empty strings
+      let holderName = 'Unknown'
+      if (ticket.holder_name && ticket.holder_name.trim() !== '') {
+        holderName = ticket.holder_name
+      } else if (order?.customer_name && order.customer_name.trim() !== '') {
+        holderName = order.customer_name
+      }
+      
+      // Handle holder_age: prefer ticket, then order, then null
+      let holderAge = null
+      if (ticket.holder_age !== null && ticket.holder_age !== undefined && ticket.holder_age > 0) {
+        holderAge = ticket.holder_age
+      } else if (order?.customer_age !== null && order?.customer_age !== undefined && order.customer_age > 0) {
+        holderAge = order.customer_age
+      }
+      
+      logger.info('Final holder info', { holderName, holderAge })
 
     // Update verification tracking or redeem ticket
     const updateData = {

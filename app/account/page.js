@@ -80,7 +80,7 @@ export default function AccountPage() {
     setUser(userData)
     setShowLogin(false)
     setShowRegister(false)
-    // 重新加载用户数据
+      // Reload user data
     if (supabaseUrl && supabaseKey && userData && userData.id) {
       const client = createClient(supabaseUrl, supabaseKey)
       loadUserData(client, userData.id)
@@ -99,7 +99,7 @@ export default function AccountPage() {
 
   const loadUserData = async (client, userId) => {
     try {
-      // 获取用户信息
+      // Get user information
       const { data: userData, error: userError } = await client
         .from('users')
         .select('*')
@@ -107,7 +107,7 @@ export default function AccountPage() {
         .single()
 
       if (userError) {
-        console.error('❌ 获取用户信息失败:', userError)
+        console.error('❌ Failed to get user information:', userError)
         setLoading(false)
         router.push('/auth/login')
         return
@@ -116,7 +116,7 @@ export default function AccountPage() {
       if (userData) {
         delete userData.password_hash
         
-        // 检查邮箱是否已验证
+        // Check if email is verified
         if (!userData.email_verified_at) {
           console.log('❌ Email not verified, redirecting to verification page')
           setLoading(false)
@@ -127,7 +127,7 @@ export default function AccountPage() {
         setUser(userData)
       }
 
-      // 获取用户票务（按用户ID筛选，优先使用user_id，回退到邮箱）
+      // Get user tickets (filter by user ID, fallback to email)
       const { data: ticketsData } = await client
         .from('tickets')
         .select(`
@@ -155,7 +155,7 @@ export default function AccountPage() {
         setTickets(ticketsData)
       }
 
-      // 获取用户订单（按邮箱筛选）
+      // Get user orders (filter by email)
       const { data: ordersData } = await client
         .from('orders')
         .select('*')
@@ -167,20 +167,20 @@ export default function AccountPage() {
       }
 
     } catch (error) {
-      console.error('❌ 加载用户数据失败:', error)
+      console.error('❌ Failed to load user data:', error)
     } finally {
       setLoading(false)
     }
   }
 
   const handleLogout = async () => {
-    // 清除会话
+    // Clear session
     localStorage.removeItem('userSession')
     if (supabase) {
       try {
         await supabase.auth.signOut()
       } catch (error) {
-        console.error('❌ 登出失败:', error)
+        console.error('❌ Logout failed:', error)
       }
     }
     setUser(null)
@@ -232,7 +232,7 @@ export default function AccountPage() {
     )
   }
 
-  // 显示登录表单
+  // Show login form
   if (showLogin) {
     return (
       <div style={{
@@ -256,7 +256,7 @@ export default function AccountPage() {
     )
   }
 
-  // 显示注册表单
+  // Show register form
   if (showRegister) {
     return (
       <div style={{
@@ -416,14 +416,14 @@ export default function AccountPage() {
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              {/* 分类票务 */}
+              {/* Categorize tickets */}
               {(() => {
                 const unusedTickets = (tickets || []).filter(t => t.status === 'unused' || !t.status)
                 const usedTickets = (tickets || []).filter(t => t.status === 'used')
                 
                 return (
                   <>
-                    {/* 未使用票务 */}
+                    {/* Unused Tickets */}
                     {unusedTickets.length > 0 && (
                       <div>
                         <button
@@ -457,10 +457,10 @@ export default function AccountPage() {
                               fontSize: '12px',
                               fontWeight: '600'
                             }}>
-                              未使用
+                              Unused
                             </span>
                             <span style={{ color: 'white', fontSize: '16px', fontWeight: '600' }}>
-                              未使用票务 ({unusedTickets.length})
+                              Unused Tickets ({unusedTickets.length})
                             </span>
                           </div>
                           <span style={{ 
@@ -599,7 +599,7 @@ export default function AccountPage() {
                       </div>
                     )}
                     
-                    {/* 已使用票务 */}
+                    {/* Used Tickets */}
                     {usedTickets.length > 0 && (
                       <div>
                         <button
@@ -633,10 +633,10 @@ export default function AccountPage() {
                               fontSize: '12px',
                               fontWeight: '600'
                             }}>
-                              已使用
+                              Used
                             </span>
                             <span style={{ color: 'white', fontSize: '16px', fontWeight: '600' }}>
-                              已使用票务 ({usedTickets.length})
+                              Used Tickets ({usedTickets.length})
                             </span>
                           </div>
                           <span style={{ 

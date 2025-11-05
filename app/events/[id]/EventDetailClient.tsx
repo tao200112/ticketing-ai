@@ -373,15 +373,6 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
                         }}>
                           {price.label}
                         </h3>
-                        {price.inventory && (
-                          <p style={{
-                            color: '#94a3b8',
-                            fontSize: '0.875rem',
-                            marginBottom: '8px'
-                          }}>
-                            Stock: {price.inventory} tickets
-                          </p>
-                        )}
                         <div style={{
                           display: 'flex',
                           alignItems: 'center',

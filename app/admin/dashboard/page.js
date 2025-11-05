@@ -25,6 +25,11 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('overview')
   const [showEventModal, setShowEventModal] = useState(false)
   const [editingEvent, setEditingEvent] = useState(null)
+  const [merchantSearch, setMerchantSearch] = useState('')
+  const [eventSearch, setEventSearch] = useState('')
+  const [customerSearch, setCustomerSearch] = useState('')
+  const [editingMerchant, setEditingMerchant] = useState(null)
+  const [maxEventsValue, setMaxEventsValue] = useState('')
   const [eventForm, setEventForm] = useState({
     title: '',
     description: '',
@@ -290,6 +295,61 @@ export default function AdminDashboard() {
       alert('Failed to delete event, please try again')
     }
   }
+
+  const handleUpdateMerchantMaxEvents = async (merchantId, maxEvents) => {
+    try {
+      const response = await fetch(`/api/admin/merchants/${merchantId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ max_events: maxEvents })
+      })
+
+      if (response.ok) {
+        loadData() // Reload data to reflect changes
+        setEditingMerchant(null)
+        setMaxEventsValue('')
+      } else {
+        alert('Failed to update merchant max events')
+      }
+    } catch (error) {
+      console.error('Error updating merchant max events:', error)
+      alert('Failed to update merchant max events')
+    }
+  }
+
+  // Filter functions
+  const filteredMerchants = merchants.filter(merchant => {
+    if (!merchantSearch) return true
+    const search = merchantSearch.toLowerCase()
+    return (
+      merchant.name?.toLowerCase().includes(search) ||
+      merchant.contact_email?.toLowerCase().includes(search) ||
+      merchant.contact_phone?.toLowerCase().includes(search)
+    )
+  })
+
+  const filteredEvents = events.filter(event => {
+    if (!eventSearch) return true
+    const search = eventSearch.toLowerCase()
+    return (
+      event.title?.toLowerCase().includes(search) ||
+      event.description?.toLowerCase().includes(search) ||
+      event.venue_name?.toLowerCase().includes(search) ||
+      event.address?.toLowerCase().includes(search) ||
+      event.merchants?.name?.toLowerCase().includes(search)
+    )
+  })
+
+  const filteredCustomers = customers.filter(customer => {
+    if (!customerSearch) return true
+    const search = customerSearch.toLowerCase()
+    return (
+      customer.name?.toLowerCase().includes(search) ||
+      customer.email?.toLowerCase().includes(search)
+    )
+  })
 
   if (loading) {
     return (
@@ -568,12 +628,32 @@ export default function AdminDashboard() {
                 </button>
               </div>
               
+              {/* Search Bar */}
+              <div style={{ marginBottom: '20px' }}>
+                <input
+                  type="text"
+                  placeholder="Search merchants by name, email, or phone..."
+                  value={merchantSearch}
+                  onChange={(e) => setMerchantSearch(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    borderRadius: '8px',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    color: 'white',
+                    fontSize: '14px',
+                    outline: 'none'
+                  }}
+                />
+              </div>
+              
               <div style={{ color: 'rgba(255, 255, 255, 0.8)', marginBottom: '20px' }}>
-                {merchants.length} merchants registered
+                {filteredMerchants.length} of {merchants.length} merchants
               </div>
 
               <div style={{ display: 'grid', gap: '16px' }}>
-                {merchants.map(merchant => (
+                {filteredMerchants.map(merchant => (
                   <div
                     key={merchant.id}
                     style={{
@@ -593,10 +673,92 @@ export default function AdminDashboard() {
                         <p style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '14px', marginBottom: '8px' }}>
                           {merchant.contact_email}
                         </p>
-                        <div style={{ display: 'flex', gap: '16px', fontSize: '12px', color: 'rgba(255, 255, 255, 0.6)' }}>
+                        <div style={{ display: 'flex', gap: '16px', fontSize: '12px', color: 'rgba(255, 255, 255, 0.6)', flexWrap: 'wrap', alignItems: 'center' }}>
                           <span>📞 {merchant.contact_phone || 'No phone'}</span>
                           <span>✅ {merchant.verified ? 'Verified' : 'Unverified'}</span>
-                          <span>📊 Max Events: {merchant.max_events}</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span>📊 Max Events:</span>
+                            {editingMerchant === merchant.id ? (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  value={maxEventsValue}
+                                  onChange={(e) => setMaxEventsValue(e.target.value)}
+                                  onKeyPress={(e) => {
+                                    if (e.key === 'Enter') {
+                                      handleUpdateMerchantMaxEvents(merchant.id, parseInt(maxEventsValue) || 1)
+                                    }
+                                  }}
+                                  style={{
+                                    width: '60px',
+                                    padding: '4px 8px',
+                                    borderRadius: '4px',
+                                    border: '1px solid rgba(255, 255, 255, 0.3)',
+                                    background: 'rgba(255, 255, 255, 0.1)',
+                                    color: 'white',
+                                    fontSize: '12px',
+                                    outline: 'none'
+                                  }}
+                                  autoFocus
+                                />
+                                <button
+                                  onClick={() => handleUpdateMerchantMaxEvents(merchant.id, parseInt(maxEventsValue) || 1)}
+                                  style={{
+                                    padding: '4px 8px',
+                                    borderRadius: '4px',
+                                    background: 'rgba(34, 197, 94, 0.2)',
+                                    border: '1px solid rgba(34, 197, 94, 0.3)',
+                                    color: '#22c55e',
+                                    cursor: 'pointer',
+                                    fontSize: '11px'
+                                  }}
+                                >
+                                  ✓
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setEditingMerchant(null)
+                                    setMaxEventsValue('')
+                                  }}
+                                  style={{
+                                    padding: '4px 8px',
+                                    borderRadius: '4px',
+                                    background: 'rgba(239, 68, 68, 0.2)',
+                                    border: '1px solid rgba(239, 68, 68, 0.3)',
+                                    color: '#ef4444',
+                                    cursor: 'pointer',
+                                    fontSize: '11px'
+                                  }}
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            ) : (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <span>{merchant.max_events || 1}</span>
+                                <button
+                                  onClick={() => {
+                                    setEditingMerchant(merchant.id)
+                                    setMaxEventsValue(merchant.max_events?.toString() || '1')
+                                  }}
+                                  style={{
+                                    padding: '2px 6px',
+                                    borderRadius: '4px',
+                                    background: 'rgba(34, 211, 238, 0.2)',
+                                    border: '1px solid rgba(34, 211, 238, 0.3)',
+                                    color: '#22D3EE',
+                                    cursor: 'pointer',
+                                    fontSize: '10px',
+                                    marginLeft: '4px'
+                                  }}
+                                  title="Edit max events"
+                                >
+                                  ✎
+                                </button>
+                              </div>
+                            )}
+                          </div>
                           <span>📅 Created: {new Date(merchant.created_at).toLocaleDateString()}</span>
                         </div>
                       </div>
@@ -697,12 +859,32 @@ export default function AdminDashboard() {
                 </div>
               </div>
               
+              {/* Search Bar */}
+              <div style={{ marginBottom: '20px' }}>
+                <input
+                  type="text"
+                  placeholder="Search events by title, description, venue, or merchant..."
+                  value={eventSearch}
+                  onChange={(e) => setEventSearch(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    borderRadius: '8px',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    color: 'white',
+                    fontSize: '14px',
+                    outline: 'none'
+                  }}
+                />
+              </div>
+              
               <div style={{ color: 'rgba(255, 255, 255, 0.8)', marginBottom: '20px' }}>
-                {events.length} events created
+                {filteredEvents.length} of {events.length} events
               </div>
 
               <div style={{ display: 'grid', gap: '16px' }}>
-                {events.map(event => (
+                {filteredEvents.map(event => (
                   <div
                     key={event.id}
                     style={{
@@ -820,12 +1002,32 @@ export default function AdminDashboard() {
             <div>
               <h2 style={{ color: 'white', marginBottom: '20px', fontSize: '20px' }}>Customers</h2>
               
+              {/* Search Bar */}
+              <div style={{ marginBottom: '20px' }}>
+                <input
+                  type="text"
+                  placeholder="Search customers by name or email..."
+                  value={customerSearch}
+                  onChange={(e) => setCustomerSearch(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    borderRadius: '8px',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    color: 'white',
+                    fontSize: '14px',
+                    outline: 'none'
+                  }}
+                />
+              </div>
+              
               <div style={{ color: 'rgba(255, 255, 255, 0.8)', marginBottom: '20px' }}>
-                {customers.length} customers registered
+                {filteredCustomers.length} of {customers.length} customers
               </div>
 
               <div style={{ display: 'grid', gap: '16px' }}>
-                {customers.map(customer => (
+                {filteredCustomers.map(customer => (
                   <div
                     key={customer.id}
                     style={{

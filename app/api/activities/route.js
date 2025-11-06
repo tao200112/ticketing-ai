@@ -20,7 +20,6 @@ export async function GET() {
       .from('activities')
       .select('*')
       .eq('is_active', true)
-      .order('sort_order', { ascending: true })
       .order('created_at', { ascending: false })
 
     if (error) {

@@ -16,7 +16,6 @@ export async function GET() {
     const { data: activities, error } = await supabase
       .from('activities')
       .select('*')
-      .order('sort_order', { ascending: true })
       .order('created_at', { ascending: false })
 
     if (error) {

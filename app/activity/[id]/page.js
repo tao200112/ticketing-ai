@@ -180,9 +180,18 @@ export default function ActivityDetailPage() {
             </div>
           )}
           <div style={{ padding: '40px' }}>
+            <h1 style={{
+              color: 'white',
+              fontSize: '32px',
+              fontWeight: '700',
+              marginBottom: '24px',
+              lineHeight: '1.3'
+            }}>
+              {activity.title || 'Untitled Activity'}
+            </h1>
             {activity.text && (
               <div style={{
-                color: 'white',
+                color: 'rgba(255, 255, 255, 0.9)',
                 fontSize: '18px',
                 lineHeight: '1.8',
                 whiteSpace: 'pre-wrap',

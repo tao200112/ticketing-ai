@@ -168,9 +168,18 @@ export default function ActivityPage() {
                       </div>
                     )}
                     <div style={{ padding: '24px' }}>
+                      <h3 style={{
+                        color: 'white',
+                        fontSize: '20px',
+                        fontWeight: '600',
+                        marginBottom: '12px',
+                        lineHeight: '1.4'
+                      }}>
+                        {activity.title || 'Untitled Activity'}
+                      </h3>
                       {previewText && (
                         <p style={{
-                          color: 'white',
+                          color: 'rgba(255, 255, 255, 0.9)',
                           fontSize: '16px',
                           lineHeight: '1.6',
                           margin: 0,

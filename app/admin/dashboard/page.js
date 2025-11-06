@@ -28,6 +28,7 @@ export default function AdminDashboard() {
   const [showActivityModal, setShowActivityModal] = useState(false)
   const [editingActivity, setEditingActivity] = useState(null)
   const [activityForm, setActivityForm] = useState({
+    title: '',
     image_url: '',
     text: '',
     is_active: true
@@ -1331,7 +1332,7 @@ export default function AdminDashboard() {
                 <button
                   onClick={() => {
                     setEditingActivity(null)
-                    setActivityForm({ image_url: '', text: '', is_active: true })
+                    setActivityForm({ title: '', image_url: '', text: '', is_active: true })
                     setImagePreview(null)
                     const fileInput = document.getElementById('activity-image-upload')
                     if (fileInput) fileInput.value = ''
@@ -1508,6 +1509,7 @@ export default function AdminDashboard() {
                           onClick={() => {
                             setEditingActivity(activity)
                             setActivityForm({
+                              title: activity.title || '',
                               image_url: activity.image_url || '',
                               text: activity.text || '',
                               is_active: activity.is_active !== false
@@ -1645,7 +1647,7 @@ export default function AdminDashboard() {
               onClick={() => {
                 setShowActivityModal(false)
                 setEditingActivity(null)
-                setActivityForm({ image_url: '', text: '', is_active: true })
+                setActivityForm({ title: '', image_url: '', text: '', is_active: true })
                 setImagePreview(null)
                 const fileInput = document.getElementById('activity-image-upload')
                 if (fileInput) fileInput.value = ''
@@ -1675,6 +1677,33 @@ export default function AdminDashboard() {
             </h2>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div>
+                <label style={{
+                  display: 'block',
+                  color: 'rgba(255, 255, 255, 0.9)',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  marginBottom: '8px'
+                }}>
+                  Title *
+                </label>
+                <input
+                  type="text"
+                  value={activityForm.title}
+                  onChange={(e) => setActivityForm(prev => ({ ...prev, title: e.target.value }))}
+                  placeholder="Enter activity title..."
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    borderRadius: '8px',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    color: 'white',
+                    fontSize: '14px',
+                    outline: 'none'
+                  }}
+                />
+              </div>
               <div>
                 <label style={{
                   display: 'block',
@@ -1889,7 +1918,7 @@ export default function AdminDashboard() {
                   onClick={() => {
                     setShowActivityModal(false)
                     setEditingActivity(null)
-                    setActivityForm({ image_url: '', text: '', is_active: true })
+                    setActivityForm({ title: '', image_url: '', text: '', is_active: true })
                     setImagePreview(null)
                     const fileInput = document.getElementById('activity-image-upload')
                     if (fileInput) fileInput.value = ''
@@ -1909,6 +1938,10 @@ export default function AdminDashboard() {
                 </button>
                 <button
                   onClick={async () => {
+                    if (!activityForm.title || activityForm.title.trim() === '') {
+                      alert('Please enter activity title')
+                      return
+                    }
                     if (!activityForm.text || activityForm.text.trim() === '') {
                       alert('Please enter activity text')
                       return

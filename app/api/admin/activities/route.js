@@ -40,12 +40,19 @@ export async function POST(request) {
     }
 
     const body = await request.json()
-    const { image_url, text, is_active = true } = body
+    const { title, image_url, text, is_active = true } = body
 
     if (!text || text.trim() === '') {
       throw ErrorHandler.validationError(
         'MISSING_FIELDS',
         'Text is required'
+      )
+    }
+
+    if (!title || title.trim() === '') {
+      throw ErrorHandler.validationError(
+        'MISSING_FIELDS',
+        'Title is required'
       )
     }
 
@@ -73,6 +80,7 @@ export async function POST(request) {
 
     // Build insert data - only include sort_order if column exists
     const insertData = {
+      title: title.trim(),
       image_url: image_url || null,
       text: text.trim(),
       is_active: is_active

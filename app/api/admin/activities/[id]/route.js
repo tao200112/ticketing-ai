@@ -9,7 +9,7 @@ export async function PUT(request, { params }) {
   try {
     const { id } = await params
     const body = await request.json()
-    const { image_url, text, is_active } = body
+    const { title, image_url, text, is_active } = body
 
     if (!isSupabaseConfigured()) {
       throw ErrorHandler.configurationError(
@@ -25,9 +25,17 @@ export async function PUT(request, { params }) {
       )
     }
 
+    if (!title || title.trim() === '') {
+      throw ErrorHandler.validationError(
+        'MISSING_FIELDS',
+        'Title is required'
+      )
+    }
+
     const supabase = createSupabaseClient()
 
     const updateData = {
+      title: title.trim(),
       text: text.trim(),
       ...(image_url !== undefined && { image_url: image_url || null }),
       ...(is_active !== undefined && { is_active }),

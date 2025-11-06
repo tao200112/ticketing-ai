@@ -37,24 +37,24 @@ export async function POST(request) {
       )
     }
 
-    // Fetch ticket and verify ownership
+    // Fetch ticket (without requiring order join - use LEFT JOIN instead)
+    // Note: orders might be null or an array, so we handle both cases
     const { data: ticket, error: ticketError } = await supabase
       .from('tickets')
-      .select('*, orders!inner(customer_email, metadata)')
+      .select('*, orders(customer_email, metadata)')
       .eq('id', ticket_id)
       .single()
 
     if (ticketError || !ticket) {
-      throw ErrorHandler.notFoundError(
-        'TICKET_NOT_FOUND',
-        'Ticket not found'
-      )
+      logger.error('Ticket query error', { error: ticketError, ticket_id })
+      if (ticketError?.code === 'PGRST116') {
+        throw ErrorHandler.notFoundError(
+          'TICKET_NOT_FOUND',
+          'Ticket not found'
+        )
+      }
+      throw ErrorHandler.databaseError(ticketError, 'DATABASE_QUERY_ERROR')
     }
-
-    // Verify ticket belongs to the user
-    // Check if user_id matches from order metadata or customer_email matches user's email
-    const orderUserId = ticket.orders?.metadata?.user_id
-    const orderEmail = ticket.orders?.customer_email
 
     // Get user email from users table
     const { data: userData, error: userError } = await supabase
@@ -64,17 +64,39 @@ export async function POST(request) {
       .single()
 
     if (userError || !userData) {
+      logger.error('User query error', { error: userError, userId })
       throw ErrorHandler.unauthorizedError(
         'USER_NOT_FOUND',
         'User not found'
       )
     }
 
-    // Verify ownership: check user_id from order metadata OR email match
+    // Verify ticket belongs to the user
+    // Handle orders being null, object, or array
+    const orderData = Array.isArray(ticket.orders) ? ticket.orders[0] : ticket.orders
+    const orderUserId = orderData?.metadata?.user_id
+    const orderEmail = orderData?.customer_email
+    
+    const ticketUserId = ticket.user_id
+    const ticketHolderEmail = ticket.holder_email
+
+    // Verify ownership: check user_id from ticket, order metadata, email match, or holder_email match
     const isOwner = 
+      (ticketUserId && ticketUserId === userId) ||
       (orderUserId && orderUserId === userId) ||
       (orderEmail && orderEmail === userData.email) ||
-      (ticket.holder_email === userData.email)
+      (ticketHolderEmail && ticketHolderEmail === userData.email)
+    
+    logger.info('Ticket ownership check', {
+      ticket_id,
+      userId,
+      ticketUserId,
+      orderUserId,
+      ticketHolderEmail,
+      orderEmail,
+      userEmail: userData.email,
+      isOwner
+    })
 
     if (!isOwner) {
       throw ErrorHandler.unauthorizedError(

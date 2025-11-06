@@ -30,14 +30,15 @@ FROM events
 WHERE id = 'YOUR_EVENT_ID_HERE';  -- 替换为实际的事件 ID，例如: '62c7b850-1a67-466d-9bca-6ab72414ea65'
 
 -- 3. 检查该事件的价格（替换 YOUR_EVENT_ID_HERE）
+-- 注意：如果 ticket_kind 列不存在，移除下面的 ticket_kind 行
 SELECT 
     id,
     event_id,
     name,
     amount_cents,
     inventory,
-    ticket_kind,
     is_active
+    -- ticket_kind,  -- 如果列不存在，取消这行的注释
 FROM prices
 WHERE event_id = 'YOUR_EVENT_ID_HERE';  -- 替换为实际的事件 ID
 
@@ -73,7 +74,7 @@ FROM pg_tables
 WHERE schemaname = 'public'
 AND tablename IN ('events', 'prices', 'merchants');
 
--- 6. 测试查询（模拟 API 查询）
+-- 6. 测试查询（模拟 API 查询，不包含 ticket_kind 以避免错误）
 SELECT 
     e.*,
     json_agg(
@@ -81,8 +82,8 @@ SELECT
             'id', p.id,
             'name', p.name,
             'amount_cents', p.amount_cents,
-            'inventory', p.inventory,
-            'ticket_kind', p.ticket_kind
+            'inventory', p.inventory
+            -- 'ticket_kind', p.ticket_kind  -- 如果列不存在，取消这行的注释
         )
     ) FILTER (WHERE p.id IS NOT NULL) as prices,
     json_build_object(
@@ -93,6 +94,6 @@ SELECT
 FROM events e
 LEFT JOIN prices p ON p.event_id = e.id
 LEFT JOIN merchants m ON m.id = e.merchant_id
-WHERE e.id = :'event_id'
+WHERE e.id = 'YOUR_EVENT_ID_HERE'  -- 替换为实际的事件 ID
 GROUP BY e.id, m.id, m.name, m.contact_email;
 

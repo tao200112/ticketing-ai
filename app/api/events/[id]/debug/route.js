@@ -66,7 +66,7 @@ export async function GET(request, { params }) {
       .select(`
         *,
         merchants (id, name, contact_email),
-        prices (id, name, amount_cents, inventory, ticket_kind)
+        prices (id, name, amount_cents, inventory)
       `)
       .eq('id', id)
       .single()

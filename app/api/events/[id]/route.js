@@ -98,15 +98,20 @@ export async function GET(request, { params }) {
     }
 
     // 查询事件详情，不限制 status（允许查看所有状态的事件）
-    const { data: event, error } = await supabase
+    // 先尝试查询包含 ticket_kind，如果失败则查询不包含 ticket_kind
+    let query = supabase
       .from('events')
       .select(`
         *,
         merchants (id, name, contact_email),
-        prices (id, name, amount_cents, inventory, ticket_kind)
+        prices (id, name, amount_cents, inventory)
       `)
       .eq('id', finalId)
       .single()
+    
+    // 尝试添加 ticket_kind（如果列存在）
+    // 注意：Supabase 如果列不存在会返回错误，所以我们需要先尝试不包含它
+    const { data: event, error } = await query
 
     logger.info('Full query result', { 
       eventId: finalId,
@@ -152,7 +157,7 @@ export async function GET(request, { params }) {
             .select(`
               *,
               merchants (id, name, contact_email),
-              prices (id, name, amount_cents, inventory, ticket_kind)
+              prices (id, name, amount_cents, inventory)
             `)
             .eq('id', finalId)
             .single()

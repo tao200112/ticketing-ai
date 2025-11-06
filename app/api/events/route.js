@@ -20,7 +20,7 @@ export async function GET() {
     const supabase = createSupabaseClient()
 
     // 从 Supabase 获取活动数据
-    // 查询所有已发布的活动，如果没有则查询所有活动（包括草稿）
+    // 首先查询所有活动，然后在前端过滤（这样可以处理 status 字段可能为 null 的情况）
     let { data: events, error } = await supabase
       .from('events')
       .select(`
@@ -38,13 +38,12 @@ export async function GET() {
           sold_count
         )
       `)
-      .eq('status', 'published')
       .order('created_at', { ascending: false })
     
-    // 如果没有已发布的活动，查询所有活动（开发环境）
-    if (!events || events.length === 0) {
-      logger.info('No published events found, querying all events')
-      const { data: allEvents, error: allError } = await supabase
+    // 如果查询失败，尝试只查询 published 状态的活动
+    if (error || !events || events.length === 0) {
+      logger.info('Querying published events only')
+      const { data: publishedEvents, error: publishedError } = await supabase
         .from('events')
         .select(`
           *,
@@ -61,11 +60,28 @@ export async function GET() {
             sold_count
           )
         `)
+        .eq('status', 'published')
         .order('created_at', { ascending: false })
       
-      if (!allError && allEvents) {
-        events = allEvents
-        logger.info(`Found ${allEvents.length} events (including drafts)`)
+      if (!publishedError && publishedEvents) {
+        events = publishedEvents
+        logger.info(`Found ${publishedEvents.length} published events`)
+      } else if (publishedError) {
+        logger.warn('Error querying published events', { error: publishedError })
+      }
+    } else {
+      // 如果查询成功，过滤出已发布的活动（如果 status 字段存在）
+      // 如果 status 为 null 或 undefined，也视为已发布（兼容旧数据）
+      if (events && events.length > 0) {
+        const publishedEvents = events.filter(event => {
+          const status = event.status
+          // 如果 status 为 null、undefined 或 'published'，都视为已发布
+          return status === 'published' || status === null || status === undefined
+        })
+        if (publishedEvents.length > 0) {
+          events = publishedEvents
+          logger.info(`Filtered to ${publishedEvents.length} published/active events from ${events.length} total`)
+        }
       }
     }
 

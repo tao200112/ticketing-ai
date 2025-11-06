@@ -81,6 +81,16 @@ export default function NavbarPartyTix() {
               Events
             </Link>
             <Link 
+              href="/activity" 
+              style={{ 
+                color: 'white', 
+                textDecoration: 'none',
+                transition: 'color 0.3s ease'
+              }}
+            >
+              Activity
+            </Link>
+            <Link 
               href="/contact" 
               style={{ 
                 color: 'white', 
@@ -152,6 +162,19 @@ export default function NavbarPartyTix() {
             onClick={() => setIsMobileMenuOpen(false)}
           >
             Events
+          </Link>
+          <Link 
+            href="/activity" 
+            style={{ 
+              color: 'white', 
+              textDecoration: 'none',
+              fontSize: '16px',
+              padding: '8px 0',
+              transition: 'color 0.3s ease'
+            }}
+            onClick={() => setIsMobileMenuOpen(false)}
+          >
+            Activity
           </Link>
           <Link 
             href="/account" 

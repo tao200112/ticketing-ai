@@ -21,8 +21,16 @@ export default function AdminDashboard() {
   const [inviteCodes, setInviteCodes] = useState([])
   const [customers, setCustomers] = useState([])
   const [tickets, setTickets] = useState([])
+  const [activities, setActivities] = useState([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('overview')
+  const [showActivityModal, setShowActivityModal] = useState(false)
+  const [editingActivity, setEditingActivity] = useState(null)
+  const [activityForm, setActivityForm] = useState({
+    image_url: '',
+    text: '',
+    is_active: true
+  })
   const [showEventModal, setShowEventModal] = useState(false)
   const [editingEvent, setEditingEvent] = useState(null)
   const [merchantSearch, setMerchantSearch] = useState('')
@@ -551,7 +559,7 @@ export default function AdminDashboard() {
           borderRadius: '8px',
           width: 'fit-content'
         }}>
-          {['overview', 'merchants', 'events', 'customers', 'tickets', 'invite-codes'].map(tab => (
+          {['overview', 'merchants', 'events', 'customers', 'tickets', 'invite-codes', 'activities'].map(tab => (
                   <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -1223,6 +1231,154 @@ export default function AdminDashboard() {
               </div>
             </div>
           )}
+
+          {activeTab === 'activities' && (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <h2 style={{ color: 'white', fontSize: '20px' }}>Activities</h2>
+                <button
+                  onClick={() => {
+                    setEditingActivity(null)
+                    setActivityForm({ image_url: '', text: '', is_active: true })
+                    setShowActivityModal(true)
+                  }}
+                  className="btn-partytix-gradient"
+                  style={{
+                    padding: '12px 24px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '600'
+                  }}
+                >
+                  Create Activity
+                </button>
+              </div>
+              
+              <div style={{ color: 'rgba(255, 255, 255, 0.8)', marginBottom: '20px' }}>
+                {activities.length} activities
+              </div>
+
+              <div style={{ display: 'grid', gap: '16px' }}>
+                {activities.map(activity => (
+                  <div
+                    key={activity.id}
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.03)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '12px',
+                      padding: '20px',
+                      transition: 'all 0.3s ease',
+                      boxShadow: '0 4px 16px rgba(0, 0, 0, 0.2)'
+                    }}
+                  >
+                    <div style={{ display: 'flex', gap: '20px', alignItems: 'start' }}>
+                      {activity.image_url && (
+                        <div style={{
+                          width: '200px',
+                          height: '150px',
+                          borderRadius: '8px',
+                          overflow: 'hidden',
+                          flexShrink: 0,
+                          background: 'rgba(255, 255, 255, 0.1)'
+                        }}>
+                          <img
+                            src={activity.image_url}
+                            alt={activity.text || 'Activity'}
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                              objectFit: 'cover'
+                            }}
+                            onError={(e) => {
+                              e.target.style.display = 'none'
+                            }}
+                          />
+                        </div>
+                      )}
+                      <div style={{ flex: 1 }}>
+                        <p style={{
+                          color: 'white',
+                          fontSize: '16px',
+                          lineHeight: '1.6',
+                          marginBottom: '16px',
+                          whiteSpace: 'pre-wrap'
+                        }}>
+                          {activity.text}
+                        </p>
+                        <div style={{ display: 'flex', gap: '8px', fontSize: '12px', color: 'rgba(255, 255, 255, 0.6)' }}>
+                          <span>📅 Created: {new Date(activity.created_at).toLocaleDateString()}</span>
+                          <span style={{
+                            background: activity.is_active ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                            color: activity.is_active ? '#22c55e' : '#ef4444',
+                            padding: '4px 8px',
+                            borderRadius: '4px'
+                          }}>
+                            {activity.is_active ? 'Active' : 'Inactive'}
+                          </span>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button
+                          onClick={() => {
+                            setEditingActivity(activity)
+                            setActivityForm({
+                              image_url: activity.image_url || '',
+                              text: activity.text || '',
+                              is_active: activity.is_active !== false
+                            })
+                            setShowActivityModal(true)
+                          }}
+                          style={{
+                            background: 'rgba(34, 211, 238, 0.2)',
+                            border: '1px solid rgba(34, 211, 238, 0.3)',
+                            color: '#22D3EE',
+                            padding: '6px 12px',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '12px'
+                          }}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={async () => {
+                            if (confirm('Are you sure you want to delete this activity?')) {
+                              try {
+                                const response = await fetch(`/api/admin/activities/${activity.id}`, {
+                                  method: 'DELETE'
+                                })
+                                if (response.ok) {
+                                  loadData()
+                                } else {
+                                  alert('Failed to delete activity')
+                                }
+                              } catch (error) {
+                                console.error('Error deleting activity:', error)
+                                alert('Failed to delete activity')
+                              }
+                            }
+                          }}
+                          style={{
+                            background: 'rgba(239, 68, 68, 0.2)',
+                            border: '1px solid rgba(239, 68, 68, 0.3)',
+                            color: '#ef4444',
+                            padding: '6px 12px',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '12px'
+                          }}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -1272,6 +1428,236 @@ export default function AdminDashboard() {
               isEditing={!!editingEvent}
               merchantId={editingEvent?.merchant_id || (merchants.length > 0 ? merchants[0].id : 'admin-created')}
             />
+          </div>
+        </div>
+      )}
+
+      {/* Activity Modal */}
+      {showActivityModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.8)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '20px'
+        }}>
+          <div style={{
+            background: 'rgba(15, 23, 42, 0.95)',
+            borderRadius: '16px',
+            padding: '32px',
+            maxWidth: '600px',
+            width: '100%',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            position: 'relative'
+          }}>
+            <button
+              onClick={() => {
+                setShowActivityModal(false)
+                setEditingActivity(null)
+                setActivityForm({ image_url: '', text: '', is_active: true })
+              }}
+              style={{
+                position: 'absolute',
+                top: '16px',
+                right: '16px',
+                background: 'rgba(255, 255, 255, 0.1)',
+                border: 'none',
+                color: 'white',
+                fontSize: '24px',
+                cursor: 'pointer',
+                borderRadius: '50%',
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              ×
+            </button>
+
+            <h2 style={{ color: 'white', fontSize: '24px', marginBottom: '24px' }}>
+              {editingActivity ? 'Edit Activity' : 'Create Activity'}
+            </h2>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div>
+                <label style={{
+                  display: 'block',
+                  color: 'rgba(255, 255, 255, 0.9)',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  marginBottom: '8px'
+                }}>
+                  Image URL
+                </label>
+                <input
+                  type="text"
+                  value={activityForm.image_url}
+                  onChange={(e) => setActivityForm(prev => ({ ...prev, image_url: e.target.value }))}
+                  placeholder="https://example.com/image.jpg"
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    borderRadius: '8px',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    color: 'white',
+                    fontSize: '14px',
+                    outline: 'none'
+                  }}
+                />
+                {activityForm.image_url && (
+                  <div style={{
+                    marginTop: '12px',
+                    width: '100%',
+                    height: '200px',
+                    borderRadius: '8px',
+                    overflow: 'hidden',
+                    background: 'rgba(255, 255, 255, 0.1)'
+                  }}>
+                    <img
+                      src={activityForm.image_url}
+                      alt="Preview"
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover'
+                      }}
+                      onError={(e) => {
+                        e.target.style.display = 'none'
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label style={{
+                  display: 'block',
+                  color: 'rgba(255, 255, 255, 0.9)',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  marginBottom: '8px'
+                }}>
+                  Text *
+                </label>
+                <textarea
+                  value={activityForm.text}
+                  onChange={(e) => setActivityForm(prev => ({ ...prev, text: e.target.value }))}
+                  placeholder="Enter activity text..."
+                  rows={6}
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    borderRadius: '8px',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    color: 'white',
+                    fontSize: '14px',
+                    outline: 'none',
+                    resize: 'vertical',
+                    fontFamily: 'inherit'
+                  }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <input
+                  type="checkbox"
+                  checked={activityForm.is_active}
+                  onChange={(e) => setActivityForm(prev => ({ ...prev, is_active: e.target.checked }))}
+                  style={{
+                    width: '18px',
+                    height: '18px',
+                    cursor: 'pointer'
+                  }}
+                />
+                <label style={{
+                  color: 'rgba(255, 255, 255, 0.9)',
+                  fontSize: '14px',
+                  cursor: 'pointer'
+                }}>
+                  Active (visible on Activity page)
+                </label>
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '8px' }}>
+                <button
+                  onClick={() => {
+                    setShowActivityModal(false)
+                    setEditingActivity(null)
+                    setActivityForm({ image_url: '', text: '', is_active: true })
+                  }}
+                  style={{
+                    padding: '10px 20px',
+                    borderRadius: '8px',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    background: 'transparent',
+                    color: 'white',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '500'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    if (!activityForm.text || activityForm.text.trim() === '') {
+                      alert('Please enter activity text')
+                      return
+                    }
+
+                    try {
+                      const url = editingActivity
+                        ? `/api/admin/activities/${editingActivity.id}`
+                        : '/api/admin/activities'
+                      const method = editingActivity ? 'PUT' : 'POST'
+
+                      const response = await fetch(url, {
+                        method,
+                        headers: {
+                          'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(activityForm)
+                      })
+
+                      const result = await response.json()
+
+                      if (result.success) {
+                        setShowActivityModal(false)
+                        setEditingActivity(null)
+                        setActivityForm({ image_url: '', text: '', is_active: true })
+                        loadData()
+                      } else {
+                        alert(result.message || 'Failed to save activity')
+                      }
+                    } catch (error) {
+                      console.error('Error saving activity:', error)
+                      alert('Failed to save activity')
+                    }
+                  }}
+                  className="btn-partytix-gradient"
+                  style={{
+                    padding: '10px 20px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '600'
+                  }}
+                >
+                  {editingActivity ? 'Save Changes' : 'Create Activity'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

@@ -7,9 +7,41 @@ const logger = createLogger('event-detail-api')
 
 export async function GET(request, { params }) {
   try {
-    const { id } = await params
+    // Next.js 15: params 是 Promise，需要 await
+    const resolvedParams = await params
+    const id = resolvedParams?.id
+    
+    // 如果 id 不存在，尝试从 URL 中提取
+    let finalId = id
+    if (!finalId) {
+      const url = new URL(request.url)
+      const pathParts = url.pathname.split('/')
+      const eventIndex = pathParts.indexOf('events')
+      if (eventIndex !== -1 && pathParts[eventIndex + 1]) {
+        finalId = pathParts[eventIndex + 1]
+      }
+    }
+    
+    logger.info('Event detail API called', { 
+      id: finalId,
+      params: resolvedParams,
+      url: request.url,
+      pathname: new URL(request.url).pathname
+    })
 
-    if (id === 'ridiculous-chicken') {
+    if (!finalId) {
+      logger.error('Event ID is missing', { 
+        params: resolvedParams, 
+        url: request.url,
+        pathname: new URL(request.url).pathname
+      })
+      throw ErrorHandler.validationError(
+        'MISSING_EVENT_ID',
+        'Event ID is required'
+      )
+    }
+
+    if (finalId === 'ridiculous-chicken') {
       const defaultEvent = {
         id: 'ridiculous-chicken',
         title: 'Ridiculous Chicken Night Event',
@@ -36,6 +68,35 @@ export async function GET(request, { params }) {
 
     const supabase = createSupabaseClient()
 
+    logger.info('Querying event from database', { eventId: finalId })
+
+    // 先尝试简单查询（不包含关联），看看事件是否存在
+    const { data: simpleEvent, error: simpleError } = await supabase
+      .from('events')
+      .select('id, title, status')
+      .eq('id', finalId)
+      .single()
+
+    if (simpleError) {
+      logger.error('Simple query failed', { 
+        eventId: finalId,
+        error: {
+          code: simpleError.code,
+          message: simpleError.message,
+          details: simpleError.details,
+          hint: simpleError.hint
+        }
+      })
+    } else if (simpleEvent) {
+      logger.info('Event found (simple query)', { 
+        eventId: finalId, 
+        title: simpleEvent.title,
+        status: simpleEvent.status 
+      })
+    } else {
+      logger.warn('Event not found (simple query returned no data)', { eventId: finalId })
+    }
+
     // 查询事件详情，不限制 status（允许查看所有状态的事件）
     const { data: event, error } = await supabase
       .from('events')
@@ -44,8 +105,16 @@ export async function GET(request, { params }) {
         merchants (id, name, contact_email),
         prices (id, name, amount_cents, inventory, ticket_kind)
       `)
-      .eq('id', id)
+      .eq('id', finalId)
       .single()
+
+    logger.info('Full query result', { 
+      eventId: finalId,
+      hasEvent: !!event,
+      hasError: !!error,
+      errorCode: error?.code,
+      pricesCount: event?.prices?.length || 0
+    })
 
     if (error) {
       logger.error('Error fetching event', { 
@@ -55,12 +124,12 @@ export async function GET(request, { params }) {
           details: error.details,
           hint: error.hint
         }, 
-        eventId: id 
+        eventId: finalId 
       })
       
       // 如果是 PGRST116 (no rows found)，返回 404
       if (error.code === 'PGRST116') {
-        logger.warn('Event not found in database', { eventId: id })
+        logger.warn('Event not found in database', { eventId: finalId })
         throw ErrorHandler.notFoundError(
           'EVENT_NOT_FOUND',
           'Event not found'
@@ -69,7 +138,7 @@ export async function GET(request, { params }) {
       
       // 如果是权限错误（RLS 问题）
       if (error.code === '42501' || error.message?.includes('permission') || error.message?.includes('RLS')) {
-        logger.error('RLS permission error', { eventId: id, error })
+        logger.error('RLS permission error', { eventId: finalId, error })
         // 尝试使用 service role key 重新查询
         const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
         if (serviceKey) {
@@ -85,11 +154,11 @@ export async function GET(request, { params }) {
               merchants (id, name, contact_email),
               prices (id, name, amount_cents, inventory, ticket_kind)
             `)
-            .eq('id', id)
+            .eq('id', finalId)
             .single()
           
           if (!adminError && adminEvent) {
-            logger.info('Event found using service role key', { eventId: id })
+            logger.info('Event found using service role key', { eventId: finalId })
             return NextResponse.json({ success: true, data: adminEvent })
           }
         }
@@ -107,14 +176,14 @@ export async function GET(request, { params }) {
     }
 
     if (!event) {
-      logger.warn('Event not found', { eventId: id })
+      logger.warn('Event not found', { eventId: finalId })
       throw ErrorHandler.notFoundError(
         'EVENT_NOT_FOUND',
         'Event not found'
       )
     }
 
-    logger.info('Event fetched successfully', { eventId: id, eventTitle: event.title })
+    logger.info('Event fetched successfully', { eventId: finalId, eventTitle: event.title })
     return NextResponse.json({ success: true, data: event })
 
   } catch (error) {
@@ -124,7 +193,15 @@ export async function GET(request, { params }) {
 
 export async function DELETE(request, { params }) {
   try {
-    const { id } = await params
+    const resolvedParams = await params
+    const id = resolvedParams?.id
+
+    if (!id) {
+      throw ErrorHandler.validationError(
+        'MISSING_EVENT_ID',
+        'Event ID is required'
+      )
+    }
 
     if (!isSupabaseConfigured()) {
       throw ErrorHandler.configurationError(
@@ -158,7 +235,8 @@ export async function DELETE(request, { params }) {
 
 export async function PUT(request, { params }) {
   try {
-    const { id } = await params
+    const resolvedParams = await params
+    const id = resolvedParams?.id || resolvedParams?.id
     const body = await request.json()
     const { title, description, startTime, endTime, location, poster_url, status, prices } = body
 

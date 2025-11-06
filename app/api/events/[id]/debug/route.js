@@ -7,7 +7,18 @@ import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase-api'
  */
 export async function GET(request, { params }) {
   try {
-    const { id } = await params
+    const resolvedParams = await params
+    let id = resolvedParams?.id
+    
+    // 如果 id 不存在，尝试从 URL 中提取
+    if (!id) {
+      const url = new URL(request.url)
+      const pathParts = url.pathname.split('/')
+      const eventIndex = pathParts.indexOf('events')
+      if (eventIndex !== -1 && pathParts[eventIndex + 1]) {
+        id = pathParts[eventIndex + 1]
+      }
+    }
     
     const result = {
       eventId: id,

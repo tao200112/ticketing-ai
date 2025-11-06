@@ -7,7 +7,7 @@ import LoginForm from '../../components/LoginForm'
 import RegisterForm from '../../components/RegisterForm'
 import { createClient } from '@supabase/supabase-js'
 import { QRCodeSVG } from 'qrcode.react'
-import { getTicketKindDisplayName } from '@/lib/ticket-helpers'
+import { getTicketKindDisplayName, getTicketKindCategoryName } from '@/lib/ticket-helpers'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -21,7 +21,13 @@ export default function AccountPage() {
   const [supabase, setSupabase] = useState(null)
   const [showLogin, setShowLogin] = useState(false)
   const [showRegister, setShowRegister] = useState(false)
-  const [ticketsExpanded, setTicketsExpanded] = useState({ unused: true, used: true })
+  const [ticketsExpanded, setTicketsExpanded] = useState({
+    // Structure: { '正常票': { unused: true, used: true }, '酒水票': { unused: true, used: true }, '插队票': { unused: true, used: true } }
+    '正常票': { unused: true, used: true },
+    '酒水票': { unused: true, used: true },
+    '插队票': { unused: true, used: true },
+    '其他': { unused: true, used: true }
+  })
   const [ordersExpanded, setOrdersExpanded] = useState(true)
   const [clickingTickets, setClickingTickets] = useState({}) // Track triple-click state per ticket
 
@@ -418,66 +424,164 @@ export default function AccountPage() {
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              {/* Categorize tickets */}
+              {/* Categorize tickets by kind first, then by usage status */}
               {(() => {
-                const unusedTickets = (tickets || []).filter(t => t.status === 'unused' || !t.status)
-                const usedTickets = (tickets || []).filter(t => t.status === 'used')
+                // Group tickets by category (正常票, 酒水票, 插队票)
+                const ticketsByCategory = {}
+                
+                ;(tickets || []).forEach(ticket => {
+                  const category = getTicketKindCategoryName(ticket.ticket_kind)
+                  if (!ticketsByCategory[category]) {
+                    ticketsByCategory[category] = { unused: [], used: [] }
+                  }
+                  
+                  // Check if ticket is used
+                  const isUsed = ticket.used || ticket.status === 'used'
+                  if (isUsed) {
+                    ticketsByCategory[category].used.push(ticket)
+                  } else {
+                    ticketsByCategory[category].unused.push(ticket)
+                  }
+                })
+                
+                // Define category order and colors
+                const categoryOrder = ['正常票', '酒水票', '插队票', '其他']
+                const categoryColors = {
+                  '正常票': { bg: 'rgba(59, 130, 246, 0.2)', color: '#3b82f6' },
+                  '酒水票': { bg: 'rgba(168, 85, 247, 0.2)', color: '#a855f7' },
+                  '插队票': { bg: 'rgba(236, 72, 153, 0.2)', color: '#ec4899' },
+                  '其他': { bg: 'rgba(107, 114, 128, 0.2)', color: '#6b7280' }
+                }
                 
                 return (
                   <>
-                    {/* Unused Tickets */}
-                    {unusedTickets.length > 0 && (
-                      <div>
-                        <button
-                          onClick={() => setTicketsExpanded(prev => ({ ...prev, unused: !prev.unused }))}
-                          style={{
-                            width: '100%',
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            background: 'rgba(255, 255, 255, 0.05)',
-                            border: '1px solid rgba(255, 255, 255, 0.1)',
-                            borderRadius: '12px',
-                            padding: '16px 20px',
-                            cursor: 'pointer',
-                            transition: 'all 0.3s ease',
-                            marginBottom: '16px'
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
-                          }}
-                        >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    {categoryOrder.map(category => {
+                      const categoryTickets = ticketsByCategory[category]
+                      if (!categoryTickets || (categoryTickets.unused.length === 0 && categoryTickets.used.length === 0)) {
+                        return null
+                      }
+                      
+                      const totalCount = categoryTickets.unused.length + categoryTickets.used.length
+                      const categoryColor = categoryColors[category] || categoryColors['其他']
+                      
+                      return (
+                        <div key={category} style={{ marginBottom: '24px' }}>
+                          {/* Category Header */}
+                          <button
+                            onClick={() => setTicketsExpanded(prev => ({
+                              ...prev,
+                              [category]: {
+                                ...prev[category],
+                                categoryExpanded: !prev[category]?.categoryExpanded
+                              }
+                            }))}
+                            style={{
+                              width: '100%',
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              background: categoryColor.bg,
+                              border: `1px solid ${categoryColor.color}40`,
+                              borderRadius: '12px',
+                              padding: '16px 20px',
+                              cursor: 'pointer',
+                              transition: 'all 0.3s ease',
+                              marginBottom: '12px'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.opacity = '0.9'
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.opacity = '1'
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                              <span style={{ 
+                                background: categoryColor.color,
+                                color: 'white',
+                                padding: '6px 12px',
+                                borderRadius: '6px',
+                                fontSize: '14px',
+                                fontWeight: '600'
+                              }}>
+                                {category}
+                              </span>
+                              <span style={{ color: 'white', fontSize: '16px', fontWeight: '600' }}>
+                                {category} ({totalCount})
+                              </span>
+                            </div>
                             <span style={{ 
-                              background: 'rgba(34, 211, 238, 0.2)',
-                              color: '#22D3EE',
-                              padding: '4px 8px',
-                              borderRadius: '6px',
-                              fontSize: '12px',
-                              fontWeight: '600'
+                              color: 'rgba(255, 255, 255, 0.6)',
+                              fontSize: '20px',
+                              transform: ticketsExpanded[category]?.categoryExpanded !== false ? 'rotate(180deg)' : 'rotate(0deg)',
+                              transition: 'transform 0.3s ease'
                             }}>
-                              Unused
+                              ▼
                             </span>
-                            <span style={{ color: 'white', fontSize: '16px', fontWeight: '600' }}>
-                              Unused Tickets ({unusedTickets.length})
-                            </span>
-                          </div>
-                          <span style={{ 
-                            color: 'rgba(255, 255, 255, 0.6)',
-                            fontSize: '20px',
-                            transform: ticketsExpanded.unused ? 'rotate(180deg)' : 'rotate(0deg)',
-                            transition: 'transform 0.3s ease'
-                          }}>
-                            ▼
-                          </span>
-                        </button>
-                        
-                        {ticketsExpanded.unused && (
-                          <div style={{ display: 'grid', gap: '20px', paddingLeft: '8px' }}>
-                            {unusedTickets.map(ticket => (
+                          </button>
+                          
+                          {/* Category Content */}
+                          {ticketsExpanded[category]?.categoryExpanded !== false && (
+                            <div style={{ paddingLeft: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                              {/* Unused Tickets in this category */}
+                              {categoryTickets.unused.length > 0 && (
+                                <div>
+                                  <button
+                                    onClick={() => setTicketsExpanded(prev => ({
+                                      ...prev,
+                                      [category]: {
+                                        ...prev[category],
+                                        unused: !prev[category]?.unused
+                                      }
+                                    }))}
+                                    style={{
+                                      width: '100%',
+                                      display: 'flex',
+                                      justifyContent: 'space-between',
+                                      alignItems: 'center',
+                                      background: 'rgba(255, 255, 255, 0.05)',
+                                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                                      borderRadius: '12px',
+                                      padding: '12px 16px',
+                                      cursor: 'pointer',
+                                      transition: 'all 0.3s ease',
+                                      marginBottom: '12px'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
+                                    }}
+                                  >
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                      <span style={{ 
+                                        background: 'rgba(34, 211, 238, 0.2)',
+                                        color: '#22D3EE',
+                                        padding: '4px 8px',
+                                        borderRadius: '6px',
+                                        fontSize: '12px',
+                                        fontWeight: '600'
+                                      }}>
+                                        未使用
+                                      </span>
+                                      <span style={{ color: 'white', fontSize: '14px', fontWeight: '600' }}>
+                                        未使用票 ({categoryTickets.unused.length})
+                                      </span>
+                                    </div>
+                                    <span style={{ 
+                                      color: 'rgba(255, 255, 255, 0.6)',
+                                      fontSize: '18px',
+                                      transform: ticketsExpanded[category]?.unused !== false ? 'rotate(180deg)' : 'rotate(0deg)',
+                                      transition: 'transform 0.3s ease'
+                                    }}>
+                                      ▼
+                                    </span>
+                                  </button>
+                                  
+                                  {ticketsExpanded[category]?.unused !== false && (
+                                    <div style={{ display: 'grid', gap: '16px', paddingLeft: '8px' }}>
+                                      {categoryTickets.unused.map(ticket => (
                 <div
                   key={ticket.id}
                   style={{
@@ -697,184 +801,198 @@ export default function AccountPage() {
                     </div>
                   </div>
                 </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    
-                    {/* Used Tickets */}
-                    {usedTickets.length > 0 && (
-                      <div>
-                        <button
-                          onClick={() => setTicketsExpanded(prev => ({ ...prev, used: !prev.used }))}
-                          style={{
-                            width: '100%',
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            background: 'rgba(255, 255, 255, 0.05)',
-                            border: '1px solid rgba(255, 255, 255, 0.1)',
-                            borderRadius: '12px',
-                            padding: '16px 20px',
-                            cursor: 'pointer',
-                            transition: 'all 0.3s ease',
-                            marginBottom: '16px'
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
-                          }}
-                        >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                            <span style={{ 
-                              background: 'rgba(34, 197, 94, 0.2)',
-                              color: '#22c55e',
-                              padding: '4px 8px',
-                              borderRadius: '6px',
-                              fontSize: '12px',
-                              fontWeight: '600'
-                            }}>
-                              Used
-                            </span>
-                            <span style={{ color: 'white', fontSize: '16px', fontWeight: '600' }}>
-                              Used Tickets ({usedTickets.length})
-                            </span>
-                          </div>
-                          <span style={{ 
-                            color: 'rgba(255, 255, 255, 0.6)',
-                            fontSize: '20px',
-                            transform: ticketsExpanded.used ? 'rotate(180deg)' : 'rotate(0deg)',
-                            transition: 'transform 0.3s ease'
-                          }}>
-                            ▼
-                          </span>
-                        </button>
-                        
-                        {ticketsExpanded.used && (
-                          <div style={{ display: 'grid', gap: '20px', paddingLeft: '8px' }}>
-                            {usedTickets.map(ticket => (
-                              <div
-                                key={ticket.id}
-                                style={{
-                                  background: 'rgba(255, 255, 255, 0.03)',
-                                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                                  borderRadius: '16px',
-                                  padding: '24px',
-                                  transition: 'all 0.3s ease',
-                                  boxShadow: '0 4px 16px rgba(0, 0, 0, 0.2)'
-                                }}
-                              >
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '20px', alignItems: 'start' }}>
-                                  <div style={{ flex: 1 }}>
-                                    <h3 style={{ color: 'white', fontSize: '20px', marginBottom: '8px', fontWeight: '600' }}>
-                                      {ticket.events?.title || 'Event Ticket'}
-                                    </h3>
-                                    <p style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '14px', marginBottom: '12px' }}>
-                                      Ticket #{ticket.short_id || ticket.id.substring(0, 8)}
-                                    </p>
-                                    
-                                    <div style={{ 
-                                      display: 'grid', 
-                                      gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-                                      gap: '12px',
-                                      marginBottom: '16px',
-                                      fontSize: '14px'
-                                    }}>
-                                      <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
-                                        <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>🎫 Tier:</span> {ticket.tier || 'General'}
-                                      </div>
-                                      {ticket.events?.start_at && (
-                                        <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
-                                          <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>📅 Date:</span> {new Date(ticket.events.start_at).toLocaleDateString()}
-                                        </div>
-                                      )}
-                                      {ticket.events?.venue_name && (
-                                        <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
-                                          <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>📍 Venue:</span> {ticket.events.venue_name}
-                                        </div>
-                                      )}
-                                      <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
-                                        <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>📅 Issued:</span> {new Date(ticket.created_at).toLocaleDateString()}
-                                      </div>
+                                      ))}
                                     </div>
-
-                                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                      <span style={{
-                                        background: ticket.status === 'used' ? 'rgba(34, 197, 94, 0.2)' : 
-                                                   ticket.status === 'unused' ? 'rgba(34, 211, 238, 0.2)' : 'rgba(239, 68, 68, 0.2)',
-                                        color: ticket.status === 'used' ? '#22c55e' : 
-                                               ticket.status === 'unused' ? '#22D3EE' : '#ef4444',
-                                        padding: '6px 12px',
+                                  )}
+                                </div>
+                              )}
+                              
+                              {/* Used Tickets in this category */}
+                              {categoryTickets.used.length > 0 && (
+                                <div>
+                                  <button
+                                    onClick={() => setTicketsExpanded(prev => ({
+                                      ...prev,
+                                      [category]: {
+                                        ...prev[category],
+                                        used: !prev[category]?.used
+                                      }
+                                    }))}
+                                    style={{
+                                      width: '100%',
+                                      display: 'flex',
+                                      justifyContent: 'space-between',
+                                      alignItems: 'center',
+                                      background: 'rgba(255, 255, 255, 0.05)',
+                                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                                      borderRadius: '12px',
+                                      padding: '12px 16px',
+                                      cursor: 'pointer',
+                                      transition: 'all 0.3s ease',
+                                      marginBottom: '12px'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
+                                    }}
+                                  >
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                      <span style={{ 
+                                        background: 'rgba(34, 197, 94, 0.2)',
+                                        color: '#22c55e',
+                                        padding: '4px 8px',
                                         borderRadius: '6px',
-                                        fontSize: '13px',
-                                        fontWeight: '500',
-                                        textTransform: 'capitalize'
+                                        fontSize: '12px',
+                                        fontWeight: '600'
                                       }}>
-                                        {ticket.status || 'Unknown'}
+                                        已使用
                                       </span>
-                                      {ticket.orders && (
-                                        <span style={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: '13px' }}>
-                                          💰 ${ticket.orders.total_amount_cents ? (ticket.orders.total_amount_cents / 100).toFixed(2) : '0.00'}
-                                        </span>
-                                      )}
+                                      <span style={{ color: 'white', fontSize: '14px', fontWeight: '600' }}>
+                                        已使用票 ({categoryTickets.used.length})
+                                      </span>
                                     </div>
-                                  </div>
+                                    <span style={{ 
+                                      color: 'rgba(255, 255, 255, 0.6)',
+                                      fontSize: '18px',
+                                      transform: ticketsExpanded[category]?.used !== false ? 'rotate(180deg)' : 'rotate(0deg)',
+                                      transition: 'transform 0.3s ease'
+                                    }}>
+                                      ▼
+                                    </span>
+                                  </button>
+                                  
+                                  {ticketsExpanded[category]?.used !== false && (
+                                    <div style={{ display: 'grid', gap: '16px', paddingLeft: '8px' }}>
+                                      {categoryTickets.used.map(ticket => (
+                                        <div
+                                          key={ticket.id}
+                                          style={{
+                                            background: 'rgba(255, 255, 255, 0.03)',
+                                            border: '1px solid rgba(255, 255, 255, 0.1)',
+                                            borderRadius: '16px',
+                                            padding: '24px',
+                                            transition: 'all 0.3s ease',
+                                            boxShadow: '0 4px 16px rgba(0, 0, 0, 0.2)'
+                                          }}
+                                        >
+                                          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '20px', alignItems: 'start' }}>
+                                            <div style={{ flex: 1 }}>
+                                              <h3 style={{ color: 'white', fontSize: '20px', marginBottom: '8px', fontWeight: '600' }}>
+                                                {ticket.events?.title || 'Event Ticket'}
+                                              </h3>
+                                              <p style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '14px', marginBottom: '12px' }}>
+                                                Ticket #{ticket.short_id || ticket.id.substring(0, 8)}
+                                              </p>
+                                              
+                                              <div style={{ 
+                                                display: 'grid', 
+                                                gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+                                                gap: '12px',
+                                                marginBottom: '16px',
+                                                fontSize: '14px'
+                                              }}>
+                                                <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
+                                                  <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>🎫 Tier:</span> {ticket.tier || 'General'}
+                                                </div>
+                                                {ticket.ticket_kind && (
+                                                  <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
+                                                    <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>🎟️ Type:</span> {getTicketKindDisplayName(ticket.ticket_kind)}
+                                                  </div>
+                                                )}
+                                                {ticket.events?.start_at && (
+                                                  <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
+                                                    <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>📅 Date:</span> {new Date(ticket.events.start_at).toLocaleDateString()}
+                                                  </div>
+                                                )}
+                                                {ticket.events?.venue_name && (
+                                                  <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
+                                                    <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>📍 Venue:</span> {ticket.events.venue_name}
+                                                  </div>
+                                                )}
+                                                <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
+                                                  <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>📅 Issued:</span> {new Date(ticket.created_at).toLocaleDateString()}
+                                                </div>
+                                                {ticket.used_at && (
+                                                  <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
+                                                    <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>✅ Used:</span> {new Date(ticket.used_at).toLocaleDateString()}
+                                                  </div>
+                                                )}
+                                              </div>
 
-                                  {/* QR Code */}
-                                  <div style={{
-                                    background: 'white',
-                                    padding: '16px',
-                                    borderRadius: '12px',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    alignItems: 'center',
-                                    gap: '8px',
+                                              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '12px' }}>
+                                                <span style={{
+                                                  background: 'rgba(34, 197, 94, 0.2)',
+                                                  color: '#22c55e',
+                                                  padding: '6px 12px',
+                                                  borderRadius: '6px',
+                                                  fontSize: '13px',
+                                                  fontWeight: '500',
+                                                  textTransform: 'capitalize'
+                                                }}>
+                                                  已使用
+                                                </span>
+                                                {ticket.orders && (
+                                                  <span style={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: '13px' }}>
+                                                    💰 ${ticket.orders.total_amount_cents ? (ticket.orders.total_amount_cents / 100).toFixed(2) : '0.00'}
+                                                  </span>
+                                                )}
+                                              </div>
+                                            </div>
+
+                    {/* QR Code */}
+                    <div style={{
+                      background: 'white',
+                      padding: '16px',
+                      borderRadius: '12px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '8px',
                                     minWidth: '180px',
                                     opacity: ticket.status === 'used' ? 0.6 : 1
-                                  }}>
-                                    <div style={{ 
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      background: 'rgba(124, 58, 237, 0.1)',
-                                      borderRadius: '8px',
-                                      padding: '8px',
-                                      marginBottom: '4px'
-                                    }}>
-                                      <QRCodeSVG 
-                                        value={ticket.qr_payload || JSON.stringify({
-                                          ticket_id: ticket.id,
-                                          short_id: ticket.short_id,
-                                          event_id: ticket.event_id
-                                        })}
-                                        size={150}
-                                        level="M"
-                                      />
-                                    </div>
-                                    <div style={{ 
-                                      fontSize: '11px', 
-                                      color: '#666', 
-                                      textAlign: 'center',
-                                      fontWeight: '500'
-                                    }}>
+                    }}>
+                      <div style={{ 
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        background: 'rgba(124, 58, 237, 0.1)',
+                        borderRadius: '8px',
+                        padding: '8px',
+                        marginBottom: '4px'
+                      }}>
+                        <QRCodeSVG 
+                          value={ticket.qr_payload || JSON.stringify({
+                            ticket_id: ticket.id,
+                            short_id: ticket.short_id,
+                            event_id: ticket.event_id
+                          })}
+                          size={150}
+                          level="M"
+                        />
+                      </div>
+                      <div style={{ 
+                        fontSize: '11px', 
+                        color: '#666', 
+                        textAlign: 'center',
+                        fontWeight: '500'
+                      }}>
                                       {ticket.status === 'used' ? 'Used' : 'Scan for Entry'}
-                                    </div>
-                                    {ticket.short_id && (
-                                      <div style={{ 
-                                        fontSize: '10px', 
-                                        color: '#999',
-                                        fontFamily: 'monospace'
-                                      }}>
-                                        ID: {ticket.short_id}
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
+                      </div>
+                      {ticket.short_id && (
+                        <div style={{ 
+                          fontSize: '10px', 
+                          color: '#999',
+                          fontFamily: 'monospace'
+                        }}>
+                          ID: {ticket.short_id}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
                           </div>
                         )}
                       </div>
@@ -915,8 +1033,8 @@ export default function AccountPage() {
                 fontSize: '20px',
                 margin: 0
               }}>
-                Purchase History ({orders?.length || 0})
-              </h2>
+              Purchase History ({orders?.length || 0})
+            </h2>
               <span style={{ 
                 color: 'rgba(255, 255, 255, 0.6)',
                 fontSize: '20px',
@@ -928,8 +1046,8 @@ export default function AccountPage() {
             </button>
             
             {ordersExpanded && (
-              <div style={{ display: 'grid', gap: '16px' }}>
-                {(orders || []).map(order => (
+            <div style={{ display: 'grid', gap: '16px' }}>
+              {(orders || []).map(order => (
                 <div
                   key={order.id}
                   style={{
@@ -967,8 +1085,8 @@ export default function AccountPage() {
                     </div>
                   </div>
                 </div>
-                ))}
-              </div>
+              ))}
+            </div>
             )}
           </div>
         )}

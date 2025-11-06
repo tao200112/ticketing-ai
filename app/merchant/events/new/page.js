@@ -10,6 +10,7 @@ export default function NewEventWizardPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [merchantUser, setMerchantUser] = useState(null)
+  const [isLoadingAuth, setIsLoadingAuth] = useState(true)
 
   const [eventData, setEventData] = useState({
     title: '',
@@ -27,6 +28,7 @@ export default function NewEventWizardPage() {
   useEffect(() => {
     // 检查商家登录状态
     const checkMerchantAuth = () => {
+      setIsLoadingAuth(true)
       const token = localStorage.getItem('merchantToken')
       const user = localStorage.getItem('merchantUser')
       
@@ -35,7 +37,15 @@ export default function NewEventWizardPage() {
         return
       }
       
-      setMerchantUser(JSON.parse(user))
+      try {
+        const userData = JSON.parse(user)
+        setMerchantUser(userData)
+      } catch (err) {
+        console.error('Error parsing merchant user data:', err)
+        router.push('/merchant/auth/login')
+      } finally {
+        setIsLoadingAuth(false)
+      }
     }
     
     checkMerchantAuth()
@@ -102,9 +112,17 @@ export default function NewEventWizardPage() {
     setError('')
     
     try {
+      // 验证商家用户是否已加载
+      if (!merchantUser) {
+        setError('Merchant information is not loaded. Please refresh the page.')
+        setIsSubmitting(false)
+        return
+      }
+
       // 验证必填字段
       if (!eventData.title || !eventData.description || !eventData.startTime || !eventData.endTime || !eventData.location) {
         setError('Please fill in all required fields')
+        setIsSubmitting(false)
         return
       }
 
@@ -112,6 +130,7 @@ export default function NewEventWizardPage() {
       const validPrices = eventData.prices.filter(price => price.name && price.amount_cents && price.ticket_kind)
       if (validPrices.length === 0) {
         setError('Please set at least one valid ticket type with ticket kind selected')
+        setIsSubmitting(false)
         return
       }
 
@@ -119,6 +138,16 @@ export default function NewEventWizardPage() {
       const invalidPrices = validPrices.filter(price => parseFloat(price.amount_cents) < 0.50)
       if (invalidPrices.length > 0) {
         setError('All ticket prices must be at least $0.50 (Stripe minimum requirement)')
+        setIsSubmitting(false)
+        return
+      }
+
+      // 获取 merchant_id，支持多种可能的字段名
+      const merchantId = merchantUser.merchant_id || merchantUser.merchant?.id || null
+      
+      if (!merchantId) {
+        setError('Merchant ID is required. Please ensure you are logged in as a merchant.')
+        setIsSubmitting(false)
         return
       }
 
@@ -135,7 +164,7 @@ export default function NewEventWizardPage() {
           endTime: eventData.endTime,
           location: eventData.location,
           poster_url: eventData.posterPreview,
-          merchant_id: merchantUser.merchant_id || null,
+          merchant_id: merchantId,
           prices: validPrices.map(price => ({
             name: price.name,
             amount_cents: Math.round(parseFloat(price.amount_cents) * 100), // 将美元转换为分
@@ -151,6 +180,7 @@ export default function NewEventWizardPage() {
 
       if (!result.success) {
         setError(result.message || 'Failed to create event')
+        setIsSubmitting(false)
         return
       }
 
@@ -170,6 +200,85 @@ export default function NewEventWizardPage() {
     { number: 2, title: 'Poster Upload', description: 'Upload event poster' },
     { number: 3, title: 'Ticket Settings', description: 'Set ticket types and prices' }
   ]
+
+  // 如果正在加载认证信息，显示加载状态
+  if (isLoadingAuth) {
+    return (
+      <div style={{ 
+        minHeight: '100vh', 
+        background: 'linear-gradient(135deg, #0f172a 0%, #7c3aed 50%, #0f172a 100%)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}>
+        <div style={{
+          background: 'rgba(255, 255, 255, 0.05)',
+          backdropFilter: 'blur(12px)',
+          borderRadius: '16px',
+          padding: '40px',
+          textAlign: 'center',
+          color: 'white'
+        }}>
+          <div style={{ fontSize: '18px', marginBottom: '20px' }}>Loading...</div>
+          <div style={{
+            width: '40px',
+            height: '40px',
+            border: '3px solid rgba(255, 255, 255, 0.3)',
+            borderTop: '3px solid white',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite',
+            margin: '0 auto'
+          }}></div>
+          <style jsx>{`
+            @keyframes spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+          `}</style>
+        </div>
+      </div>
+    )
+  }
+
+  // 如果商家用户未加载，不显示表单
+  if (!merchantUser) {
+    return (
+      <div style={{ 
+        minHeight: '100vh', 
+        background: 'linear-gradient(135deg, #0f172a 0%, #7c3aed 50%, #0f172a 100%)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}>
+        <div style={{
+          background: 'rgba(255, 255, 255, 0.05)',
+          backdropFilter: 'blur(12px)',
+          borderRadius: '16px',
+          padding: '40px',
+          textAlign: 'center',
+          color: 'white'
+        }}>
+          <div style={{ fontSize: '18px', marginBottom: '20px' }}>Please log in to create events</div>
+          <button
+            onClick={() => router.push('/merchant/auth/login')}
+            style={{
+              padding: '12px 24px',
+              borderRadius: '8px',
+              border: 'none',
+              background: 'linear-gradient(135deg, #7c3aed 0%, #ec4899 100%)',
+              color: 'white',
+              fontSize: '16px',
+              fontWeight: '600',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease'
+            }}
+          >
+            Go to Login
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div style={{ 

@@ -22,11 +22,12 @@ export default function AccountPage() {
   const [showLogin, setShowLogin] = useState(false)
   const [showRegister, setShowRegister] = useState(false)
   const [ticketsExpanded, setTicketsExpanded] = useState({
-    // Structure: { 'Entry Tickets': { categoryExpanded: true, unused: true, used: true }, 'Drink Tickets': { categoryExpanded: true, unused: true, used: true }, etc. }
-    'Entry Tickets': { categoryExpanded: true, unused: true, used: true },
-    'Drink Tickets': { categoryExpanded: true, unused: true, used: true },
-    'Queue Pass': { categoryExpanded: true, unused: true, used: true },
-    'Other': { categoryExpanded: true, unused: true, used: true }
+    // Structure: { 'Entry Tickets': { categoryExpanded: true, unused: true, used: false }, 'Drink Tickets': { categoryExpanded: true, unused: true, used: false }, etc. }
+    // unused: true (expanded by default), used: false (collapsed by default)
+    'Entry Tickets': { categoryExpanded: true, unused: true, used: false },
+    'Drink Tickets': { categoryExpanded: true, unused: true, used: false },
+    'Queue Pass': { categoryExpanded: true, unused: true, used: false },
+    'Other': { categoryExpanded: true, unused: true, used: false }
   })
   const [ordersExpanded, setOrdersExpanded] = useState(true)
   const [clickingTickets, setClickingTickets] = useState({}) // Track triple-click state per ticket

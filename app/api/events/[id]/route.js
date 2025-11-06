@@ -41,7 +41,7 @@ export async function GET(request, { params }) {
       .select(`
         *,
         merchants (id, name, contact_email),
-        prices (id, name, amount_cents, inventory)
+        prices (id, name, amount_cents, inventory, ticket_kind)
       `)
       .eq('id', id)
       .single()
@@ -174,7 +174,8 @@ export async function PUT(request, { params }) {
         amount_cents: price.amount_cents,
         inventory: price.inventory !== null && price.inventory !== undefined ? price.inventory : null, // null表示无限库存
         limit_per_user: price.limit_per_user || 4,
-        is_active: true
+        is_active: true,
+        ticket_kind: price.ticket_kind || null
       }))
 
       const { error: pricesError } = await supabase

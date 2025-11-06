@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { getTicketKindDisplayName } from '@/lib/ticket-helpers'
 
 export default function NewEventWizardPage() {
   const router = useRouter()
@@ -19,7 +20,7 @@ export default function NewEventWizardPage() {
     poster: null,
     posterPreview: null,
     prices: [
-      { name: '', amount_cents: '', inventory: '', limit_per_user: '' }
+      { name: '', amount_cents: '', inventory: '', limit_per_user: '', ticket_kind: '' }
     ]
   })
 
@@ -59,7 +60,7 @@ export default function NewEventWizardPage() {
   const addPrice = () => {
     setEventData(prev => ({
       ...prev,
-      prices: [...prev.prices, { name: '', amount_cents: '', inventory: '', limit_per_user: '' }]
+      prices: [...prev.prices, { name: '', amount_cents: '', inventory: '', limit_per_user: '', ticket_kind: '' }]
     }))
   }
 
@@ -107,10 +108,10 @@ export default function NewEventWizardPage() {
         return
       }
 
-      // 验证价格设置（库存是可选的，留空表示无限）
-      const validPrices = eventData.prices.filter(price => price.name && price.amount_cents)
+      // 验证价格设置（库存是可选的，留空表示无限，但ticket_kind是必需的）
+      const validPrices = eventData.prices.filter(price => price.name && price.amount_cents && price.ticket_kind)
       if (validPrices.length === 0) {
-        setError('Please set at least one valid ticket type')
+        setError('Please set at least one valid ticket type with ticket kind selected')
         return
       }
 
@@ -139,7 +140,8 @@ export default function NewEventWizardPage() {
             name: price.name,
             amount_cents: Math.round(parseFloat(price.amount_cents) * 100), // 将美元转换为分
             inventory: price.inventory && price.inventory.trim() !== '' ? parseInt(price.inventory) : null, // null表示无限库存
-            limit_per_user: price.limit_per_user ? parseInt(price.limit_per_user) : null
+            limit_per_user: price.limit_per_user ? parseInt(price.limit_per_user) : null,
+            ticket_kind: price.ticket_kind && price.ticket_kind.trim() !== '' ? price.ticket_kind : null
           })),
           status: 'published'
         }),
@@ -634,6 +636,41 @@ export default function NewEventWizardPage() {
                               e.target.style.boxShadow = 'none'
                             }}
                           />
+                        </div>
+                        
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: 'rgba(255, 255, 255, 0.9)', marginBottom: '0.5rem' }}>
+                            Ticket Kind *
+                          </label>
+                          <select
+                            value={price.ticket_kind || ''}
+                            onChange={(e) => updatePriceData(index, 'ticket_kind', e.target.value)}
+                            style={{
+                              width: '100%',
+                              padding: '0.75rem 1rem',
+                              border: '1px solid rgba(255, 255, 255, 0.2)',
+                              borderRadius: '0.5rem',
+                              color: 'white',
+                              backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                              fontSize: '1rem',
+                              outline: 'none',
+                              cursor: 'pointer'
+                            }}
+                            onFocus={(e) => {
+                              e.target.style.borderColor = '#7c3aed'
+                              e.target.style.boxShadow = '0 0 0 3px rgba(124, 58, 237, 0.2)'
+                            }}
+                            onBlur={(e) => {
+                              e.target.style.borderColor = 'rgba(255, 255, 255, 0.2)'
+                              e.target.style.boxShadow = 'none'
+                            }}
+                          >
+                            <option value="">Select ticket kind...</option>
+                            <option value="entry_18_20">正常票 - Entry (18-20)</option>
+                            <option value="entry_21_plus">正常票 - Entry (21+)</option>
+                            <option value="queue">插队票 - Queue Pass</option>
+                            <option value="drink">酒水票 - Drink Ticket</option>
+                          </select>
                         </div>
                         
                         <div>

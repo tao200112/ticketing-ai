@@ -71,8 +71,9 @@ export default function EditEventPage() {
           name: price.name || '',
           amount_cents: price.amount_cents ? (price.amount_cents / 100).toFixed(2) : '0.00',
           inventory: price.inventory !== null && price.inventory !== undefined ? price.inventory : '', // null或undefined显示为空字符串（无限）
-          limit_per_user: price.limit_per_user || 4
-        })) || [{ name: '', amount_cents: '', inventory: '', limit_per_user: '' }]
+          limit_per_user: price.limit_per_user || 4,
+          ticket_kind: price.ticket_kind || ''
+        })) || [{ name: '', amount_cents: '', inventory: '', limit_per_user: '', ticket_kind: '' }]
       }
       
       setEventData(formattedEvent)
@@ -126,7 +127,8 @@ export default function EditEventPage() {
             name: price.name,
             amount_cents: Math.round(parseFloat(price.amount_cents) * 100), // 将美元转换为分存储
             inventory: price.inventory && price.inventory.trim() !== '' ? parseInt(price.inventory) : null, // null表示无限库存
-            limit_per_user: price.limit_per_user ? parseInt(price.limit_per_user) : 4
+            limit_per_user: price.limit_per_user ? parseInt(price.limit_per_user) : 4,
+            ticket_kind: price.ticket_kind && price.ticket_kind.trim() !== '' ? price.ticket_kind : null
           }))
         })
       })
@@ -168,7 +170,7 @@ export default function EditEventPage() {
   const addPrice = () => {
     setEventData(prev => ({
       ...prev,
-      prices: [...prev.prices, { name: '', amount_cents: '', inventory: '', limit_per_user: '' }]
+      prices: [...prev.prices, { name: '', amount_cents: '', inventory: '', limit_per_user: '', ticket_kind: '' }]
     }))
   }
 
@@ -525,6 +527,41 @@ export default function EditEventPage() {
                             e.target.style.boxShadow = 'none'
                           }}
                         />
+                      </div>
+                      
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                          Ticket Kind *
+                        </label>
+                        <select
+                          value={price.ticket_kind || ''}
+                          onChange={(e) => updatePriceData(index, 'ticket_kind', e.target.value)}
+                          style={{
+                            width: '100%',
+                            padding: '0.75rem 1rem',
+                            border: '1px solid #d1d5db',
+                            borderRadius: '0.5rem',
+                            color: '#111827',
+                            backgroundColor: 'white',
+                            fontSize: '1rem',
+                            outline: 'none',
+                            cursor: 'pointer'
+                          }}
+                          onFocus={(e) => {
+                            e.target.style.borderColor = '#2563eb'
+                            e.target.style.boxShadow = '0 0 0 3px rgba(37, 99, 235, 0.1)'
+                          }}
+                          onBlur={(e) => {
+                            e.target.style.borderColor = '#d1d5db'
+                            e.target.style.boxShadow = 'none'
+                          }}
+                        >
+                          <option value="">Select ticket kind...</option>
+                          <option value="entry_18_20">正常票 - Entry (18-20)</option>
+                          <option value="entry_21_plus">正常票 - Entry (21+)</option>
+                          <option value="queue">插队票 - Queue Pass</option>
+                          <option value="drink">酒水票 - Drink Ticket</option>
+                        </select>
                       </div>
                       
                       <div>

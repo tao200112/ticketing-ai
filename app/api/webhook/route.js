@@ -117,11 +117,26 @@ export async function POST(request) {
 
       // 创建票据
       const quantity = parseInt(session.metadata?.quantity || '1')
+      const priceId = session.metadata?.price_id
       const priceName = session.metadata?.price_name || 'general'
+      
+      // Get ticket_kind from price if available, otherwise determine from price name
+      let ticketKindFromPrice = null
+      if (priceId) {
+        const { data: priceData, error: priceError } = await supabase
+          .from('prices')
+          .select('ticket_kind')
+          .eq('id', priceId)
+          .single()
+        
+        if (!priceError && priceData?.ticket_kind) {
+          ticketKindFromPrice = priceData.ticket_kind
+        }
+      }
       
       // Check if this is a combo ticket
       const isCombo = isComboTicket(priceName)
-      const comboKinds = isCombo ? getComboTicketKinds(priceName) : [getTicketKindFromPriceName(priceName) || null]
+      const comboKinds = isCombo ? getComboTicketKinds(priceName) : [ticketKindFromPrice || getTicketKindFromPriceName(priceName) || null]
       
       const tickets = []
 

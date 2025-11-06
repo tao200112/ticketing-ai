@@ -225,7 +225,8 @@ export async function POST(request) {
         amount_cents: price.amount_cents,
         inventory: price.inventory !== null && price.inventory !== undefined ? price.inventory : null, // null表示无限库存
         limit_per_user: price.limit_per_user || 4,
-        is_active: true
+        is_active: true,
+        ticket_kind: price.ticket_kind || null // Store ticket_kind in prices table metadata or as a separate field if needed
       }))
 
       const { error: pricesError } = await supabase

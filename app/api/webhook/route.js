@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import Stripe from 'stripe'
 import { generateShortTicketId } from '@/lib/ticket-utils'
+import { isComboTicket, getComboTicketKinds, getTicketKindFromPriceName } from '@/lib/ticket-helpers'
 
 // 安全地初始化Stripe
 const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY, {
@@ -118,9 +119,6 @@ export async function POST(request) {
       const quantity = parseInt(session.metadata?.quantity || '1')
       const priceName = session.metadata?.price_name || 'general'
       
-      // Import ticket helpers
-      const { isComboTicket, getComboTicketKinds, getTicketKindFromPriceName } = await import('@/lib/ticket-helpers')
-      
       // Check if this is a combo ticket
       const isCombo = isComboTicket(priceName)
       const comboKinds = isCombo ? getComboTicketKinds(priceName) : [getTicketKindFromPriceName(priceName) || null]
@@ -224,15 +222,16 @@ export async function POST(request) {
           .select()
           .single()
 
-        if (ticketError) {
-          console.error('❌ 创建票据失败:', ticketError)
-          return NextResponse.json({ 
-            error: 'Failed to create ticket', 
-            details: ticketError.message 
-          }, { status: 500 })
-        } else {
-          console.log('✅ 票据创建成功:', ticket.id)
-          tickets.push(ticket)
+          if (ticketError) {
+            console.error('❌ 创建票据失败:', ticketError)
+            return NextResponse.json({ 
+              error: 'Failed to create ticket', 
+              details: ticketError.message 
+            }, { status: 500 })
+          } else {
+            console.log('✅ 票据创建成功:', ticket.id)
+            tickets.push(ticket)
+          }
         }
       }
 

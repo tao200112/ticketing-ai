@@ -116,92 +116,107 @@ export async function POST(request) {
 
       // 创建票据
       const quantity = parseInt(session.metadata?.quantity || '1')
+      const priceName = session.metadata?.price_name || 'general'
+      
+      // Import ticket helpers
+      const { isComboTicket, getComboTicketKinds, getTicketKindFromPriceName } = await import('@/lib/ticket-helpers')
+      
+      // Check if this is a combo ticket
+      const isCombo = isComboTicket(priceName)
+      const comboKinds = isCombo ? getComboTicketKinds(priceName) : [getTicketKindFromPriceName(priceName) || null]
+      
       const tickets = []
 
+      // 获取或创建默认活动ID
+      let eventId = session.metadata?.event_id
+      
+      // 如果event_id不是有效的UUID，使用默认活动
+      if (!eventId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(eventId)) {
+        console.log('⚠️ 使用默认活动ID，因为event_id无效:', eventId)
+        // 获取第一个活动作为默认
+        const { data: defaultEvent, error: defaultEventError } = await supabase
+          .from('events')
+          .select('id')
+          .limit(1)
+          .single()
+        
+        if (defaultEventError || !defaultEvent) {
+          console.warn('⚠️ 获取默认活动失败，使用回退ID:', defaultEventError)
+        }
+        
+        eventId = defaultEvent?.id || '45091d37-7252-43c7-93c8-a7033d28af31'
+      }
+      
+      // Get event to determine validity window
+      let validityStartTime = null
+      let validityEndTime = null
+      
+      if (eventId) {
+        const { data: eventData, error: eventDataError } = await supabase
+          .from('events')
+          .select('start_at, end_at')
+          .eq('id', eventId)
+          .single()
+        
+        if (eventDataError) {
+          console.warn('⚠️ 获取活动时间失败:', eventDataError)
+        } else if (eventData) {
+          // Set validity window based on event times
+          validityStartTime = eventData.start_at
+          validityEndTime = eventData.end_at
+        }
+      }
+
+      // Get user information if available
+      let holderName = session.customer_email
+      let holderAge = null
+      
+      if (session.metadata?.user_id) {
+        const { data: userData, error: userDataError } = await supabase
+          .from('users')
+          .select('name, age')
+          .eq('id', session.metadata.user_id)
+          .single()
+        
+        if (userDataError) {
+          console.warn('⚠️ 获取用户信息失败:', userDataError)
+        } else if (userData) {
+          holderName = userData.name || session.metadata?.customer_name || session.customer_email
+          holderAge = userData.age
+        }
+      } else if (session.metadata?.customer_name) {
+        holderName = session.metadata.customer_name
+      }
+
+      // 获取年龄（优先从metadata，其次从用户数据）
+      let ticketHolderAge = holderAge
+      if (session.metadata?.customer_age) {
+        const ageFromMetadata = parseInt(session.metadata.customer_age)
+        if (!isNaN(ageFromMetadata) && ageFromMetadata > 0) {
+          ticketHolderAge = ageFromMetadata
+        }
+      }
+
+      // Create tickets: for combo tickets, create multiple tickets per quantity
       for (let i = 0; i < quantity; i++) {
-        const shortId = generateShortTicketId()
+        const ticketKinds = isCombo ? comboKinds : [comboKinds[0]]
         
-        // 获取或创建默认活动ID
-        let eventId = session.metadata?.event_id
-        
-        // 如果event_id不是有效的UUID，使用默认活动
-        if (!eventId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(eventId)) {
-          console.log('⚠️ 使用默认活动ID，因为event_id无效:', eventId)
-          // 获取第一个活动作为默认
-          const { data: defaultEvent, error: defaultEventError } = await supabase
-            .from('events')
-            .select('id')
-            .limit(1)
-            .single()
+        for (const ticketKind of ticketKinds) {
+          const shortId = generateShortTicketId()
           
-          if (defaultEventError || !defaultEvent) {
-            console.warn('⚠️ 获取默认活动失败，使用回退ID:', defaultEventError)
-          }
-          
-          eventId = defaultEvent?.id || '45091d37-7252-43c7-93c8-a7033d28af31'
-        }
-        
-        // Get event to determine validity window
-        let validityStartTime = null
-        let validityEndTime = null
-        
-        if (eventId) {
-          const { data: eventData, error: eventDataError } = await supabase
-            .from('events')
-            .select('start_at, end_at')
-            .eq('id', eventId)
-            .single()
-          
-          if (eventDataError) {
-            console.warn('⚠️ 获取活动时间失败:', eventDataError)
-          } else if (eventData) {
-            // Set validity window based on event times
-            validityStartTime = eventData.start_at
-            validityEndTime = eventData.end_at
-          }
-        }
-
-        // Get user information if available
-        let holderName = session.customer_email
-        let holderAge = null
-        
-        if (session.metadata?.user_id) {
-          const { data: userData, error: userDataError } = await supabase
-            .from('users')
-            .select('name, age')
-            .eq('id', session.metadata.user_id)
-            .single()
-          
-          if (userDataError) {
-            console.warn('⚠️ 获取用户信息失败:', userDataError)
-          } else if (userData) {
-            holderName = userData.name || session.metadata?.customer_name || session.customer_email
-            holderAge = userData.age
-          }
-        } else if (session.metadata?.customer_name) {
-          holderName = session.metadata.customer_name
-        }
-
-        // 获取年龄（优先从metadata，其次从用户数据）
-        let ticketHolderAge = holderAge
-        if (session.metadata?.customer_age) {
-          const ageFromMetadata = parseInt(session.metadata.customer_age)
-          if (!isNaN(ageFromMetadata) && ageFromMetadata > 0) {
-            ticketHolderAge = ageFromMetadata
-          }
-        }
-        
-        const { data: ticket, error: ticketError } = await supabase
+          const { data: ticket, error: ticketError } = await supabase
           .from('tickets')
           .insert({
             order_id: order.id,
             event_id: eventId,
             tier: session.metadata?.price_name || 'general',
+            ticket_kind: ticketKind || null,
             holder_email: session.customer_email,
             holder_name: holderName,
             holder_age: ticketHolderAge,
             user_id: session.metadata?.user_id || null,
             status: 'unused',
+            used: false,
             short_id: shortId,
             validity_start_time: validityStartTime,
             validity_end_time: validityEndTime

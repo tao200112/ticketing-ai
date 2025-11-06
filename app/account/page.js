@@ -7,6 +7,7 @@ import LoginForm from '../../components/LoginForm'
 import RegisterForm from '../../components/RegisterForm'
 import { createClient } from '@supabase/supabase-js'
 import { QRCodeSVG } from 'qrcode.react'
+import { getTicketKindDisplayName } from '@/lib/ticket-helpers'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -22,6 +23,7 @@ export default function AccountPage() {
   const [showRegister, setShowRegister] = useState(false)
   const [ticketsExpanded, setTicketsExpanded] = useState({ unused: true, used: true })
   const [ordersExpanded, setOrdersExpanded] = useState(true)
+  const [clickingTickets, setClickingTickets] = useState({}) // Track triple-click state per ticket
 
   useEffect(() => {
     // Check if user session exists
@@ -506,6 +508,11 @@ export default function AccountPage() {
                         <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
                           <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>🎫 Tier:</span> {ticket.tier || 'General'}
                         </div>
+                        {ticket.ticket_kind && (
+                          <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
+                            <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>🎟️ Type:</span> {getTicketKindDisplayName(ticket.ticket_kind)}
+                          </div>
+                        )}
                         {ticket.events?.start_at && (
                           <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
                             <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>📅 Date:</span> {new Date(ticket.events.start_at).toLocaleDateString()}
@@ -521,11 +528,11 @@ export default function AccountPage() {
                         </div>
                       </div>
 
-                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '12px' }}>
                         <span style={{
-                          background: ticket.status === 'used' ? 'rgba(34, 197, 94, 0.2)' : 
+                          background: ticket.status === 'used' || ticket.used ? 'rgba(34, 197, 94, 0.2)' : 
                                      ticket.status === 'unused' ? 'rgba(34, 211, 238, 0.2)' : 'rgba(239, 68, 68, 0.2)',
-                          color: ticket.status === 'used' ? '#22c55e' : 
+                          color: ticket.status === 'used' || ticket.used ? '#22c55e' : 
                                  ticket.status === 'unused' ? '#22D3EE' : '#ef4444',
                           padding: '6px 12px',
                           borderRadius: '6px',
@@ -533,7 +540,7 @@ export default function AccountPage() {
                           fontWeight: '500',
                           textTransform: 'capitalize'
                         }}>
-                          {ticket.status || 'Unknown'}
+                          {ticket.used ? 'Used' : (ticket.status || 'Unknown')}
                         </span>
                         {ticket.orders && (
                           <span style={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: '13px' }}>
@@ -541,6 +548,107 @@ export default function AccountPage() {
                           </span>
                         )}
                       </div>
+
+                      {/* Triple-click use button - only show for unused tickets */}
+                      {!ticket.used && ticket.status !== 'used' && user && (
+                        <div style={{ marginTop: '12px' }}>
+                          <button
+                            onClick={async () => {
+                              const ticketId = ticket.id
+                              const currentClicks = clickingTickets[ticketId] || { count: 0, timeout: null }
+                              
+                              // Clear previous timeout
+                              if (currentClicks.timeout) {
+                                clearTimeout(currentClicks.timeout)
+                              }
+                              
+                              // Increment click count
+                              const newCount = currentClicks.count + 1
+                              
+                              // If 3 clicks, use the ticket
+                              if (newCount >= 3) {
+                                setClickingTickets(prev => ({ ...prev, [ticketId]: { count: 0, timeout: null } }))
+                                
+                                try {
+                                  const response = await fetch('/api/tickets/use', {
+                                    method: 'POST',
+                                    headers: {
+                                      'Content-Type': 'application/json'
+                                    },
+                                    body: JSON.stringify({
+                                      ticket_id: ticketId,
+                                      userId: user.id
+                                    })
+                                  })
+                                  
+                                  const result = await response.json()
+                                  
+                                  if (result.success) {
+                                    // Update ticket in local state
+                                    setTickets(prev => prev.map(t => 
+                                      t.id === ticketId 
+                                        ? { ...t, used: true, status: 'used', used_at: result.data.used_at }
+                                        : t
+                                    ))
+                                    alert('Ticket has been used successfully!')
+                                  } else {
+                                    alert(result.message || 'Failed to use ticket')
+                                  }
+                                } catch (error) {
+                                  console.error('Error using ticket:', error)
+                                  alert('Failed to use ticket. Please try again.')
+                                }
+                              } else {
+                                // Set timeout to reset after 2 seconds
+                                const timeout = setTimeout(() => {
+                                  setClickingTickets(prev => {
+                                    const updated = { ...prev }
+                                    if (updated[ticketId]) {
+                                      updated[ticketId].count = 0
+                                    }
+                                    return updated
+                                  })
+                                }, 2000)
+                                
+                                setClickingTickets(prev => ({
+                                  ...prev,
+                                  [ticketId]: { count: newCount, timeout }
+                                }))
+                              }
+                            }}
+                            style={{
+                              background: clickingTickets[ticket.id]?.count >= 2
+                                ? 'linear-gradient(135deg, #7c3aed 0%, #ec4899 100%)'
+                                : 'rgba(124, 58, 237, 0.2)',
+                              border: '1px solid rgba(124, 58, 237, 0.5)',
+                              color: 'white',
+                              padding: '10px 20px',
+                              borderRadius: '8px',
+                              fontSize: '14px',
+                              fontWeight: '600',
+                              cursor: 'pointer',
+                              transition: 'all 0.3s ease',
+                              width: '100%'
+                            }}
+                            onMouseEnter={(e) => {
+                              if (clickingTickets[ticket.id]?.count < 2) {
+                                e.target.style.background = 'rgba(124, 58, 237, 0.3)'
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              if (clickingTickets[ticket.id]?.count < 2) {
+                                e.target.style.background = 'rgba(124, 58, 237, 0.2)'
+                              }
+                            }}
+                          >
+                            {clickingTickets[ticket.id]?.count === 1
+                              ? 'Click 2 more times to use'
+                              : clickingTickets[ticket.id]?.count === 2
+                              ? 'Click 1 more time to use'
+                              : 'Click 3 times to use ticket'}
+                          </button>
+                        </div>
+                      )}
                     </div>
 
                     {/* QR Code */}
@@ -564,11 +672,7 @@ export default function AccountPage() {
                         marginBottom: '4px'
                       }}>
                         <QRCodeSVG 
-                          value={ticket.qr_payload || JSON.stringify({
-                            ticket_id: ticket.id,
-                            short_id: ticket.short_id,
-                            event_id: ticket.event_id
-                          })}
+                          value={`${typeof window !== 'undefined' ? window.location.origin : ''}/ticket/${ticket.short_id || ticket.id}`}
                           size={150}
                           level="M"
                         />
@@ -579,7 +683,7 @@ export default function AccountPage() {
                         textAlign: 'center',
                         fontWeight: '500'
                       }}>
-                        Scan for Entry
+                        Scan for Info
                       </div>
                       {ticket.short_id && (
                         <div style={{ 

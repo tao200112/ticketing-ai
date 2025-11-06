@@ -112,26 +112,39 @@ export async function GET(request) {
           eventId = defaultEvent?.id || '45091d37-7252-43c7-93c8-a7033d28af31'
         }
         
+        // Import ticket helpers
+        const { isComboTicket, getComboTicketKinds, getTicketKindFromPriceName } = await import('@/lib/ticket-helpers')
+        
+        const priceName = session.metadata?.price_name || 'general'
+        const isCombo = isComboTicket(priceName)
+        const comboKinds = isCombo ? getComboTicketKinds(priceName) : [getTicketKindFromPriceName(priceName) || null]
+        
         for (let i = 0; i < quantity; i++) {
-          const shortId = generateShortTicketId()
+          const ticketKinds = isCombo ? comboKinds : [comboKinds[0]]
           
-          const { data: ticket, error: ticketError } = await supabase
-            .from('tickets')
-            .insert({
-              order_id: newOrder.id,
-              event_id: eventId,
-              tier: session.metadata?.price_name || 'general',
-              holder_email: session.customer_email,
-              status: 'unused',
-              short_id: shortId
-            })
-            .select()
-            .single()
-          
-          if (!ticketError && ticket) {
-            console.log('✅ 票据创建成功:', ticket.id)
-          } else {
-            console.error('❌ 创建票据失败:', ticketError)
+          for (const ticketKind of ticketKinds) {
+            const shortId = generateShortTicketId()
+            
+            const { data: ticket, error: ticketError } = await supabase
+              .from('tickets')
+              .insert({
+                order_id: newOrder.id,
+                event_id: eventId,
+                tier: session.metadata?.price_name || 'general',
+                ticket_kind: ticketKind || null,
+                holder_email: session.customer_email,
+                status: 'unused',
+                used: false,
+                short_id: shortId
+              })
+              .select()
+              .single()
+            
+            if (!ticketError && ticket) {
+              console.log('✅ 票据创建成功:', ticket.id, 'ticket_kind:', ticketKind)
+            } else {
+              console.error('❌ 创建票据失败:', ticketError)
+            }
           }
         }
       } catch (stripeError) {

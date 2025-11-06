@@ -100,7 +100,7 @@ export default function EventsPage() {
       return title.length > 1 && title !== '11' && title !== 'bb' && title !== 'aa'
     })
     
-    console.log(`📊 活动统计 - API: ${apiEvents?.length || 0}, Default: ${defaultEvents.length}, 最终: ${filteredEvents.length}`)
+    console.log(`📊 活动统计 - API: ${apiEvents?.length || 0}, Local: ${localEvents.length}, 最终: ${filteredEvents.length}`)
     
     return filteredEvents
   }, [apiEvents, apiLoading, apiError]) // 添加更多依赖项确保数据更新

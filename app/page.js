@@ -92,7 +92,7 @@ export default function Home() {
       return title.length > 1 && title !== '11' && title !== 'bb' && title !== 'aa'
     })
     
-    console.log(`📊 活动统计 - API: ${apiEvents?.length || 0}, Default: ${defaultEvents.length}, 最终: ${filteredEvents.length}`)
+    console.log(`📊 活动统计 - API: ${apiEvents?.length || 0}, 最终: ${filteredEvents.length}`)
     
     // 只返回前3个（按sort_order排序，已在API中排序）
     return filteredEvents.slice(0, 3)

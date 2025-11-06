@@ -22,11 +22,11 @@ export default function AccountPage() {
   const [showLogin, setShowLogin] = useState(false)
   const [showRegister, setShowRegister] = useState(false)
   const [ticketsExpanded, setTicketsExpanded] = useState({
-    // Structure: { '正常票': { unused: true, used: true }, '酒水票': { unused: true, used: true }, '插队票': { unused: true, used: true } }
-    '正常票': { unused: true, used: true },
-    '酒水票': { unused: true, used: true },
-    '插队票': { unused: true, used: true },
-    '其他': { unused: true, used: true }
+    // Structure: { '正常票': { categoryExpanded: true, unused: true, used: true }, '酒水票': { categoryExpanded: true, unused: true, used: true }, etc. }
+    '正常票': { categoryExpanded: true, unused: true, used: true },
+    '酒水票': { categoryExpanded: true, unused: true, used: true },
+    '插队票': { categoryExpanded: true, unused: true, used: true },
+    '其他': { categoryExpanded: true, unused: true, used: true }
   })
   const [ordersExpanded, setOrdersExpanded] = useState(true)
   const [clickingTickets, setClickingTickets] = useState({}) // Track triple-click state per ticket
@@ -941,65 +941,65 @@ export default function AccountPage() {
                                               </div>
                                             </div>
 
-                    {/* QR Code */}
-                    <div style={{
-                      background: 'white',
-                      padding: '16px',
-                      borderRadius: '12px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      gap: '8px',
-                                    minWidth: '180px',
-                                    opacity: ticket.status === 'used' ? 0.6 : 1
-                    }}>
-                      <div style={{ 
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        background: 'rgba(124, 58, 237, 0.1)',
-                        borderRadius: '8px',
-                        padding: '8px',
-                        marginBottom: '4px'
-                      }}>
-                        <QRCodeSVG 
-                          value={ticket.qr_payload || JSON.stringify({
-                            ticket_id: ticket.id,
-                            short_id: ticket.short_id,
-                            event_id: ticket.event_id
-                          })}
-                          size={150}
-                          level="M"
-                        />
-                      </div>
-                      <div style={{ 
-                        fontSize: '11px', 
-                        color: '#666', 
-                        textAlign: 'center',
-                        fontWeight: '500'
-                      }}>
-                                      {ticket.status === 'used' ? 'Used' : 'Scan for Entry'}
-                      </div>
-                      {ticket.short_id && (
-                        <div style={{ 
-                          fontSize: '10px', 
-                          color: '#999',
-                          fontFamily: 'monospace'
-                        }}>
-                          ID: {ticket.short_id}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
+                                            {/* QR Code */}
+                                            <div style={{
+                                              background: 'white',
+                                              padding: '16px',
+                                              borderRadius: '12px',
+                                              display: 'flex',
+                                              flexDirection: 'column',
+                                              alignItems: 'center',
+                                              gap: '8px',
+                                              minWidth: '180px',
+                                              opacity: ticket.used || ticket.status === 'used' ? 0.6 : 1
+                                            }}>
+                                              <div style={{ 
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                background: 'rgba(124, 58, 237, 0.1)',
+                                                borderRadius: '8px',
+                                                padding: '8px',
+                                                marginBottom: '4px'
+                                              }}>
+                                                <QRCodeSVG 
+                                                  value={`${typeof window !== 'undefined' ? window.location.origin : ''}/ticket/${ticket.short_id || ticket.id}`}
+                                                  size={150}
+                                                  level="M"
+                                                />
+                                              </div>
+                                              <div style={{ 
+                                                fontSize: '11px', 
+                                                color: '#666', 
+                                                textAlign: 'center',
+                                                fontWeight: '500'
+                                              }}>
+                                                Scan for Info
+                                              </div>
+                                              {ticket.short_id && (
+                                                <div style={{ 
+                                                  fontSize: '10px', 
+                                                  color: '#999',
+                                                  fontFamily: 'monospace'
+                                                }}>
+                                                  ID: {ticket.short_id}
+                                                </div>
+                                              )}
+                                            </div>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
                           </div>
-                        )}
-                      </div>
-                    )}
-                  </>
-                )
-              })()}
+                        )
+                      })}
+                    </>
+                  )
+                })()}
             </div>
           )}
         </div>

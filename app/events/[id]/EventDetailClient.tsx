@@ -1067,7 +1067,8 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
                 <div style={{
                   display: 'flex',
                   justifyContent: 'space-between',
-                  alignItems: 'center'
+                  alignItems: 'center',
+                  marginBottom: '8px'
                 }}>
                   <span style={{ color: '#94a3b8' }}>Total</span>
                   <span style={{
@@ -1077,6 +1078,15 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
                   }}>
                     ${totalPrice.toFixed(2)}
                   </span>
+                </div>
+                <div style={{
+                  color: 'rgba(239, 68, 68, 0.9)',
+                  fontSize: '0.875rem',
+                  textAlign: 'center',
+                  paddingTop: '8px',
+                  borderTop: '1px solid rgba(255, 255, 255, 0.1)'
+                }}>
+                  ⚠️ Tickets are non-refundable once purchased
                 </div>
               </div>
 

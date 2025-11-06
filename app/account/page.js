@@ -33,6 +33,8 @@ export default function AccountPage() {
   const [showProfileDetails, setShowProfileDetails] = useState(false) // Show profile edit modal
   const [editingProfile, setEditingProfile] = useState(false) // Edit mode for profile
   const [profileData, setProfileData] = useState({ name: '', email: '', age: '' }) // Profile form data
+  const [showTicketsModal, setShowTicketsModal] = useState(false) // Show tickets modal
+  const [showOrdersModal, setShowOrdersModal] = useState(false) // Show orders modal
 
   useEffect(() => {
     // Check if user session exists
@@ -309,9 +311,6 @@ export default function AccountPage() {
       }}>
         {/* Header */}
         <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
           marginBottom: '24px'
         }}>
           <h1 style={{
@@ -322,22 +321,6 @@ export default function AccountPage() {
           }}>
             Account
           </h1>
-          <button
-            onClick={() => setShowProfileDetails(true)}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              padding: '8px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
-          >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
-              <path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
-            </svg>
-          </button>
         </div>
 
         {/* User Profile Card */}
@@ -435,13 +418,7 @@ export default function AccountPage() {
           }}>
             {/* My Tickets */}
             <button
-              onClick={() => {
-                // Scroll to tickets section or show tickets
-                const ticketsSection = document.getElementById('tickets-section')
-                if (ticketsSection) {
-                  ticketsSection.scrollIntoView({ behavior: 'smooth' })
-                }
-              }}
+              onClick={() => setShowTicketsModal(true)}
               style={{
                 background: 'rgba(255, 255, 255, 0.08)',
                 border: '1px solid rgba(255, 255, 255, 0.1)',
@@ -486,12 +463,7 @@ export default function AccountPage() {
 
             {/* Order History */}
             <button
-              onClick={() => {
-                const ordersSection = document.getElementById('orders-section')
-                if (ordersSection) {
-                  ordersSection.scrollIntoView({ behavior: 'smooth' })
-                }
-              }}
+              onClick={() => setShowOrdersModal(true)}
               style={{
                 background: 'rgba(255, 255, 255, 0.08)',
                 border: '1px solid rgba(255, 255, 255, 0.1)',
@@ -584,16 +556,37 @@ export default function AccountPage() {
           </div>
         </div>
 
-        {/* My Tickets Section */}
-        <div id="tickets-section" style={{
-          background: 'rgba(255, 255, 255, 0.05)',
-          backdropFilter: 'blur(12px)',
-          borderRadius: '16px',
-          padding: '32px',
-          marginBottom: '30px',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)'
-        }}>
+        {/* Logout Button */}
+        <div style={{ marginTop: '40px', marginBottom: '20px' }}>
+          <button
+            onClick={handleLogout}
+            style={{
+              width: '100%',
+              background: 'rgba(239, 68, 68, 0.2)',
+              border: '1px solid rgba(239, 68, 68, 0.4)',
+              color: '#fca5a5',
+              borderRadius: '12px',
+              padding: '14px',
+              fontSize: '15px',
+              fontWeight: '600',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(239, 68, 68, 0.3)'
+              e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.6)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)'
+              e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.4)'
+            }}
+          >
+            Logout
+          </button>
+        </div>
+
+        {/* My Tickets Section - Hidden, content moved to modal */}
+        <div id="tickets-section" style={{ display: 'none' }}>
           <h2 style={{ color: 'white', marginBottom: '20px', fontSize: '20px' }}>
             My Tickets ({tickets?.length || 0})
           </h2>
@@ -1278,6 +1271,759 @@ export default function AccountPage() {
           </div>
         )}
       </div>
+
+      {/* My Tickets Modal */}
+      {showTicketsModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.7)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '20px'
+        }}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            setShowTicketsModal(false)
+          }
+        }}
+        >
+          <div style={{
+            background: 'rgba(15, 23, 42, 0.95)',
+            backdropFilter: 'blur(20px)',
+            borderRadius: '20px',
+            padding: '32px',
+            maxWidth: '900px',
+            width: '100%',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)',
+            maxHeight: '90vh',
+            overflowY: 'auto'
+          }}
+          onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '24px'
+            }}>
+              <h2 style={{
+                color: 'white',
+                fontSize: '24px',
+                fontWeight: 'bold',
+                margin: 0
+              }}>
+                My Tickets ({tickets?.length || 0})
+              </h2>
+              <button
+                onClick={() => setShowTicketsModal(false)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'rgba(255, 255, 255, 0.7)',
+                  fontSize: '24px',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Tickets Content */}
+            {(tickets?.length || 0) === 0 ? (
+              <div style={{ 
+                textAlign: 'center', 
+                color: 'rgba(255, 255, 255, 0.6)',
+                padding: '40px'
+              }}>
+                <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎫</div>
+                <div style={{ fontSize: '18px', marginBottom: '8px' }}>No tickets yet</div>
+                <div style={{ fontSize: '14px' }}>Purchase tickets for events to see them here</div>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                {(() => {
+                  // Group tickets by category
+                  const ticketsByCategory = {}
+                  
+                  ;(tickets || []).forEach(ticket => {
+                    const category = getTicketKindCategoryName(ticket.ticket_kind)
+                    if (!ticketsByCategory[category]) {
+                      ticketsByCategory[category] = { unused: [], used: [] }
+                    }
+                    
+                    // Check if ticket is used
+                    const isUsed = ticket.used || ticket.status === 'used'
+                    if (isUsed) {
+                      ticketsByCategory[category].used.push(ticket)
+                    } else {
+                      ticketsByCategory[category].unused.push(ticket)
+                    }
+                  })
+                  
+                  // Define category order and colors
+                  const categoryOrder = ['Entry Tickets', 'Drink Tickets', 'Queue Pass', 'Other']
+                  const categoryColors = {
+                    'Entry Tickets': { bg: 'rgba(59, 130, 246, 0.2)', color: '#3b82f6' },
+                    'Drink Tickets': { bg: 'rgba(168, 85, 247, 0.2)', color: '#a855f7' },
+                    'Queue Pass': { bg: 'rgba(236, 72, 153, 0.2)', color: '#ec4899' },
+                    'Other': { bg: 'rgba(107, 114, 128, 0.2)', color: '#6b7280' }
+                  }
+                  
+                  return (
+                    <>
+                      {categoryOrder.map(category => {
+                        const categoryTickets = ticketsByCategory[category]
+                        if (!categoryTickets || (categoryTickets.unused.length === 0 && categoryTickets.used.length === 0)) {
+                          return null
+                        }
+                        
+                        const totalCount = categoryTickets.unused.length + categoryTickets.used.length
+                        const categoryColor = categoryColors[category] || categoryColors['Other']
+                        
+                        return (
+                          <div key={category} style={{ marginBottom: '24px' }}>
+                            {/* Category Header */}
+                            <button
+                              onClick={() => setTicketsExpanded(prev => ({
+                                ...prev,
+                                [category]: {
+                                  ...prev[category],
+                                  categoryExpanded: !prev[category]?.categoryExpanded
+                                }
+                              }))}
+                              style={{
+                                width: '100%',
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                background: categoryColor.bg,
+                                border: `1px solid ${categoryColor.color}40`,
+                                borderRadius: '12px',
+                                padding: '16px 20px',
+                                cursor: 'pointer',
+                                transition: 'all 0.3s ease',
+                                marginBottom: '12px'
+                              }}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                <span style={{ 
+                                  background: categoryColor.color,
+                                  color: 'white',
+                                  padding: '6px 12px',
+                                  borderRadius: '6px',
+                                  fontSize: '14px',
+                                  fontWeight: '600'
+                                }}>
+                                  {category}
+                                </span>
+                                <span style={{ color: 'white', fontSize: '16px', fontWeight: '600' }}>
+                                  {category} ({totalCount})
+                                </span>
+                              </div>
+                              <span style={{ 
+                                color: 'rgba(255, 255, 255, 0.6)',
+                                fontSize: '20px',
+                                transform: ticketsExpanded[category]?.categoryExpanded !== false ? 'rotate(180deg)' : 'rotate(0deg)',
+                                transition: 'transform 0.3s ease'
+                              }}>
+                                ▼
+                              </span>
+                            </button>
+                            
+                            {/* Category Content */}
+                            {ticketsExpanded[category]?.categoryExpanded !== false && (
+                              <div style={{ paddingLeft: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                {/* Unused Tickets in this category */}
+                                {categoryTickets.unused.length > 0 && (
+                                  <div>
+                                    <button
+                                      onClick={() => setTicketsExpanded(prev => ({
+                                        ...prev,
+                                        [category]: {
+                                          ...prev[category],
+                                          unused: !prev[category]?.unused
+                                        }
+                                      }))}
+                                      style={{
+                                        width: '100%',
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
+                                        background: 'rgba(255, 255, 255, 0.05)',
+                                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                                        borderRadius: '12px',
+                                        padding: '12px 16px',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.3s ease',
+                                        marginBottom: '12px'
+                                      }}
+                                    >
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                        <span style={{ 
+                                          background: 'rgba(34, 211, 238, 0.2)',
+                                          color: '#22D3EE',
+                                          padding: '4px 8px',
+                                          borderRadius: '6px',
+                                          fontSize: '12px',
+                                          fontWeight: '600'
+                                        }}>
+                                          Unused
+                                        </span>
+                                        <span style={{ color: 'white', fontSize: '14px', fontWeight: '600' }}>
+                                          Unused ({categoryTickets.unused.length})
+                                        </span>
+                                      </div>
+                                      <span style={{ 
+                                        color: 'rgba(255, 255, 255, 0.6)',
+                                        fontSize: '18px',
+                                        transform: ticketsExpanded[category]?.unused !== false ? 'rotate(180deg)' : 'rotate(0deg)',
+                                        transition: 'transform 0.3s ease'
+                                      }}>
+                                        ▼
+                                      </span>
+                                    </button>
+                                    
+                                    {ticketsExpanded[category]?.unused !== false && (
+                                      <div style={{ display: 'grid', gap: '16px', paddingLeft: '8px' }}>
+                                        {categoryTickets.unused.map(ticket => (
+                                          <div
+                                            key={ticket.id}
+                                            style={{
+                                              background: 'rgba(255, 255, 255, 0.03)',
+                                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                                              borderRadius: '16px',
+                                              padding: '24px',
+                                              transition: 'all 0.3s ease',
+                                              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.2)'
+                                            }}
+                                          >
+                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '20px', alignItems: 'start' }}>
+                                              <div style={{ flex: 1 }}>
+                                                <h3 style={{ color: 'white', fontSize: '20px', marginBottom: '8px', fontWeight: '600' }}>
+                                                  {ticket.events?.title || 'Event Ticket'}
+                                                </h3>
+                                                <p style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '14px', marginBottom: '12px' }}>
+                                                  Ticket #{ticket.short_id || ticket.id.substring(0, 8)}
+                                                </p>
+                                                
+                                                <div style={{ 
+                                                  display: 'grid', 
+                                                  gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+                                                  gap: '12px',
+                                                  marginBottom: '16px',
+                                                  fontSize: '14px'
+                                                }}>
+                                                  <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
+                                                    <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>🎫 Tier:</span> {ticket.tier || 'General'}
+                                                  </div>
+                                                  {ticket.ticket_kind && (
+                                                    <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
+                                                      <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>🎟️ Type:</span> {getTicketKindDisplayName(ticket.ticket_kind)}
+                                                    </div>
+                                                  )}
+                                                  {ticket.events?.start_at && (
+                                                    <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
+                                                      <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>📅 Date:</span> {new Date(ticket.events.start_at).toLocaleDateString()}
+                                                    </div>
+                                                  )}
+                                                  {ticket.events?.venue_name && (
+                                                    <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
+                                                      <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>📍 Venue:</span> {ticket.events.venue_name}
+                                                    </div>
+                                                  )}
+                                                  <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
+                                                    <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>📅 Issued:</span> {new Date(ticket.created_at).toLocaleDateString()}
+                                                  </div>
+                                                </div>
+
+                                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '12px' }}>
+                                                  <span style={{
+                                                    background: ticket.status === 'used' || ticket.used ? 'rgba(34, 197, 94, 0.2)' : 
+                                                               ticket.status === 'unused' ? 'rgba(34, 211, 238, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                                                    color: ticket.status === 'used' || ticket.used ? '#22c55e' : 
+                                                           ticket.status === 'unused' ? '#22D3EE' : '#ef4444',
+                                                    padding: '6px 12px',
+                                                    borderRadius: '6px',
+                                                    fontSize: '13px',
+                                                    fontWeight: '500',
+                                                    textTransform: 'capitalize'
+                                                  }}>
+                                                    {ticket.used ? 'Used' : (ticket.status || 'Unknown')}
+                                                  </span>
+                                                  {ticket.orders && (
+                                                    <span style={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: '13px' }}>
+                                                      💰 ${ticket.orders.total_amount_cents ? (ticket.orders.total_amount_cents / 100).toFixed(2) : '0.00'}
+                                                    </span>
+                                                  )}
+                                                </div>
+
+                                                {/* Triple-click use button */}
+                                                {!ticket.used && ticket.status !== 'used' && user && (
+                                                  <div style={{ marginTop: '12px' }}>
+                                                    <button
+                                                      onClick={async () => {
+                                                        const ticketId = ticket.id
+                                                        const currentClicks = clickingTickets[ticketId] || { count: 0, timeout: null }
+                                                        
+                                                        if (currentClicks.timeout) {
+                                                          clearTimeout(currentClicks.timeout)
+                                                        }
+                                                        
+                                                        const newCount = currentClicks.count + 1
+                                                        
+                                                        if (newCount >= 3) {
+                                                          setClickingTickets(prev => ({ ...prev, [ticketId]: { count: 0, timeout: null } }))
+                                                          
+                                                          try {
+                                                            const response = await fetch('/api/tickets/use', {
+                                                              method: 'POST',
+                                                              headers: { 'Content-Type': 'application/json' },
+                                                              body: JSON.stringify({ ticket_id: ticketId, userId: user.id })
+                                                            })
+                                                            
+                                                            const result = await response.json()
+                                                            
+                                                            if (result.success) {
+                                                              setTickets(prev => prev.map(t => 
+                                                                t.id === ticketId 
+                                                                  ? { ...t, used: true, status: 'used', used_at: result.data.used_at }
+                                                                  : t
+                                                              ))
+                                                              alert('Ticket has been used successfully!')
+                                                            } else {
+                                                              alert(result.message || 'Failed to use ticket')
+                                                            }
+                                                          } catch (error) {
+                                                            console.error('Error using ticket:', error)
+                                                            alert('Failed to use ticket. Please try again.')
+                                                          }
+                                                        } else {
+                                                          const timeout = setTimeout(() => {
+                                                            setClickingTickets(prev => {
+                                                              const updated = { ...prev }
+                                                              if (updated[ticketId]) {
+                                                                updated[ticketId].count = 0
+                                                              }
+                                                              return updated
+                                                            })
+                                                          }, 2000)
+                                                          
+                                                          setClickingTickets(prev => ({
+                                                            ...prev,
+                                                            [ticketId]: { count: newCount, timeout }
+                                                          }))
+                                                        }
+                                                      }}
+                                                      style={{
+                                                        background: clickingTickets[ticket.id]?.count >= 2
+                                                          ? 'linear-gradient(135deg, #7c3aed 0%, #ec4899 100%)'
+                                                          : 'rgba(124, 58, 237, 0.2)',
+                                                        border: '1px solid rgba(124, 58, 237, 0.5)',
+                                                        color: 'white',
+                                                        padding: '10px 20px',
+                                                        borderRadius: '8px',
+                                                        fontSize: '14px',
+                                                        fontWeight: '600',
+                                                        cursor: 'pointer',
+                                                        transition: 'all 0.3s ease',
+                                                        width: '100%'
+                                                      }}
+                                                    >
+                                                      {clickingTickets[ticket.id]?.count === 1
+                                                        ? 'Click 2 more times to use'
+                                                        : clickingTickets[ticket.id]?.count === 2
+                                                        ? 'Click 1 more time to use'
+                                                        : 'Click 3 times to use ticket'}
+                                                    </button>
+                                                  </div>
+                                                )}
+                                              </div>
+
+                                              {/* QR Code */}
+                                              <div style={{
+                                                background: 'white',
+                                                padding: '16px',
+                                                borderRadius: '12px',
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                alignItems: 'center',
+                                                gap: '8px',
+                                                minWidth: '180px'
+                                              }}>
+                                                <div style={{ 
+                                                  display: 'flex',
+                                                  alignItems: 'center',
+                                                  justifyContent: 'center',
+                                                  background: 'rgba(124, 58, 237, 0.1)',
+                                                  borderRadius: '8px',
+                                                  padding: '8px',
+                                                  marginBottom: '4px'
+                                                }}>
+                                                  <QRCodeSVG 
+                                                    value={`${typeof window !== 'undefined' ? window.location.origin : ''}/ticket/${ticket.short_id || ticket.id}`}
+                                                    size={150}
+                                                    level="M"
+                                                  />
+                                                </div>
+                                                <div style={{ 
+                                                  fontSize: '11px', 
+                                                  color: '#666', 
+                                                  textAlign: 'center',
+                                                  fontWeight: '500'
+                                                }}>
+                                                  Scan for Info
+                                                </div>
+                                                {ticket.short_id && (
+                                                  <div style={{ 
+                                                    fontSize: '10px', 
+                                                    color: '#999',
+                                                    fontFamily: 'monospace'
+                                                  }}>
+                                                    ID: {ticket.short_id}
+                                                  </div>
+                                                )}
+                                              </div>
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                                
+                                {/* Used Tickets in this category */}
+                                {categoryTickets.used.length > 0 && (
+                                  <div>
+                                    <button
+                                      onClick={() => setTicketsExpanded(prev => ({
+                                        ...prev,
+                                        [category]: {
+                                          ...prev[category],
+                                          used: !prev[category]?.used
+                                        }
+                                      }))}
+                                      style={{
+                                        width: '100%',
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
+                                        background: 'rgba(255, 255, 255, 0.05)',
+                                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                                        borderRadius: '12px',
+                                        padding: '12px 16px',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.3s ease',
+                                        marginBottom: '12px'
+                                      }}
+                                    >
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                        <span style={{ 
+                                          background: 'rgba(34, 197, 94, 0.2)',
+                                          color: '#22c55e',
+                                          padding: '4px 8px',
+                                          borderRadius: '6px',
+                                          fontSize: '12px',
+                                          fontWeight: '600'
+                                        }}>
+                                          Used
+                                        </span>
+                                        <span style={{ color: 'white', fontSize: '14px', fontWeight: '600' }}>
+                                          Used ({categoryTickets.used.length})
+                                        </span>
+                                      </div>
+                                      <span style={{ 
+                                        color: 'rgba(255, 255, 255, 0.6)',
+                                        fontSize: '18px',
+                                        transform: ticketsExpanded[category]?.used !== false ? 'rotate(180deg)' : 'rotate(0deg)',
+                                        transition: 'transform 0.3s ease'
+                                      }}>
+                                        ▼
+                                      </span>
+                                    </button>
+                                    
+                                    {ticketsExpanded[category]?.used !== false && (
+                                      <div style={{ display: 'grid', gap: '16px', paddingLeft: '8px' }}>
+                                        {categoryTickets.used.map(ticket => (
+                                          <div
+                                            key={ticket.id}
+                                            style={{
+                                              background: 'rgba(255, 255, 255, 0.03)',
+                                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                                              borderRadius: '16px',
+                                              padding: '24px',
+                                              transition: 'all 0.3s ease',
+                                              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.2)'
+                                            }}
+                                          >
+                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '20px', alignItems: 'start' }}>
+                                              <div style={{ flex: 1 }}>
+                                                <h3 style={{ color: 'white', fontSize: '20px', marginBottom: '8px', fontWeight: '600' }}>
+                                                  {ticket.events?.title || 'Event Ticket'}
+                                                </h3>
+                                                <p style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '14px', marginBottom: '12px' }}>
+                                                  Ticket #{ticket.short_id || ticket.id.substring(0, 8)}
+                                                </p>
+                                                
+                                                <div style={{ 
+                                                  display: 'grid', 
+                                                  gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+                                                  gap: '12px',
+                                                  marginBottom: '16px',
+                                                  fontSize: '14px'
+                                                }}>
+                                                  <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
+                                                    <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>🎫 Tier:</span> {ticket.tier || 'General'}
+                                                  </div>
+                                                  {ticket.ticket_kind && (
+                                                    <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
+                                                      <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>🎟️ Type:</span> {getTicketKindDisplayName(ticket.ticket_kind)}
+                                                    </div>
+                                                  )}
+                                                  {ticket.events?.start_at && (
+                                                    <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
+                                                      <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>📅 Date:</span> {new Date(ticket.events.start_at).toLocaleDateString()}
+                                                    </div>
+                                                  )}
+                                                  {ticket.events?.venue_name && (
+                                                    <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
+                                                      <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>📍 Venue:</span> {ticket.events.venue_name}
+                                                    </div>
+                                                  )}
+                                                  <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
+                                                    <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>📅 Issued:</span> {new Date(ticket.created_at).toLocaleDateString()}
+                                                  </div>
+                                                  {ticket.used_at && (
+                                                    <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
+                                                      <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>✅ Used:</span> {new Date(ticket.used_at).toLocaleDateString()}
+                                                    </div>
+                                                  )}
+                                                </div>
+
+                                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '12px' }}>
+                                                  <span style={{
+                                                    background: 'rgba(34, 197, 94, 0.2)',
+                                                    color: '#22c55e',
+                                                    padding: '6px 12px',
+                                                    borderRadius: '6px',
+                                                    fontSize: '13px',
+                                                    fontWeight: '500',
+                                                    textTransform: 'capitalize'
+                                                  }}>
+                                                    Used
+                                                  </span>
+                                                  {ticket.orders && (
+                                                    <span style={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: '13px' }}>
+                                                      💰 ${ticket.orders.total_amount_cents ? (ticket.orders.total_amount_cents / 100).toFixed(2) : '0.00'}
+                                                    </span>
+                                                  )}
+                                                </div>
+                                              </div>
+
+                                              {/* QR Code */}
+                                              <div style={{
+                                                background: 'white',
+                                                padding: '16px',
+                                                borderRadius: '12px',
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                alignItems: 'center',
+                                                gap: '8px',
+                                                minWidth: '180px',
+                                                opacity: 0.6
+                                              }}>
+                                                <div style={{ 
+                                                  display: 'flex',
+                                                  alignItems: 'center',
+                                                  justifyContent: 'center',
+                                                  background: 'rgba(124, 58, 237, 0.1)',
+                                                  borderRadius: '8px',
+                                                  padding: '8px',
+                                                  marginBottom: '4px'
+                                                }}>
+                                                  <QRCodeSVG 
+                                                    value={`${typeof window !== 'undefined' ? window.location.origin : ''}/ticket/${ticket.short_id || ticket.id}`}
+                                                    size={150}
+                                                    level="M"
+                                                  />
+                                                </div>
+                                                <div style={{ 
+                                                  fontSize: '11px', 
+                                                  color: '#666', 
+                                                  textAlign: 'center',
+                                                  fontWeight: '500'
+                                                }}>
+                                                  Scan for Info
+                                                </div>
+                                                {ticket.short_id && (
+                                                  <div style={{ 
+                                                    fontSize: '10px', 
+                                                    color: '#999',
+                                                    fontFamily: 'monospace'
+                                                  }}>
+                                                    ID: {ticket.short_id}
+                                                  </div>
+                                                )}
+                                              </div>
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </>
+                  )
+                })()}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Order History Modal */}
+      {showOrdersModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.7)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '20px'
+        }}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            setShowOrdersModal(false)
+          }
+        }}
+        >
+          <div style={{
+            background: 'rgba(15, 23, 42, 0.95)',
+            backdropFilter: 'blur(20px)',
+            borderRadius: '20px',
+            padding: '32px',
+            maxWidth: '900px',
+            width: '100%',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)',
+            maxHeight: '90vh',
+            overflowY: 'auto'
+          }}
+          onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '24px'
+            }}>
+              <h2 style={{
+                color: 'white',
+                fontSize: '24px',
+                fontWeight: 'bold',
+                margin: 0
+              }}>
+                Purchase History ({orders?.length || 0})
+              </h2>
+              <button
+                onClick={() => setShowOrdersModal(false)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'rgba(255, 255, 255, 0.7)',
+                  fontSize: '24px',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Orders Content */}
+            {(orders?.length || 0) === 0 ? (
+              <div style={{ 
+                textAlign: 'center', 
+                color: 'rgba(255, 255, 255, 0.6)',
+                padding: '40px'
+              }}>
+                <div style={{ fontSize: '48px', marginBottom: '16px' }}>📋</div>
+                <div style={{ fontSize: '18px', marginBottom: '8px' }}>No orders yet</div>
+                <div style={{ fontSize: '14px' }}>Your purchase history will appear here</div>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gap: '16px' }}>
+                {(orders || []).map(order => (
+                  <div
+                    key={order.id}
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.03)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '12px',
+                      padding: '20px',
+                      transition: 'all 0.3s ease',
+                      boxShadow: '0 4px 16px rgba(0, 0, 0, 0.2)'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '12px' }}>
+                      <div>
+                        <h3 style={{ color: 'white', fontSize: '16px', marginBottom: '4px' }}>
+                          Order #{order.id.substring(0, 8)}
+                        </h3>
+                        <div style={{ display: 'flex', gap: '16px', fontSize: '12px', color: 'rgba(255, 255, 255, 0.6)' }}>
+                          <span>💰 Total: ${order.total_amount_cents ? (order.total_amount_cents / 100).toFixed(2) : '0.00'}</span>
+                          <span>📅 Date: {new Date(order.created_at).toLocaleDateString()}</span>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <span style={{
+                          background: order.status === 'completed' || order.status === 'paid' ? 'rgba(34, 197, 94, 0.2)' : 
+                                     order.status === 'pending' ? 'rgba(251, 191, 36, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                          color: order.status === 'completed' || order.status === 'paid' ? '#22c55e' : 
+                                 order.status === 'pending' ? '#fbbf24' : '#ef4444',
+                          padding: '4px 8px',
+                          borderRadius: '4px',
+                          fontSize: '12px',
+                          textTransform: 'capitalize'
+                        }}>
+                          {order.status || 'Unknown'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Profile Details Modal */}
       {showProfileDetails && (

@@ -30,6 +30,9 @@ export default function AccountPage() {
   })
   const [ordersExpanded, setOrdersExpanded] = useState(true)
   const [clickingTickets, setClickingTickets] = useState({}) // Track triple-click state per ticket
+  const [showProfileDetails, setShowProfileDetails] = useState(false) // Show profile edit modal
+  const [editingProfile, setEditingProfile] = useState(false) // Edit mode for profile
+  const [profileData, setProfileData] = useState({ name: '', email: '', age: '' }) // Profile form data
 
   useEffect(() => {
     // Check if user session exists
@@ -133,6 +136,11 @@ export default function AccountPage() {
         }
         
         setUser(userData)
+        setProfileData({
+          name: userData.name || '',
+          email: userData.email || '',
+          age: userData.age || ''
+        })
       }
 
       // Get user tickets (filter by user ID, fallback to email)
@@ -304,102 +312,280 @@ export default function AccountPage() {
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          marginBottom: '30px'
+          marginBottom: '24px'
         }}>
-          <div>
-            <h1 style={{
-              fontSize: '32px', 
-              fontWeight: 'bold',
-              color: 'white',
-              marginBottom: '8px'
-            }}>
-              My Account
-            </h1>
-            <p style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '16px' }}>
-              Welcome back, {user?.name || 'User'}
-            </p>
-          </div>
-          <div style={{ display: 'flex', gap: '12px' }}>
-            <button
-              onClick={() => {
-                setUser(null)
-                setTickets([])
-                setOrders([])
-                setShowLogin(true)
-              }}
-              style={{
-                padding: '12px 24px',
-                borderRadius: '8px',
-                border: '1px solid rgba(255, 255, 255, 0.2)',
-                background: 'transparent',
-                color: 'white',
-                cursor: 'pointer',
-                fontWeight: '600',
-                fontSize: '14px',
-                transition: 'all 0.3s ease'
-              }}
-            >
-              Switch Account
-            </button>
-            <button
-              onClick={handleLogout}
-              className="btn-partytix-gradient"
-              style={{
-                padding: '12px 24px',
-                borderRadius: '8px',
-                border: 'none',
-                cursor: 'pointer',
-                fontWeight: '600',
-                fontSize: '14px',
-                transition: 'all 0.3s ease'
-              }}
-            >
-              Logout
-            </button>
-          </div>
+          <h1 style={{
+            fontSize: '28px', 
+            fontWeight: 'bold',
+            color: 'white',
+            margin: 0
+          }}>
+            Account
+          </h1>
+          <button
+            onClick={() => setShowProfileDetails(true)}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+              <path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+            </svg>
+          </button>
         </div>
 
-        {/* User Info */}
+        {/* User Profile Card */}
         <div style={{
-          background: 'rgba(255, 255, 255, 0.05)',
+          background: 'rgba(255, 255, 255, 0.08)',
           backdropFilter: 'blur(12px)',
           borderRadius: '16px',
-          padding: '32px',
-          marginBottom: '30px',
+          padding: '24px',
+          marginBottom: '24px',
           border: '1px solid rgba(255, 255, 255, 0.1)',
           boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)'
         }}>
-          <h2 style={{ color: 'white', marginBottom: '20px', fontSize: '20px' }}>
-            Account Information
-          </h2>
-          <div style={{ display: 'grid', gap: '16px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ color: 'rgba(255, 255, 255, 0.8)' }}>Name:</span>
-              <span style={{ color: 'white', fontWeight: '500' }}>{user?.name || 'N/A'}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '20px', marginBottom: '20px' }}>
+            {/* Avatar */}
+            <div style={{
+              width: '80px',
+              height: '80px',
+              borderRadius: '50%',
+              background: 'rgba(124, 58, 237, 0.3)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '32px',
+              fontWeight: 'bold',
+              color: 'white',
+              border: '2px solid rgba(255, 255, 255, 0.2)',
+              flexShrink: 0
+            }}>
+              {user?.name ? user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : 'U'}
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ color: 'rgba(255, 255, 255, 0.8)' }}>Email:</span>
-              <span style={{ color: 'white', fontWeight: '500' }}>{user?.email || 'N/A'}</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ color: 'rgba(255, 255, 255, 0.8)' }}>Age:</span>
-              <span style={{ color: 'white', fontWeight: '500' }}>{user?.age || 'N/A'}</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ color: 'rgba(255, 255, 255, 0.8)' }}>Role:</span>
-              <span style={{ 
-                color: 'white', 
-                fontWeight: '500',
+            
+            {/* User Info */}
+            <div style={{ flex: 1 }}>
+              <h2 style={{
+                color: 'white',
+                fontSize: '20px',
+                fontWeight: '600',
+                marginBottom: '4px',
                 textTransform: 'capitalize'
               }}>
-                {user?.role || 'User'}
-              </span>
+                {user?.name || 'User'}
+              </h2>
+              <p style={{
+                color: 'rgba(255, 255, 255, 0.7)',
+                fontSize: '14px',
+                margin: 0
+              }}>
+                {user?.email || 'No email'}
+              </p>
             </div>
+          </div>
+          
+          {/* View My Profile Button */}
+          <button
+            onClick={() => setShowProfileDetails(true)}
+            style={{
+              width: '100%',
+              background: 'linear-gradient(135deg, #3b82f6 0%, #22d3ee 100%)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '12px',
+              padding: '14px',
+              fontSize: '15px',
+              fontWeight: '600',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.opacity = '0.9'
+              e.currentTarget.style.transform = 'translateY(-1px)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.opacity = '1'
+              e.currentTarget.style.transform = 'translateY(0)'
+            }}
+          >
+            View My Profile
+          </button>
+        </div>
+
+        {/* Shortcuts Section */}
+        <div style={{ marginBottom: '24px' }}>
+          <h3 style={{
+            color: 'white',
+            fontSize: '18px',
+            fontWeight: '600',
+            marginBottom: '16px'
+          }}>
+            Shortcuts
+          </h3>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+            gap: '16px'
+          }}>
+            {/* My Tickets */}
+            <button
+              onClick={() => {
+                // Scroll to tickets section or show tickets
+                const ticketsSection = document.getElementById('tickets-section')
+                if (ticketsSection) {
+                  ticketsSection.scrollIntoView({ behavior: 'smooth' })
+                }
+              }}
+              style={{
+                background: 'rgba(255, 255, 255, 0.08)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '16px',
+                padding: '24px 16px',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '12px',
+                cursor: 'pointer',
+                transition: 'all 0.3s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)'
+                e.currentTarget.style.transform = 'translateY(-2px)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
+                e.currentTarget.style.transform = 'translateY(0)'
+              }}
+            >
+              <div style={{
+                width: '48px',
+                height: '48px',
+                borderRadius: '12px',
+                background: 'rgba(59, 130, 246, 0.2)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '24px'
+              }}>
+                🎫
+              </div>
+              <span style={{
+                color: 'white',
+                fontSize: '14px',
+                fontWeight: '600'
+              }}>
+                My Tickets
+              </span>
+            </button>
+
+            {/* Order History */}
+            <button
+              onClick={() => {
+                const ordersSection = document.getElementById('orders-section')
+                if (ordersSection) {
+                  ordersSection.scrollIntoView({ behavior: 'smooth' })
+                }
+              }}
+              style={{
+                background: 'rgba(255, 255, 255, 0.08)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '16px',
+                padding: '24px 16px',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '12px',
+                cursor: 'pointer',
+                transition: 'all 0.3s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)'
+                e.currentTarget.style.transform = 'translateY(-2px)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
+                e.currentTarget.style.transform = 'translateY(0)'
+              }}
+            >
+              <div style={{
+                width: '48px',
+                height: '48px',
+                borderRadius: '12px',
+                background: 'rgba(168, 85, 247, 0.2)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '24px'
+              }}>
+                📋
+              </div>
+              <span style={{
+                color: 'white',
+                fontSize: '14px',
+                fontWeight: '600'
+              }}>
+                Order History
+              </span>
+            </button>
+
+            {/* Settings */}
+            <button
+              onClick={() => {
+                // Settings functionality to be added later
+                alert('Settings feature coming soon!')
+              }}
+              style={{
+                background: 'rgba(255, 255, 255, 0.08)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '16px',
+                padding: '24px 16px',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '12px',
+                cursor: 'pointer',
+                transition: 'all 0.3s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)'
+                e.currentTarget.style.transform = 'translateY(-2px)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
+                e.currentTarget.style.transform = 'translateY(0)'
+              }}
+            >
+              <div style={{
+                width: '48px',
+                height: '48px',
+                borderRadius: '12px',
+                background: 'rgba(107, 114, 128, 0.2)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '24px'
+              }}>
+                ⚙️
+              </div>
+              <span style={{
+                color: 'white',
+                fontSize: '14px',
+                fontWeight: '600'
+              }}>
+                Settings
+              </span>
+            </button>
           </div>
         </div>
 
-        {/* My Tickets */}
-        <div style={{
+        {/* My Tickets Section */}
+        <div id="tickets-section" style={{
           background: 'rgba(255, 255, 255, 0.05)',
           backdropFilter: 'blur(12px)',
           borderRadius: '16px',
@@ -1005,9 +1191,9 @@ export default function AccountPage() {
           )}
         </div>
 
-        {/* Purchase History */}
+        {/* Purchase History Section */}
         {(orders?.length || 0) > 0 && (
-          <div style={{
+          <div id="orders-section" style={{
             background: 'rgba(255, 255, 255, 0.05)',
             backdropFilter: 'blur(12px)',
             borderRadius: '16px',
@@ -1092,6 +1278,434 @@ export default function AccountPage() {
           </div>
         )}
       </div>
+
+      {/* Profile Details Modal */}
+      {showProfileDetails && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.7)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '20px'
+        }}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            setShowProfileDetails(false)
+            setEditingProfile(false)
+          }
+        }}
+        >
+          <div style={{
+            background: 'rgba(15, 23, 42, 0.95)',
+            backdropFilter: 'blur(20px)',
+            borderRadius: '20px',
+            padding: '32px',
+            maxWidth: '500px',
+            width: '100%',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)',
+            maxHeight: '90vh',
+            overflowY: 'auto'
+          }}
+          onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '24px'
+            }}>
+              <h2 style={{
+                color: 'white',
+                fontSize: '24px',
+                fontWeight: 'bold',
+                margin: 0
+              }}>
+                My Profile
+              </h2>
+              <button
+                onClick={() => {
+                  setShowProfileDetails(false)
+                  setEditingProfile(false)
+                }}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'rgba(255, 255, 255, 0.7)',
+                  fontSize: '24px',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Profile Content */}
+            {!editingProfile ? (
+              // View Mode
+              <div>
+                <div style={{ marginBottom: '24px' }}>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '20px',
+                    marginBottom: '24px'
+                  }}>
+                    <div style={{
+                      width: '100px',
+                      height: '100px',
+                      borderRadius: '50%',
+                      background: 'rgba(124, 58, 237, 0.3)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '40px',
+                      fontWeight: 'bold',
+                      color: 'white',
+                      border: '2px solid rgba(255, 255, 255, 0.2)'
+                    }}>
+                      {user?.name ? user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : 'U'}
+                    </div>
+                    <div>
+                      <h3 style={{
+                        color: 'white',
+                        fontSize: '22px',
+                        fontWeight: '600',
+                        marginBottom: '4px',
+                        textTransform: 'capitalize'
+                      }}>
+                        {user?.name || 'User'}
+                      </h3>
+                      <p style={{
+                        color: 'rgba(255, 255, 255, 0.7)',
+                        fontSize: '14px',
+                        margin: 0
+                      }}>
+                        {user?.email || 'No email'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gap: '20px' }}>
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      color: 'rgba(255, 255, 255, 0.7)',
+                      fontSize: '14px',
+                      marginBottom: '8px'
+                    }}>
+                      Name
+                    </label>
+                    <div style={{
+                      color: 'white',
+                      fontSize: '16px',
+                      fontWeight: '500',
+                      padding: '12px',
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      borderRadius: '8px',
+                      border: '1px solid rgba(255, 255, 255, 0.1)'
+                    }}>
+                      {user?.name || 'N/A'}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      color: 'rgba(255, 255, 255, 0.7)',
+                      fontSize: '14px',
+                      marginBottom: '8px'
+                    }}>
+                      Email
+                    </label>
+                    <div style={{
+                      color: 'white',
+                      fontSize: '16px',
+                      fontWeight: '500',
+                      padding: '12px',
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      borderRadius: '8px',
+                      border: '1px solid rgba(255, 255, 255, 0.1)'
+                    }}>
+                      {user?.email || 'N/A'}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      color: 'rgba(255, 255, 255, 0.7)',
+                      fontSize: '14px',
+                      marginBottom: '8px'
+                    }}>
+                      Age
+                    </label>
+                    <div style={{
+                      color: 'white',
+                      fontSize: '16px',
+                      fontWeight: '500',
+                      padding: '12px',
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      borderRadius: '8px',
+                      border: '1px solid rgba(255, 255, 255, 0.1)'
+                    }}>
+                      {user?.age || 'N/A'}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      color: 'rgba(255, 255, 255, 0.7)',
+                      fontSize: '14px',
+                      marginBottom: '8px'
+                    }}>
+                      Role
+                    </label>
+                    <div style={{
+                      color: 'white',
+                      fontSize: '16px',
+                      fontWeight: '500',
+                      padding: '12px',
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      borderRadius: '8px',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      textTransform: 'capitalize'
+                    }}>
+                      {user?.role || 'User'}
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setEditingProfile(true)}
+                  style={{
+                    width: '100%',
+                    marginTop: '24px',
+                    background: 'linear-gradient(135deg, #3b82f6 0%, #22d3ee 100%)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '12px',
+                    padding: '14px',
+                    fontSize: '15px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.opacity = '0.9'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.opacity = '1'
+                  }}
+                >
+                  Edit Profile
+                </button>
+              </div>
+            ) : (
+              // Edit Mode
+              <div>
+                <div style={{ display: 'grid', gap: '20px' }}>
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      color: 'rgba(255, 255, 255, 0.7)',
+                      fontSize: '14px',
+                      marginBottom: '8px'
+                    }}>
+                      Name *
+                    </label>
+                    <input
+                      type="text"
+                      value={profileData.name}
+                      onChange={(e) => setProfileData({ ...profileData, name: e.target.value })}
+                      style={{
+                        width: '100%',
+                        padding: '12px',
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid rgba(255, 255, 255, 0.2)',
+                        borderRadius: '8px',
+                        color: 'white',
+                        fontSize: '16px',
+                        outline: 'none'
+                      }}
+                      placeholder="Enter your name"
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      color: 'rgba(255, 255, 255, 0.7)',
+                      fontSize: '14px',
+                      marginBottom: '8px'
+                    }}>
+                      Email *
+                    </label>
+                    <input
+                      type="email"
+                      value={profileData.email}
+                      onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
+                      style={{
+                        width: '100%',
+                        padding: '12px',
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid rgba(255, 255, 255, 0.2)',
+                        borderRadius: '8px',
+                        color: 'white',
+                        fontSize: '16px',
+                        outline: 'none'
+                      }}
+                      placeholder="Enter your email"
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      color: 'rgba(255, 255, 255, 0.7)',
+                      fontSize: '14px',
+                      marginBottom: '8px'
+                    }}>
+                      Age
+                    </label>
+                    <input
+                      type="number"
+                      value={profileData.age}
+                      onChange={(e) => setProfileData({ ...profileData, age: e.target.value })}
+                      style={{
+                        width: '100%',
+                        padding: '12px',
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid rgba(255, 255, 255, 0.2)',
+                        borderRadius: '8px',
+                        color: 'white',
+                        fontSize: '16px',
+                        outline: 'none'
+                      }}
+                      placeholder="Enter your age"
+                      min="1"
+                      max="120"
+                    />
+                  </div>
+                </div>
+
+                <div style={{
+                  display: 'flex',
+                  gap: '12px',
+                  marginTop: '24px'
+                }}>
+                  <button
+                    onClick={async () => {
+                      try {
+                        if (!supabase || !user?.id) return
+                        
+                        const { error } = await supabase
+                          .from('users')
+                          .update({
+                            name: profileData.name,
+                            email: profileData.email,
+                            age: profileData.age ? parseInt(profileData.age) : null
+                          })
+                          .eq('id', user.id)
+                        
+                        if (error) {
+                          alert('Failed to update profile: ' + error.message)
+                          return
+                        }
+                        
+                        // Update local user state
+                        setUser({
+                          ...user,
+                          name: profileData.name,
+                          email: profileData.email,
+                          age: profileData.age ? parseInt(profileData.age) : null
+                        })
+                        
+                        // Update session
+                        const sessionData = JSON.parse(localStorage.getItem('userSession') || '{}')
+                        sessionData.name = profileData.name
+                        sessionData.email = profileData.email
+                        sessionData.age = profileData.age ? parseInt(profileData.age) : null
+                        localStorage.setItem('userSession', JSON.stringify(sessionData))
+                        
+                        setEditingProfile(false)
+                        alert('Profile updated successfully!')
+                      } catch (error) {
+                        console.error('Error updating profile:', error)
+                        alert('Failed to update profile')
+                      }
+                    }}
+                    style={{
+                      flex: 1,
+                      background: 'linear-gradient(135deg, #3b82f6 0%, #22d3ee 100%)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '12px',
+                      padding: '14px',
+                      fontSize: '15px',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      transition: 'all 0.3s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.opacity = '0.9'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.opacity = '1'
+                    }}
+                  >
+                    Save Changes
+                  </button>
+                  <button
+                    onClick={() => {
+                      setEditingProfile(false)
+                      setProfileData({
+                        name: user?.name || '',
+                        email: user?.email || '',
+                        age: user?.age || ''
+                      })
+                    }}
+                    style={{
+                      flex: 1,
+                      background: 'rgba(255, 255, 255, 0.1)',
+                      color: 'white',
+                      border: '1px solid rgba(255, 255, 255, 0.2)',
+                      borderRadius: '12px',
+                      padding: '14px',
+                      fontSize: '15px',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      transition: 'all 0.3s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

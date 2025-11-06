@@ -160,23 +160,53 @@ export async function POST(request) {
         eventId = defaultEvent?.id || '45091d37-7252-43c7-93c8-a7033d28af31'
       }
       
-      // Get event to determine validity window
+      // Get event data to save snapshot and determine validity window
+      let eventSnapshot = null
       let validityStartTime = null
       let validityEndTime = null
       
       if (eventId) {
         const { data: eventData, error: eventDataError } = await supabase
           .from('events')
-          .select('start_at, end_at')
+          .select('title, description, venue_name, address, start_at, end_at, poster_url')
           .eq('id', eventId)
           .single()
         
         if (eventDataError) {
-          console.warn('⚠️ 获取活动时间失败:', eventDataError)
+          console.warn('⚠️ 获取活动信息失败:', eventDataError)
         } else if (eventData) {
+          // Save event snapshot
+          eventSnapshot = {
+            title: eventData.title,
+            description: eventData.description,
+            venue_name: eventData.venue_name,
+            address: eventData.address,
+            start_at: eventData.start_at,
+            end_at: eventData.end_at,
+            poster_url: eventData.poster_url
+          }
           // Set validity window based on event times
           validityStartTime = eventData.start_at
           validityEndTime = eventData.end_at
+        }
+      }
+      
+      // Get price snapshot
+      let priceSnapshot = null
+      const priceId = session.metadata?.price_id
+      if (priceId) {
+        const { data: priceData, error: priceError } = await supabase
+          .from('prices')
+          .select('name, amount_cents, currency')
+          .eq('id', priceId)
+          .single()
+        
+        if (!priceError && priceData) {
+          priceSnapshot = {
+            name: priceData.name,
+            amount_cents: priceData.amount_cents,
+            currency: priceData.currency || 'USD'
+          }
         }
       }
 
@@ -232,7 +262,19 @@ export async function POST(request) {
             used: false,
             short_id: shortId,
             validity_start_time: validityStartTime,
-            validity_end_time: validityEndTime
+            validity_end_time: validityEndTime,
+            // Event snapshot fields
+            event_title_snapshot: eventSnapshot?.title || null,
+            event_description_snapshot: eventSnapshot?.description || null,
+            event_venue_snapshot: eventSnapshot?.venue_name || null,
+            event_address_snapshot: eventSnapshot?.address || null,
+            event_start_at_snapshot: eventSnapshot?.start_at || null,
+            event_end_at_snapshot: eventSnapshot?.end_at || null,
+            event_poster_url_snapshot: eventSnapshot?.poster_url || null,
+            // Price snapshot fields
+            price_name_snapshot: priceSnapshot?.name || session.metadata?.price_name || null,
+            price_amount_cents_snapshot: priceSnapshot?.amount_cents || null,
+            price_currency_snapshot: priceSnapshot?.currency || 'USD'
           })
           .select()
           .single()

@@ -20,7 +20,6 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
   const [customerEmail, setCustomerEmail] = useState('')
   const [customerName, setCustomerName] = useState('')
   const [customerAge, setCustomerAge] = useState('')
-  const [ticketValidityDate, setTicketValidityDate] = useState('')
   const [paymentLoading, setPaymentLoading] = useState(false)
   const [paymentError, setPaymentError] = useState('')
 
@@ -121,11 +120,6 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
       return
     }
 
-    if (!ticketValidityDate) {
-      setPaymentError('Please select ticket validity date')
-      return
-    }
-
     if (!selectedPrice) {
       setPaymentError('Please select a ticket type')
       return
@@ -141,14 +135,6 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
     setPaymentError('')
 
     try {
-      // 计算票券有效期时间
-      const validityStartTime = new Date(ticketValidityDate)
-      validityStartTime.setHours(16, 0, 0, 0) // 16:00
-      
-      const validityEndTime = new Date(ticketValidityDate)
-      validityEndTime.setDate(validityEndTime.getDate() + 1)
-      validityEndTime.setHours(2, 0, 0, 0) // 次日 02:00
-
       // 获取用户信息 - 确保只在客户端执行
       let user = null
       if (typeof window !== 'undefined') {
@@ -175,9 +161,6 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
           customerAge: parseInt(customerAge),
           userId: user?.id,
           userToken: user?.token ?? 'local-token',
-          ticketValidityDate: ticketValidityDate,
-          ticketValidityStart: validityStartTime.toISOString(),
-          ticketValidityEnd: validityEndTime.toISOString(),
           eventData: event
         }),
       })
@@ -196,10 +179,7 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
               totalAmount: selectedPrice.amount * quantity,
               customerEmail: customerEmail,
               customerName: customerName,
-              customerAge: parseInt(customerAge),
-              ticketValidityDate: ticketValidityDate,
-              ticketValidityStart: validityStartTime.toISOString(),
-              ticketValidityEnd: validityEndTime.toISOString()
+              customerAge: parseInt(customerAge)
             }
             localStorage.setItem('recentPurchase', JSON.stringify(purchaseInfo))
           } catch (error) {
@@ -1043,80 +1023,6 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
                         </div>
                     </div>
                   </div>
-                </div>
-              </div>
-
-              {/* 票券有效期选择 */}
-              <div style={{ marginBottom: '24px' }}>
-                <label style={{
-                  display: 'block',
-                  color: 'white',
-                  fontSize: '0.875rem',
-                  fontWeight: '500',
-                  marginBottom: '8px'
-                }}>
-                  Select Ticket Validity Date *
-                </label>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                  <div>
-                    <label style={{
-                      display: 'block',
-                      color: '#94a3b8',
-                      fontSize: '0.75rem',
-                      marginBottom: '4px'
-                    }}>
-                      Ticket Date
-                    </label>
-                    <input
-                      type="date"
-                      value={ticketValidityDate}
-                      onChange={(e) => setTicketValidityDate(e.target.value)}
-                      min={new Date().toISOString().split('T')[0]}
-                      style={{
-                        width: '100%',
-                        padding: '12px 16px',
-                        backgroundColor: 'rgba(55, 65, 81, 0.5)',
-                        border: '1px solid rgba(255, 255, 255, 0.1)',
-                        borderRadius: '8px',
-                        color: 'white',
-                        fontSize: '1rem',
-                        outline: 'none'
-                      }}
-                    />
-                  </div>
-                  <div>
-                    <label style={{
-                      display: 'block',
-                      color: '#94a3b8',
-                      fontSize: '0.75rem',
-                      marginBottom: '4px'
-                    }}>
-                      Validity Time
-                    </label>
-                    <div style={{
-                      width: '100%',
-                      padding: '12px 16px',
-                      backgroundColor: 'rgba(55, 65, 81, 0.3)',
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                      borderRadius: '8px',
-                      color: '#6b7280',
-                      fontSize: '1rem',
-                      cursor: 'not-allowed'
-                    }}>
-                      4:00 PM - Next day 2:00 AM
-                    </div>
-                  </div>
-                </div>
-                <div style={{
-                  marginTop: '8px',
-                  padding: '8px 12px',
-                  backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                  border: '1px solid rgba(16, 185, 129, 0.2)',
-                  borderRadius: '6px',
-                  fontSize: '0.75rem',
-                  color: '#6ee7b7'
-                }}>
-                  ℹ️ Ticket validity is from 4:00 PM on the selected date to 2:00 AM the next day. Please use within the validity period.
                 </div>
               </div>
 

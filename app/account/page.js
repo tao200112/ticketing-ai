@@ -776,7 +776,7 @@ export default function AccountPage() {
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '20px', alignItems: 'start' }}>
                     <div style={{ flex: 1 }}>
                       <h3 style={{ color: 'white', fontSize: '20px', marginBottom: '8px', fontWeight: '600' }}>
-                        {ticket.events?.title || 'Event Ticket'}
+                        {ticket.event_title_snapshot || ticket.events?.title || 'Event Ticket'}
                       </h3>
                       <p style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '14px', marginBottom: '12px' }}>
                         Ticket #{ticket.short_id || ticket.id.substring(0, 8)}
@@ -797,19 +797,24 @@ export default function AccountPage() {
                             <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>🎟️ Type:</span> {getTicketKindDisplayName(ticket.ticket_kind)}
                           </div>
                         )}
-                        {ticket.events?.start_at && (
+                        {(ticket.event_start_at_snapshot || ticket.events?.start_at) && (
                           <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
-                            <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>📅 Date:</span> {new Date(ticket.events.start_at).toLocaleDateString()}
+                            <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>📅 Date:</span> {new Date(ticket.event_start_at_snapshot || ticket.events.start_at).toLocaleDateString()}
                           </div>
                         )}
-                        {ticket.events?.venue_name && (
+                        {(ticket.event_venue_snapshot || ticket.events?.venue_name) && (
                           <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
-                            <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>📍 Venue:</span> {ticket.events.venue_name}
+                            <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>📍 Venue:</span> {ticket.event_venue_snapshot || ticket.events.venue_name}
                           </div>
                         )}
                         <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
                           <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>📅 Issued:</span> {new Date(ticket.created_at).toLocaleDateString()}
                         </div>
+                        {ticket.price_amount_cents_snapshot && (
+                          <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
+                            <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>💰 Price:</span> ${(ticket.price_amount_cents_snapshot / 100).toFixed(2)}
+                          </div>
+                        )}
                       </div>
 
                       <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '12px' }}>
@@ -1060,7 +1065,7 @@ export default function AccountPage() {
                                           <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '20px', alignItems: 'start' }}>
                                             <div style={{ flex: 1 }}>
                                               <h3 style={{ color: 'white', fontSize: '20px', marginBottom: '8px', fontWeight: '600' }}>
-                                                {ticket.events?.title || 'Event Ticket'}
+                                                {ticket.event_title_snapshot || ticket.events?.title || 'Event Ticket'}
                                               </h3>
                                               <p style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '14px', marginBottom: '12px' }}>
                                                 Ticket #{ticket.short_id || ticket.id.substring(0, 8)}
@@ -1081,14 +1086,19 @@ export default function AccountPage() {
                                                     <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>🎟️ Type:</span> {getTicketKindDisplayName(ticket.ticket_kind)}
                                                   </div>
                                                 )}
-                                                {ticket.events?.start_at && (
+                                                {(ticket.event_start_at_snapshot || ticket.events?.start_at) && (
                                                   <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
-                                                    <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>📅 Date:</span> {new Date(ticket.events.start_at).toLocaleDateString()}
+                                                    <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>📅 Date:</span> {new Date(ticket.event_start_at_snapshot || ticket.events.start_at).toLocaleDateString()}
                                                   </div>
                                                 )}
-                                                {ticket.events?.venue_name && (
+                                                {(ticket.event_venue_snapshot || ticket.events?.venue_name) && (
                                                   <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
-                                                    <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>📍 Venue:</span> {ticket.events.venue_name}
+                                                    <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>📍 Venue:</span> {ticket.event_venue_snapshot || ticket.events.venue_name}
+                                                  </div>
+                                                )}
+                                                {ticket.price_amount_cents_snapshot && (
+                                                  <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
+                                                    <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>💰 Price:</span> ${(ticket.price_amount_cents_snapshot / 100).toFixed(2)}
                                                   </div>
                                                 )}
                                                 <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
@@ -1428,7 +1438,7 @@ export default function AccountPage() {
                                             <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '20px', alignItems: 'start' }}>
                                               <div style={{ flex: 1 }}>
                                                 <h3 style={{ color: 'white', fontSize: '20px', marginBottom: '8px', fontWeight: '600' }}>
-                                                  {ticket.events?.title || 'Event Ticket'}
+                                                  {ticket.event_title_snapshot || ticket.events?.title || 'Event Ticket'}
                                                 </h3>
                                                 <p style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '14px', marginBottom: '12px' }}>
                                                   Ticket #{ticket.short_id || ticket.id.substring(0, 8)}
@@ -1449,19 +1459,24 @@ export default function AccountPage() {
                                                       <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>🎟️ Type:</span> {getTicketKindDisplayName(ticket.ticket_kind)}
                                                     </div>
                                                   )}
-                                                  {ticket.events?.start_at && (
+                                                  {(ticket.event_start_at_snapshot || ticket.events?.start_at) && (
                                                     <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
-                                                      <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>📅 Date:</span> {new Date(ticket.events.start_at).toLocaleDateString()}
+                                                      <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>📅 Date:</span> {new Date(ticket.event_start_at_snapshot || ticket.events.start_at).toLocaleDateString()}
                                                     </div>
                                                   )}
-                                                  {ticket.events?.venue_name && (
+                                                  {(ticket.event_venue_snapshot || ticket.events?.venue_name) && (
                                                     <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
-                                                      <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>📍 Venue:</span> {ticket.events.venue_name}
+                                                      <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>📍 Venue:</span> {ticket.event_venue_snapshot || ticket.events.venue_name}
                                                     </div>
                                                   )}
                                                   <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
                                                     <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>📅 Issued:</span> {new Date(ticket.created_at).toLocaleDateString()}
                                                   </div>
+                                                  {ticket.price_amount_cents_snapshot && (
+                                                    <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
+                                                      <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>💰 Price:</span> ${(ticket.price_amount_cents_snapshot / 100).toFixed(2)}
+                                                    </div>
+                                                  )}
                                                 </div>
 
                                                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '12px' }}>
@@ -1686,7 +1701,7 @@ export default function AccountPage() {
                                             <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '20px', alignItems: 'start' }}>
                                               <div style={{ flex: 1 }}>
                                                 <h3 style={{ color: 'white', fontSize: '20px', marginBottom: '8px', fontWeight: '600' }}>
-                                                  {ticket.events?.title || 'Event Ticket'}
+                                                  {ticket.event_title_snapshot || ticket.events?.title || 'Event Ticket'}
                                                 </h3>
                                                 <p style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '14px', marginBottom: '12px' }}>
                                                   Ticket #{ticket.short_id || ticket.id.substring(0, 8)}
@@ -1707,14 +1722,14 @@ export default function AccountPage() {
                                                       <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>🎟️ Type:</span> {getTicketKindDisplayName(ticket.ticket_kind)}
                                                     </div>
                                                   )}
-                                                  {ticket.events?.start_at && (
+                                                  {(ticket.event_start_at_snapshot || ticket.events?.start_at) && (
                                                     <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
-                                                      <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>📅 Date:</span> {new Date(ticket.events.start_at).toLocaleDateString()}
+                                                      <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>📅 Date:</span> {new Date(ticket.event_start_at_snapshot || ticket.events.start_at).toLocaleDateString()}
                                                     </div>
                                                   )}
-                                                  {ticket.events?.venue_name && (
+                                                  {(ticket.event_venue_snapshot || ticket.events?.venue_name) && (
                                                     <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
-                                                      <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>📍 Venue:</span> {ticket.events.venue_name}
+                                                      <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>📍 Venue:</span> {ticket.event_venue_snapshot || ticket.events.venue_name}
                                                     </div>
                                                   )}
                                                   <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
@@ -1723,6 +1738,11 @@ export default function AccountPage() {
                                                   {ticket.used_at && (
                                                     <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
                                                       <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>✅ Used:</span> {new Date(ticket.used_at).toLocaleDateString()}
+                                                    </div>
+                                                  )}
+                                                  {ticket.price_amount_cents_snapshot && (
+                                                    <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
+                                                      <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>💰 Price:</span> ${(ticket.price_amount_cents_snapshot / 100).toFixed(2)}
                                                     </div>
                                                   )}
                                                 </div>

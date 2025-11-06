@@ -112,23 +112,53 @@ export async function GET(request) {
           eventId = defaultEvent?.id || '45091d37-7252-43c7-93c8-a7033d28af31'
         }
         
-        // Import ticket helpers
-        const { isComboTicket, getComboTicketKinds, getTicketKindFromPriceName } = await import('@/lib/ticket-helpers')
+        // Get event snapshot
+        let eventSnapshot = null
+        if (eventId) {
+          const { data: eventData, error: eventDataError } = await supabase
+            .from('events')
+            .select('title, description, venue_name, address, start_at, end_at, poster_url')
+            .eq('id', eventId)
+            .single()
+          
+          if (!eventDataError && eventData) {
+            eventSnapshot = {
+              title: eventData.title,
+              description: eventData.description,
+              venue_name: eventData.venue_name,
+              address: eventData.address,
+              start_at: eventData.start_at,
+              end_at: eventData.end_at,
+              poster_url: eventData.poster_url
+            }
+          }
+        }
         
-        // Get ticket_kind from price if available
-        let ticketKindFromPrice = null
+        // Get price snapshot
+        let priceSnapshot = null
         const priceId = session.metadata?.price_id
         if (priceId) {
           const { data: priceData, error: priceError } = await supabase
             .from('prices')
-            .select('ticket_kind')
+            .select('name, amount_cents, currency, ticket_kind')
             .eq('id', priceId)
             .single()
           
-          if (!priceError && priceData?.ticket_kind) {
-            ticketKindFromPrice = priceData.ticket_kind
+          if (!priceError && priceData) {
+            priceSnapshot = {
+              name: priceData.name,
+              amount_cents: priceData.amount_cents,
+              currency: priceData.currency || 'USD',
+              ticket_kind: priceData.ticket_kind
+            }
           }
         }
+        
+        // Import ticket helpers
+        const { isComboTicket, getComboTicketKinds, getTicketKindFromPriceName } = await import('@/lib/ticket-helpers')
+        
+        // Get ticket_kind from price snapshot
+        let ticketKindFromPrice = priceSnapshot?.ticket_kind || null
         
         const priceName = session.metadata?.price_name || 'general'
         const isCombo = isComboTicket(priceName, ticketKindFromPrice)
@@ -150,7 +180,19 @@ export async function GET(request) {
                 holder_email: session.customer_email,
                 status: 'unused',
                 used: false,
-                short_id: shortId
+                short_id: shortId,
+                // Event snapshot fields
+                event_title_snapshot: eventSnapshot?.title || null,
+                event_description_snapshot: eventSnapshot?.description || null,
+                event_venue_snapshot: eventSnapshot?.venue_name || null,
+                event_address_snapshot: eventSnapshot?.address || null,
+                event_start_at_snapshot: eventSnapshot?.start_at || null,
+                event_end_at_snapshot: eventSnapshot?.end_at || null,
+                event_poster_url_snapshot: eventSnapshot?.poster_url || null,
+                // Price snapshot fields
+                price_name_snapshot: priceSnapshot?.name || session.metadata?.price_name || null,
+                price_amount_cents_snapshot: priceSnapshot?.amount_cents || null,
+                price_currency_snapshot: priceSnapshot?.currency || 'USD'
               })
               .select()
               .single()

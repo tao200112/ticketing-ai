@@ -1606,6 +1606,9 @@ export default function AdminDashboard() {
                 setShowActivityModal(false)
                 setEditingActivity(null)
                 setActivityForm({ image_url: '', text: '', is_active: true })
+                setImagePreview(null)
+                const fileInput = document.getElementById('activity-image-upload')
+                if (fileInput) fileInput.value = ''
               }}
               style={{
                 position: 'absolute',

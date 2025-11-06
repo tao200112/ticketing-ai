@@ -1890,17 +1890,23 @@ export default function AdminDashboard() {
 
                       const result = await response.json()
 
-                      if (result.success) {
+                      if (response.ok && result.success) {
                         setShowActivityModal(false)
                         setEditingActivity(null)
                         setActivityForm({ image_url: '', text: '', is_active: true })
+                        setImagePreview(null)
+                        const fileInput = document.getElementById('activity-image-upload')
+                        if (fileInput) fileInput.value = ''
                         loadData()
                       } else {
-                        alert(result.message || 'Failed to save activity')
+                        // Show detailed error message
+                        const errorMsg = result.message || result.error || 'Failed to save activity'
+                        console.error('Activity save error:', result)
+                        alert(`Error: ${errorMsg}`)
                       }
                     } catch (error) {
                       console.error('Error saving activity:', error)
-                      alert('Failed to save activity')
+                      alert(`Failed to save activity: ${error.message || error}`)
                     }
                   }}
                   className="btn-partytix-gradient"

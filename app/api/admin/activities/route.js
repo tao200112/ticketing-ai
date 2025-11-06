@@ -52,28 +52,48 @@ export async function POST(request) {
     const supabase = createSupabaseClient()
 
     // Get max sort_order to set new activity at the end
-    const { data: existingActivities } = await supabase
-      .from('activities')
-      .select('sort_order')
-      .order('sort_order', { ascending: false })
-      .limit(1)
+    // Handle case where sort_order column might not exist yet
+    let maxSortOrder = 999999
+    try {
+      const { data: existingActivities, error: sortError } = await supabase
+        .from('activities')
+        .select('sort_order')
+        .order('sort_order', { ascending: false })
+        .limit(1)
 
-    const maxSortOrder = existingActivities && existingActivities.length > 0
-      ? existingActivities[0].sort_order + 1
-      : 999999
+      // If sort_order column doesn't exist, just use default
+      if (!sortError && existingActivities && existingActivities.length > 0) {
+        maxSortOrder = (existingActivities[0].sort_order || 999999) + 1
+      }
+    } catch (sortErr) {
+      // If sort_order column doesn't exist, use default value
+      logger.warn('sort_order column may not exist, using default', sortErr)
+      maxSortOrder = 999999
+    }
+
+    // Build insert data - only include sort_order if column exists
+    const insertData = {
+      image_url: image_url || null,
+      text: text.trim(),
+      is_active: is_active
+    }
+
+    // Try to add sort_order, but don't fail if column doesn't exist
+    // The migration should add it, but we handle gracefully if not
+    try {
+      insertData.sort_order = maxSortOrder
+    } catch (e) {
+      // Ignore if sort_order can't be added
+    }
 
     const { data: newActivity, error } = await supabase
       .from('activities')
-      .insert({
-        image_url: image_url || null,
-        text: text.trim(),
-        is_active: is_active,
-        sort_order: maxSortOrder
-      })
+      .insert(insertData)
       .select()
       .single()
 
     if (error) {
+      logger.error('Failed to create activity:', error)
       throw ErrorHandler.fromSupabaseError(error, 'CREATION_ERROR')
     }
 

@@ -30,7 +30,8 @@ export async function PUT(request, { params }) {
     const updateData = {
       text: text.trim(),
       ...(image_url !== undefined && { image_url: image_url || null }),
-      ...(is_active !== undefined && { is_active })
+      ...(is_active !== undefined && { is_active }),
+      ...(body.sort_order !== undefined && { sort_order: body.sort_order })
     }
 
     const { data: updatedActivity, error } = await supabase

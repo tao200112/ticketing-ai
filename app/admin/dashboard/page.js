@@ -954,7 +954,77 @@ export default function AdminDashboard() {
                           </div>
                         )}
                       </div>
-                      <div style={{ display: 'flex', gap: '8px' }}>
+                      <div style={{ display: 'flex', gap: '8px', flexDirection: 'column' }}>
+                        <div style={{ display: 'flex', gap: '4px' }}>
+                          <button
+                            onClick={async () => {
+                              try {
+                                const response = await fetch(`/api/admin/events/${event.id}/reorder`, {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ direction: 'up' })
+                                })
+                                if (response.ok) {
+                                  loadData()
+                                } else {
+                                  const result = await response.json()
+                                  if (result.message !== 'Cannot move further') {
+                                    alert(result.message || 'Failed to move event')
+                                  }
+                                }
+                              } catch (error) {
+                                console.error('Error reordering event:', error)
+                                alert('Failed to move event')
+                              }
+                            }}
+                            style={{
+                              background: 'rgba(124, 58, 237, 0.2)',
+                              border: '1px solid rgba(124, 58, 237, 0.3)',
+                              color: '#a78bfa',
+                              padding: '4px 8px',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              fontSize: '12px'
+                            }}
+                            title="Move up"
+                          >
+                            ↑
+                          </button>
+                          <button
+                            onClick={async () => {
+                              try {
+                                const response = await fetch(`/api/admin/events/${event.id}/reorder`, {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ direction: 'down' })
+                                })
+                                if (response.ok) {
+                                  loadData()
+                                } else {
+                                  const result = await response.json()
+                                  if (result.message !== 'Cannot move further') {
+                                    alert(result.message || 'Failed to move event')
+                                  }
+                                }
+                              } catch (error) {
+                                console.error('Error reordering event:', error)
+                                alert('Failed to move event')
+                              }
+                            }}
+                            style={{
+                              background: 'rgba(124, 58, 237, 0.2)',
+                              border: '1px solid rgba(124, 58, 237, 0.3)',
+                              color: '#a78bfa',
+                              padding: '4px 8px',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              fontSize: '12px'
+                            }}
+                            title="Move down"
+                          >
+                            ↓
+                          </button>
+                        </div>
                         <button
                           onClick={() => window.open(`/events/${event.id}`, '_blank')}
                           style={{
@@ -964,8 +1034,7 @@ export default function AdminDashboard() {
                             padding: '6px 12px',
                             borderRadius: '4px',
                             cursor: 'pointer',
-                            fontSize: '12px',
-                            marginRight: '8px'
+                            fontSize: '12px'
                           }}
                         >
                           View
@@ -1319,7 +1388,77 @@ export default function AdminDashboard() {
                           </span>
                         </div>
                       </div>
-                      <div style={{ display: 'flex', gap: '8px' }}>
+                      <div style={{ display: 'flex', gap: '8px', flexDirection: 'column' }}>
+                        <div style={{ display: 'flex', gap: '4px' }}>
+                          <button
+                            onClick={async () => {
+                              try {
+                                const response = await fetch(`/api/admin/activities/${activity.id}/reorder`, {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ direction: 'up' })
+                                })
+                                if (response.ok) {
+                                  loadData()
+                                } else {
+                                  const result = await response.json()
+                                  if (result.message !== 'Cannot move further') {
+                                    alert(result.message || 'Failed to move activity')
+                                  }
+                                }
+                              } catch (error) {
+                                console.error('Error reordering activity:', error)
+                                alert('Failed to move activity')
+                              }
+                            }}
+                            style={{
+                              background: 'rgba(124, 58, 237, 0.2)',
+                              border: '1px solid rgba(124, 58, 237, 0.3)',
+                              color: '#a78bfa',
+                              padding: '4px 8px',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              fontSize: '12px'
+                            }}
+                            title="Move up"
+                          >
+                            ↑
+                          </button>
+                          <button
+                            onClick={async () => {
+                              try {
+                                const response = await fetch(`/api/admin/activities/${activity.id}/reorder`, {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ direction: 'down' })
+                                })
+                                if (response.ok) {
+                                  loadData()
+                                } else {
+                                  const result = await response.json()
+                                  if (result.message !== 'Cannot move further') {
+                                    alert(result.message || 'Failed to move activity')
+                                  }
+                                }
+                              } catch (error) {
+                                console.error('Error reordering activity:', error)
+                                alert('Failed to move activity')
+                              }
+                            }}
+                            style={{
+                              background: 'rgba(124, 58, 237, 0.2)',
+                              border: '1px solid rgba(124, 58, 237, 0.3)',
+                              color: '#a78bfa',
+                              padding: '4px 8px',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              fontSize: '12px'
+                            }}
+                            title="Move down"
+                          >
+                            ↓
+                          </button>
+                        </div>
                         <button
                           onClick={() => {
                             setEditingActivity(activity)

@@ -39,6 +39,7 @@ export async function GET() {
         )
       `)
       .eq('status', 'published')
+      .order('sort_order', { ascending: true })
       .order('created_at', { ascending: false })
     
     // 如果没有已发布的活动，查询所有活动（开发环境）
@@ -61,6 +62,7 @@ export async function GET() {
             sold_count
           )
         `)
+        .order('sort_order', { ascending: true })
         .order('created_at', { ascending: false })
       
       if (!allError && allEvents) {

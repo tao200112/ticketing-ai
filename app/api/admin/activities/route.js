@@ -16,6 +16,7 @@ export async function GET() {
     const { data: activities, error } = await supabase
       .from('activities')
       .select('*')
+      .order('sort_order', { ascending: true })
       .order('created_at', { ascending: false })
 
     if (error) {
@@ -51,12 +52,24 @@ export async function POST(request) {
 
     const supabase = createSupabaseClient()
 
+    // Get max sort_order to set new activity at the end
+    const { data: existingActivities } = await supabase
+      .from('activities')
+      .select('sort_order')
+      .order('sort_order', { ascending: false })
+      .limit(1)
+
+    const maxSortOrder = existingActivities && existingActivities.length > 0
+      ? existingActivities[0].sort_order + 1
+      : 999999
+
     const { data: newActivity, error } = await supabase
       .from('activities')
       .insert({
         image_url: image_url || null,
         text: text.trim(),
-        is_active: is_active
+        is_active: is_active,
+        sort_order: maxSortOrder
       })
       .select()
       .single()

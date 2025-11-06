@@ -31,6 +31,8 @@ export default function AdminDashboard() {
     text: '',
     is_active: true
   })
+  const [uploadingImage, setUploadingImage] = useState(false)
+  const [imagePreview, setImagePreview] = useState(null)
   const [showEventModal, setShowEventModal] = useState(false)
   const [editingEvent, setEditingEvent] = useState(null)
   const [merchantSearch, setMerchantSearch] = useState('')
@@ -1309,6 +1311,9 @@ export default function AdminDashboard() {
                   onClick={() => {
                     setEditingActivity(null)
                     setActivityForm({ image_url: '', text: '', is_active: true })
+                    setImagePreview(null)
+                    const fileInput = document.getElementById('activity-image-upload')
+                    if (fileInput) fileInput.value = ''
                     setShowActivityModal(true)
                   }}
                   className="btn-partytix-gradient"
@@ -1467,6 +1472,7 @@ export default function AdminDashboard() {
                               text: activity.text || '',
                               is_active: activity.is_active !== false
                             })
+                            setImagePreview(activity.image_url || null)
                             setShowActivityModal(true)
                           }}
                           style={{
@@ -1634,35 +1640,118 @@ export default function AdminDashboard() {
                   fontWeight: '500',
                   marginBottom: '8px'
                 }}>
-                  Image URL
+                  Image
                 </label>
-                <input
-                  type="text"
-                  value={activityForm.image_url}
-                  onChange={(e) => setActivityForm(prev => ({ ...prev, image_url: e.target.value }))}
-                  placeholder="https://example.com/image.jpg"
-                  style={{
-                    width: '100%',
-                    padding: '12px 16px',
-                    borderRadius: '8px',
-                    border: '1px solid rgba(255, 255, 255, 0.2)',
-                    background: 'rgba(255, 255, 255, 0.05)',
-                    color: 'white',
-                    fontSize: '14px',
-                    outline: 'none'
-                  }}
-                />
-                {activityForm.image_url && (
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'start' }}>
+                  <div style={{ flex: 1 }}>
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0]
+                        if (!file) return
+
+                        // Validate file size (max 5MB)
+                        if (file.size > 5 * 1024 * 1024) {
+                          alert('File size must be less than 5MB')
+                          return
+                        }
+
+                        // Show preview
+                        const reader = new FileReader()
+                        reader.onload = (event) => {
+                          setImagePreview(event.target?.result)
+                        }
+                        reader.readAsDataURL(file)
+
+                        // Upload file
+                        setUploadingImage(true)
+                        try {
+                          const formData = new FormData()
+                          formData.append('file', file)
+
+                          const response = await fetch('/api/admin/upload', {
+                            method: 'POST',
+                            body: formData
+                          })
+
+                          const result = await response.json()
+
+                          if (result.success) {
+                            setActivityForm(prev => ({ ...prev, image_url: result.url }))
+                          } else {
+                            alert(result.message || 'Failed to upload image')
+                            setImagePreview(null)
+                          }
+                        } catch (error) {
+                          console.error('Error uploading image:', error)
+                          alert('Failed to upload image')
+                          setImagePreview(null)
+                        } finally {
+                          setUploadingImage(false)
+                        }
+                      }}
+                      style={{ display: 'none' }}
+                      id="activity-image-upload"
+                    />
+                    <label
+                      htmlFor="activity-image-upload"
+                      style={{
+                        display: 'inline-block',
+                        padding: '12px 24px',
+                        borderRadius: '8px',
+                        border: '1px solid rgba(255, 255, 255, 0.2)',
+                        background: uploadingImage ? 'rgba(255, 255, 255, 0.1)' : 'rgba(124, 58, 237, 0.2)',
+                        color: 'white',
+                        fontSize: '14px',
+                        fontWeight: '500',
+                        cursor: uploadingImage ? 'not-allowed' : 'pointer',
+                        transition: 'all 0.3s ease',
+                        textAlign: 'center',
+                        width: '100%'
+                      }}
+                    >
+                      {uploadingImage ? 'Uploading...' : 'Upload Image'}
+                    </label>
+                  </div>
+                </div>
+                <div style={{ marginTop: '12px', display: 'flex', gap: '12px' }}>
+                  <input
+                    type="text"
+                    value={activityForm.image_url}
+                    onChange={(e) => {
+                      setActivityForm(prev => ({ ...prev, image_url: e.target.value }))
+                      if (e.target.value) {
+                        setImagePreview(e.target.value)
+                      } else {
+                        setImagePreview(null)
+                      }
+                    }}
+                    placeholder="Or enter image URL"
+                    style={{
+                      flex: 1,
+                      padding: '12px 16px',
+                      borderRadius: '8px',
+                      border: '1px solid rgba(255, 255, 255, 0.2)',
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      color: 'white',
+                      fontSize: '14px',
+                      outline: 'none'
+                    }}
+                  />
+                </div>
+                {(imagePreview || activityForm.image_url) && (
                   <div style={{
                     marginTop: '12px',
                     width: '100%',
                     height: '200px',
                     borderRadius: '8px',
                     overflow: 'hidden',
-                    background: 'rgba(255, 255, 255, 0.1)'
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    position: 'relative'
                   }}>
                     <img
-                      src={activityForm.image_url}
+                      src={imagePreview || activityForm.image_url}
                       alt="Preview"
                       style={{
                         width: '100%',
@@ -1673,6 +1762,31 @@ export default function AdminDashboard() {
                         e.target.style.display = 'none'
                       }}
                     />
+                    {activityForm.image_url && (
+                      <button
+                        onClick={() => {
+                          setActivityForm(prev => ({ ...prev, image_url: '' }))
+                          setImagePreview(null)
+                          const fileInput = document.getElementById('activity-image-upload')
+                          if (fileInput) fileInput.value = ''
+                        }}
+                        style={{
+                          position: 'absolute',
+                          top: '8px',
+                          right: '8px',
+                          background: 'rgba(239, 68, 68, 0.8)',
+                          border: 'none',
+                          color: 'white',
+                          padding: '6px 12px',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontSize: '12px',
+                          fontWeight: '500'
+                        }}
+                      >
+                        Remove
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -1733,6 +1847,9 @@ export default function AdminDashboard() {
                     setShowActivityModal(false)
                     setEditingActivity(null)
                     setActivityForm({ image_url: '', text: '', is_active: true })
+                    setImagePreview(null)
+                    const fileInput = document.getElementById('activity-image-upload')
+                    if (fileInput) fileInput.value = ''
                   }}
                   style={{
                     padding: '10px 20px',

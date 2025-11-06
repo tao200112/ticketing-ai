@@ -193,7 +193,6 @@ export async function POST(request) {
       
       // Get price snapshot
       let priceSnapshot = null
-      const priceId = session.metadata?.price_id
       if (priceId) {
         const { data: priceData, error: priceError } = await supabase
           .from('prices')

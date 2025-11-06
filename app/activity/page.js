@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import NavbarPartyTix from '../../components/NavbarPartyTix'
 
 export default function ActivityPage() {
@@ -111,64 +113,87 @@ export default function ActivityPage() {
             gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
             gap: '24px'
           }}>
-            {activities.map(activity => (
-              <div
-                key={activity.id}
-                style={{
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  backdropFilter: 'blur(12px)',
-                  borderRadius: '16px',
-                  overflow: 'hidden',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  transition: 'all 0.3s ease',
-                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-4px)'
-                  e.currentTarget.style.boxShadow = '0 12px 40px rgba(0, 0, 0, 0.4)'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)'
-                  e.currentTarget.style.boxShadow = '0 8px 32px rgba(0, 0, 0, 0.3)'
-                }}
-              >
-                {activity.image_url && (
-                  <div style={{
-                    width: '100%',
-                    height: '200px',
-                    overflow: 'hidden',
-                    background: 'rgba(255, 255, 255, 0.1)'
-                  }}>
-                    <img
-                      src={activity.image_url}
-                      alt={activity.text || 'Activity'}
-                      style={{
+            {activities.map(activity => {
+              // Truncate text to 150 characters for preview
+              const previewText = activity.text && activity.text.length > 150
+                ? activity.text.substring(0, 150) + '...'
+                : activity.text
+              
+              return (
+                <Link
+                  key={activity.id}
+                  href={`/activity/${activity.id}`}
+                  style={{ textDecoration: 'none', color: 'inherit' }}
+                >
+                  <div
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      backdropFilter: 'blur(12px)',
+                      borderRadius: '16px',
+                      overflow: 'hidden',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      transition: 'all 0.3s ease',
+                      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+                      cursor: 'pointer'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-4px)'
+                      e.currentTarget.style.boxShadow = '0 12px 40px rgba(0, 0, 0, 0.4)'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)'
+                      e.currentTarget.style.boxShadow = '0 8px 32px rgba(0, 0, 0, 0.3)'
+                    }}
+                  >
+                    {activity.image_url && (
+                      <div style={{
                         width: '100%',
-                        height: '100%',
-                        objectFit: 'cover'
-                      }}
-                      onError={(e) => {
-                        e.target.style.display = 'none'
-                        e.target.parentElement.style.display = 'none'
-                      }}
-                    />
+                        height: '200px',
+                        overflow: 'hidden',
+                        background: 'rgba(255, 255, 255, 0.1)'
+                      }}>
+                        <img
+                          src={activity.image_url}
+                          alt={activity.text || 'Activity'}
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover'
+                          }}
+                          onError={(e) => {
+                            e.target.style.display = 'none'
+                            e.target.parentElement.style.display = 'none'
+                          }}
+                        />
+                      </div>
+                    )}
+                    <div style={{ padding: '24px' }}>
+                      {previewText && (
+                        <p style={{
+                          color: 'white',
+                          fontSize: '16px',
+                          lineHeight: '1.6',
+                          margin: 0,
+                          whiteSpace: 'pre-wrap'
+                        }}>
+                          {previewText}
+                        </p>
+                      )}
+                      {activity.text && activity.text.length > 150 && (
+                        <div style={{
+                          marginTop: '12px',
+                          color: 'rgba(124, 58, 237, 0.9)',
+                          fontSize: '14px',
+                          fontWeight: '500'
+                        }}>
+                          Read more →
+                        </div>
+                      )}
+                    </div>
                   </div>
-                )}
-                <div style={{ padding: '24px' }}>
-                  {activity.text && (
-                    <p style={{
-                      color: 'white',
-                      fontSize: '16px',
-                      lineHeight: '1.6',
-                      margin: 0,
-                      whiteSpace: 'pre-wrap'
-                    }}>
-                      {activity.text}
-                    </p>
-                  )}
-                </div>
-              </div>
-            ))}
+                </Link>
+              )
+            })}
           </div>
         )}
       </div>

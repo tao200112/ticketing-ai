@@ -309,17 +309,39 @@ export default function Home() {
                     </div>
                   )}
                   <div style={{ padding: '24px' }}>
-                    {activity.text && (
-                      <p style={{
-                        color: 'white',
-                        fontSize: '16px',
-                        lineHeight: '1.6',
-                        margin: 0,
-                        whiteSpace: 'pre-wrap'
-                      }}>
-                        {activity.text}
-                      </p>
-                    )}
+                    {activity.text && (() => {
+                      const previewText = activity.text.length > 150
+                        ? activity.text.substring(0, 150) + '...'
+                        : activity.text
+                      return (
+                        <>
+                          <p style={{
+                            color: 'white',
+                            fontSize: '16px',
+                            lineHeight: '1.6',
+                            margin: 0,
+                            whiteSpace: 'pre-wrap'
+                          }}>
+                            {previewText}
+                          </p>
+                          {activity.text.length > 150 && (
+                            <Link
+                              href={`/activity/${activity.id}`}
+                              style={{
+                                display: 'inline-block',
+                                marginTop: '12px',
+                                color: 'rgba(124, 58, 237, 0.9)',
+                                fontSize: '14px',
+                                fontWeight: '500',
+                                textDecoration: 'none'
+                              }}
+                            >
+                              Read more →
+                            </Link>
+                          )}
+                        </>
+                      )
+                    })()}
                   </div>
                 </div>
               ))}

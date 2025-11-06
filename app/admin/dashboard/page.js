@@ -173,6 +173,26 @@ export default function AdminDashboard() {
         console.error('Tickets fetch failed:', ticketsResponse.status)
         setTickets([])
       }
+
+      // Load activities
+      console.log('Fetching activities...')
+      try {
+        const activitiesResponse = await fetch('/api/admin/activities')
+        console.log('Activities response:', activitiesResponse.status)
+        if (activitiesResponse.ok) {
+          const activitiesData = await activitiesResponse.json()
+          console.log('Activities data:', activitiesData)
+          setActivities(Array.isArray(activitiesData) ? activitiesData : [])
+        } else {
+          console.error('Activities fetch failed:', activitiesResponse.status)
+          const errorText = await activitiesResponse.text()
+          console.error('Activities error response:', errorText)
+          setActivities([])
+        }
+      } catch (activitiesError) {
+        console.error('Error fetching activities:', activitiesError)
+        setActivities([])
+      }
       
     } catch (error) {
       console.error('Error loading admin data:', error)
@@ -1377,10 +1397,29 @@ export default function AdminDashboard() {
                           fontSize: '16px',
                           lineHeight: '1.6',
                           marginBottom: '16px',
-                          whiteSpace: 'pre-wrap'
+                          whiteSpace: 'pre-wrap',
+                          wordBreak: 'break-word',
+                          display: '-webkit-box',
+                          WebkitLineClamp: 3,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis'
                         }}>
                           {activity.text}
                         </p>
+                        <Link
+                          href={`/activity/${activity.id}`}
+                          target="_blank"
+                          style={{
+                            display: 'inline-block',
+                            color: 'rgba(124, 58, 237, 0.9)',
+                            fontSize: '12px',
+                            textDecoration: 'none',
+                            marginTop: '8px'
+                          }}
+                        >
+                          View full content →
+                        </Link>
                         <div style={{ display: 'flex', gap: '8px', fontSize: '12px', color: 'rgba(255, 255, 255, 0.6)' }}>
                           <span>📅 Created: {new Date(activity.created_at).toLocaleDateString()}</span>
                           <span style={{

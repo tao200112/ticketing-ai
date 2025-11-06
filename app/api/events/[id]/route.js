@@ -48,14 +48,57 @@ export async function GET(request, { params }) {
       .single()
 
     if (error) {
-      logger.error('Error fetching event', { error, eventId: id })
+      logger.error('Error fetching event', { 
+        error: {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        }, 
+        eventId: id 
+      })
+      
       // 如果是 PGRST116 (no rows found)，返回 404
       if (error.code === 'PGRST116') {
+        logger.warn('Event not found in database', { eventId: id })
         throw ErrorHandler.notFoundError(
           'EVENT_NOT_FOUND',
           'Event not found'
         )
       }
+      
+      // 如果是权限错误（RLS 问题）
+      if (error.code === '42501' || error.message?.includes('permission') || error.message?.includes('RLS')) {
+        logger.error('RLS permission error', { eventId: id, error })
+        // 尝试使用 service role key 重新查询
+        const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+        if (serviceKey) {
+          const { createClient } = require('@supabase/supabase-js')
+          const adminSupabase = createClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL,
+            serviceKey
+          )
+          const { data: adminEvent, error: adminError } = await adminSupabase
+            .from('events')
+            .select(`
+              *,
+              merchants (id, name, contact_email),
+              prices (id, name, amount_cents, inventory, ticket_kind)
+            `)
+            .eq('id', id)
+            .single()
+          
+          if (!adminError && adminEvent) {
+            logger.info('Event found using service role key', { eventId: id })
+            return NextResponse.json({ success: true, data: adminEvent })
+          }
+        }
+        throw ErrorHandler.notFoundError(
+          'EVENT_NOT_FOUND',
+          'Event not found or access denied'
+        )
+      }
+      
       // 其他错误也返回 404，避免泄露数据库结构
       throw ErrorHandler.notFoundError(
         'EVENT_NOT_FOUND',

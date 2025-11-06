@@ -37,11 +37,11 @@ export async function POST(request) {
       )
     }
 
-    // Fetch ticket (without requiring order join - use LEFT JOIN instead)
-    // Note: orders might be null or an array, so we handle both cases
+    // Fetch ticket (simplified query - avoid complex joins that might fail)
+    // First, get ticket without order join to avoid potential RLS issues
     const { data: ticket, error: ticketError } = await supabase
       .from('tickets')
-      .select('*, orders(customer_email, metadata)')
+      .select('id, user_id, holder_email, status, used, used_at, order_id, event_id')
       .eq('id', ticket_id)
       .single()
 
@@ -54,6 +54,22 @@ export async function POST(request) {
         )
       }
       throw ErrorHandler.databaseError(ticketError, 'DATABASE_QUERY_ERROR')
+    }
+
+    // Fetch order data separately if order_id exists (avoid join issues)
+    let orderData = null
+    if (ticket.order_id) {
+      const { data: order, error: orderError } = await supabase
+        .from('orders')
+        .select('customer_email, metadata, user_id')
+        .eq('id', ticket.order_id)
+        .single()
+      
+      if (!orderError && order) {
+        orderData = order
+      } else {
+        logger.warn('Order query failed (non-blocking)', { error: orderError, order_id: ticket.order_id })
+      }
     }
 
     // Get user email from users table
@@ -72,15 +88,33 @@ export async function POST(request) {
     }
 
     // Verify ticket belongs to the user
-    // Handle orders being null, object, or array
-    const orderData = Array.isArray(ticket.orders) ? ticket.orders[0] : ticket.orders
-    const orderUserId = orderData?.metadata?.user_id
-    const orderEmail = orderData?.customer_email
+    // Handle metadata as JSONB or string, and check order.user_id field
+    let orderUserId = null
     
+    // First check order.user_id field directly (if exists)
+    if (orderData?.user_id) {
+      orderUserId = orderData.user_id
+    }
+    
+    // Then check metadata (if user_id not found in order.user_id)
+    if (!orderUserId && orderData?.metadata) {
+      if (typeof orderData.metadata === 'string') {
+        try {
+          const parsed = JSON.parse(orderData.metadata)
+          orderUserId = parsed.user_id
+        } catch (e) {
+          logger.warn('Failed to parse order metadata', { error: e })
+        }
+      } else if (typeof orderData.metadata === 'object') {
+        orderUserId = orderData.metadata.user_id
+      }
+    }
+    
+    const orderEmail = orderData?.customer_email
     const ticketUserId = ticket.user_id
     const ticketHolderEmail = ticket.holder_email
 
-    // Verify ownership: check user_id from ticket, order metadata, email match, or holder_email match
+    // Verify ownership: check user_id from ticket, order user_id, order metadata, email match, or holder_email match
     const isOwner = 
       (ticketUserId && ticketUserId === userId) ||
       (orderUserId && orderUserId === userId) ||
@@ -95,7 +129,8 @@ export async function POST(request) {
       ticketHolderEmail,
       orderEmail,
       userEmail: userData.email,
-      isOwner
+      isOwner,
+      hasOrder: !!orderData
     })
 
     if (!isOwner) {

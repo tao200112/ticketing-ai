@@ -134,9 +134,9 @@ export async function POST(request) {
         }
       }
       
-      // Check if this is a combo ticket
-      const isCombo = isComboTicket(priceName)
-      const comboKinds = isCombo ? getComboTicketKinds(priceName) : [ticketKindFromPrice || getTicketKindFromPriceName(priceName) || null]
+      // Check if this is a combo ticket (check both ticket_kind and price name)
+      const isCombo = isComboTicket(priceName, ticketKindFromPrice)
+      const comboKinds = isCombo ? getComboTicketKinds(priceName, ticketKindFromPrice) : [ticketKindFromPrice || getTicketKindFromPriceName(priceName) || null]
       
       const tickets = []
 

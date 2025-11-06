@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { EventDetail, Price } from '../../../lib/schemas/event'
 import { EventDetailErrorBoundary } from '../../../components/ErrorBoundary'
+import { getTicketCategory, requires21Plus, isComboTicket } from '../../../lib/ticket-helpers'
 
 interface EventDetailClientProps {
   event: EventDetail
@@ -50,6 +51,33 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
   const selectedPrice: Price | null = event?.prices?.[selectedPriceIndex] ?? null
   const totalPrice = selectedPrice ? (selectedPrice.amount * quantity) / 100 : 0
 
+  // 按分类组织价格列表
+  const groupedPrices = useMemo(() => {
+    if (!event?.prices) return {}
+    
+    const groups: Record<string, Array<{ price: Price; index: number }>> = {
+      entry: [],
+      queue: [],
+      drink: [],
+      combo: [],
+      other: []
+    }
+    
+    event.prices.forEach((price, index) => {
+      const ticketKind = price.ticket_kind || null
+      const category = getTicketCategory(ticketKind)
+      groups[category].push({ price, index })
+    })
+    
+    return groups
+  }, [event?.prices])
+
+  // 检查选中的票是否需要21+限制
+  const selectedRequires21Plus = useMemo(() => {
+    if (!selectedPrice) return false
+    return requires21Plus(selectedPrice.ticket_kind || null)
+  }, [selectedPrice])
+
   const handleBuyTickets = async () => {
     // 验证用户登录状态 - 确保只在客户端执行
     if (typeof window === 'undefined') {
@@ -83,6 +111,13 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
     
     if (!customerAge || parseInt(customerAge) < 1 || parseInt(customerAge) > 120) {
       setPaymentError('Please enter a valid age (1-120)')
+      return
+    }
+
+    // 检查21+年龄限制
+    const customerAgeNum = parseInt(customerAge)
+    if (selectedRequires21Plus && customerAgeNum < 21) {
+      setPaymentError('This ticket type requires you to be 21 years or older')
       return
     }
 
@@ -343,80 +378,518 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
                 color: 'white',
                 marginBottom: '24px'
               }}>
-                Select Ticket Type
+                Purchase Tickets
               </h2>
 
-              {/* 票种选择 */}
+              {/* 票种选择 - 按分类显示 */}
               <div style={{ marginBottom: '24px' }}>
-                {event.prices.map((price, index) => (
-                  <div key={price.id} style={{
-                    marginBottom: '16px',
-                    padding: '16px',
-                    backgroundColor: selectedPriceIndex === index ? 'rgba(124, 58, 237, 0.2)' : 'rgba(55, 65, 81, 0.3)',
-                    border: selectedPriceIndex === index ? '2px solid #7c3aed' : '1px solid rgba(255, 255, 255, 0.1)',
-                    borderRadius: '12px',
-                    cursor: 'pointer',
-                    transition: 'all 0.3s ease'
-                  }}
-                  onClick={() => setSelectedPriceIndex(index)}>
-                    <div style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center'
+                {/* 常规入场票 (18-20, 21+) */}
+                {groupedPrices.entry.length > 0 && (
+                  <div style={{ marginBottom: '32px' }}>
+                    <h3 style={{
+                      fontSize: '1.125rem',
+                      fontWeight: '600',
+                      color: 'white',
+                      marginBottom: '16px',
+                      paddingBottom: '8px',
+                      borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
                     }}>
-                      <div>
-                        <h3 style={{
-                          fontSize: '1.125rem',
-                          fontWeight: 'bold',
-                          color: 'white',
-                          marginBottom: '4px'
-                        }}>
-                          {price.label}
-                        </h3>
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px'
-                        }}>
-                          <span style={{
-                            fontSize: '1.25rem',
-                            fontWeight: 'bold',
-                            color: '#22c55e'
-                          }}>
-                            ${(price.amount / 100).toFixed(2)}
-                          </span>
-                          {price.limit_per_user && (
-                            <span style={{
-                              fontSize: '0.875rem',
-                              color: '#6b7280'
-                            }}>
-                              (Limit {price.limit_per_user} per person)
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <div style={{
-                        width: '20px',
-                        height: '20px',
-                        borderRadius: '50%',
-                        border: selectedPriceIndex === index ? '2px solid #7c3aed' : '2px solid #6b7280',
-                        backgroundColor: selectedPriceIndex === index ? '#7c3aed' : 'transparent',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}>
-                        {selectedPriceIndex === index && (
+                      常规入场票
+                    </h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {groupedPrices.entry.map(({ price, index }) => (
+                        <div key={price.id} style={{
+                          padding: '16px',
+                          backgroundColor: selectedPriceIndex === index ? 'rgba(124, 58, 237, 0.2)' : 'rgba(55, 65, 81, 0.3)',
+                          border: selectedPriceIndex === index ? '2px solid #7c3aed' : '1px solid rgba(255, 255, 255, 0.1)',
+                          borderRadius: '12px',
+                          cursor: 'pointer',
+                          transition: 'all 0.3s ease'
+                        }}
+                        onClick={() => setSelectedPriceIndex(index)}>
                           <div style={{
-                            width: '8px',
-                            height: '8px',
-                            borderRadius: '50%',
-                            backgroundColor: 'white'
-                          }}></div>
-                        )}
-                      </div>
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center'
+                          }}>
+                            <div style={{ flex: 1 }}>
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '12px',
+                                marginBottom: '4px'
+                              }}>
+                                <h4 style={{
+                                  fontSize: '1rem',
+                                  fontWeight: 'bold',
+                                  color: 'white',
+                                  margin: 0
+                                }}>
+                                  {price.label}
+                                </h4>
+                                {price.ticket_kind === 'entry_21_plus' && (
+                                  <span style={{
+                                    fontSize: '0.75rem',
+                                    padding: '2px 8px',
+                                    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+                                    color: '#fca5a5',
+                                    borderRadius: '4px',
+                                    fontWeight: '500'
+                                  }}>
+                                    21+
+                                  </span>
+                                )}
+                                {price.ticket_kind === 'entry_18_20' && (
+                                  <span style={{
+                                    fontSize: '0.75rem',
+                                    padding: '2px 8px',
+                                    backgroundColor: 'rgba(34, 211, 238, 0.2)',
+                                    color: '#67e8f9',
+                                    borderRadius: '4px',
+                                    fontWeight: '500'
+                                  }}>
+                                    18-20
+                                  </span>
+                                )}
+                              </div>
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px'
+                              }}>
+                                <span style={{
+                                  fontSize: '1.125rem',
+                                  fontWeight: 'bold',
+                                  color: '#22c55e'
+                                }}>
+                                  ${(price.amount / 100).toFixed(2)}
+                                </span>
+                                {price.inventory !== null && price.inventory !== undefined && (
+                                  <span style={{
+                                    fontSize: '0.875rem',
+                                    color: '#94a3b8'
+                                  }}>
+                                    Stock: {price.inventory > 0 ? '●' : '○'}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div style={{
+                              width: '20px',
+                              height: '20px',
+                              borderRadius: '50%',
+                              border: selectedPriceIndex === index ? '2px solid #7c3aed' : '2px solid #6b7280',
+                              backgroundColor: selectedPriceIndex === index ? '#7c3aed' : 'transparent',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0
+                            }}>
+                              {selectedPriceIndex === index && (
+                                <div style={{
+                                  width: '8px',
+                                  height: '8px',
+                                  borderRadius: '50%',
+                                  backgroundColor: 'white'
+                                }}></div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                ))}
+                )}
+
+                {/* 插队票 */}
+                {groupedPrices.queue.length > 0 && (
+                  <div style={{ marginBottom: '32px' }}>
+                    <h3 style={{
+                      fontSize: '1.125rem',
+                      fontWeight: '600',
+                      color: 'white',
+                      marginBottom: '16px',
+                      paddingBottom: '8px',
+                      borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
+                    }}>
+                      插队票
+                    </h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {groupedPrices.queue.map(({ price, index }) => (
+                        <div key={price.id} style={{
+                          padding: '16px',
+                          backgroundColor: selectedPriceIndex === index ? 'rgba(124, 58, 237, 0.2)' : 'rgba(55, 65, 81, 0.3)',
+                          border: selectedPriceIndex === index ? '2px solid #7c3aed' : '1px solid rgba(255, 255, 255, 0.1)',
+                          borderRadius: '12px',
+                          cursor: 'pointer',
+                          transition: 'all 0.3s ease'
+                        }}
+                        onClick={() => setSelectedPriceIndex(index)}>
+                          <div style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center'
+                          }}>
+                            <div style={{ flex: 1 }}>
+                              <h4 style={{
+                                fontSize: '1rem',
+                                fontWeight: 'bold',
+                                color: 'white',
+                                marginBottom: '4px'
+                              }}>
+                                {price.label}
+                              </h4>
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px'
+                              }}>
+                                <span style={{
+                                  fontSize: '1.125rem',
+                                  fontWeight: 'bold',
+                                  color: '#22c55e'
+                                }}>
+                                  ${(price.amount / 100).toFixed(2)}
+                                </span>
+                                {price.inventory !== null && price.inventory !== undefined && (
+                                  <span style={{
+                                    fontSize: '0.875rem',
+                                    color: '#94a3b8'
+                                  }}>
+                                    Stock: {price.inventory > 0 ? '●' : '○'}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div style={{
+                              width: '20px',
+                              height: '20px',
+                              borderRadius: '50%',
+                              border: selectedPriceIndex === index ? '2px solid #7c3aed' : '2px solid #6b7280',
+                              backgroundColor: selectedPriceIndex === index ? '#7c3aed' : 'transparent',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0
+                            }}>
+                              {selectedPriceIndex === index && (
+                                <div style={{
+                                  width: '8px',
+                                  height: '8px',
+                                  borderRadius: '50%',
+                                  backgroundColor: 'white'
+                                }}></div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 酒水票 */}
+                {groupedPrices.drink.length > 0 && (
+                  <div style={{ marginBottom: '32px' }}>
+                    <h3 style={{
+                      fontSize: '1.125rem',
+                      fontWeight: '600',
+                      color: 'white',
+                      marginBottom: '16px',
+                      paddingBottom: '8px',
+                      borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
+                    }}>
+                      酒水票
+                    </h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {groupedPrices.drink.map(({ price, index }) => (
+                        <div key={price.id} style={{
+                          padding: '16px',
+                          backgroundColor: selectedPriceIndex === index ? 'rgba(124, 58, 237, 0.2)' : 'rgba(55, 65, 81, 0.3)',
+                          border: selectedPriceIndex === index ? '2px solid #7c3aed' : '1px solid rgba(255, 255, 255, 0.1)',
+                          borderRadius: '12px',
+                          cursor: 'pointer',
+                          transition: 'all 0.3s ease'
+                        }}
+                        onClick={() => setSelectedPriceIndex(index)}>
+                          <div style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center'
+                          }}>
+                            <div style={{ flex: 1 }}>
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '12px',
+                                marginBottom: '4px'
+                              }}>
+                                <h4 style={{
+                                  fontSize: '1rem',
+                                  fontWeight: 'bold',
+                                  color: 'white',
+                                  margin: 0
+                                }}>
+                                  {price.label}
+                                </h4>
+                                <span style={{
+                                  fontSize: '0.75rem',
+                                  padding: '2px 8px',
+                                  backgroundColor: 'rgba(239, 68, 68, 0.2)',
+                                  color: '#fca5a5',
+                                  borderRadius: '4px',
+                                  fontWeight: '500'
+                                }}>
+                                  21+
+                                </span>
+                              </div>
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px'
+                              }}>
+                                <span style={{
+                                  fontSize: '1.125rem',
+                                  fontWeight: 'bold',
+                                  color: '#22c55e'
+                                }}>
+                                  ${(price.amount / 100).toFixed(2)}
+                                </span>
+                                {price.inventory !== null && price.inventory !== undefined && (
+                                  <span style={{
+                                    fontSize: '0.875rem',
+                                    color: '#94a3b8'
+                                  }}>
+                                    Stock: {price.inventory > 0 ? '●' : '○'}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div style={{
+                              width: '20px',
+                              height: '20px',
+                              borderRadius: '50%',
+                              border: selectedPriceIndex === index ? '2px solid #7c3aed' : '2px solid #6b7280',
+                              backgroundColor: selectedPriceIndex === index ? '#7c3aed' : 'transparent',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0
+                            }}>
+                              {selectedPriceIndex === index && (
+                                <div style={{
+                                  width: '8px',
+                                  height: '8px',
+                                  borderRadius: '50%',
+                                  backgroundColor: 'white'
+                                }}></div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Combo票 */}
+                {groupedPrices.combo.length > 0 && (
+                  <div style={{ marginBottom: '32px' }}>
+                    <h3 style={{
+                      fontSize: '1.125rem',
+                      fontWeight: '600',
+                      color: 'white',
+                      marginBottom: '16px',
+                      paddingBottom: '8px',
+                      borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
+                    }}>
+                      Combo 套餐
+                    </h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {groupedPrices.combo.map(({ price, index }) => (
+                        <div key={price.id} style={{
+                          padding: '16px',
+                          backgroundColor: selectedPriceIndex === index ? 'rgba(124, 58, 237, 0.2)' : 'rgba(55, 65, 81, 0.3)',
+                          border: selectedPriceIndex === index ? '2px solid #7c3aed' : '1px solid rgba(255, 255, 255, 0.1)',
+                          borderRadius: '12px',
+                          cursor: 'pointer',
+                          transition: 'all 0.3s ease',
+                          position: 'relative'
+                        }}
+                        onClick={() => setSelectedPriceIndex(index)}>
+                          <div style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center'
+                          }}>
+                            <div style={{ flex: 1 }}>
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '12px',
+                                marginBottom: '4px'
+                              }}>
+                                <h4 style={{
+                                  fontSize: '1rem',
+                                  fontWeight: 'bold',
+                                  color: 'white',
+                                  margin: 0
+                                }}>
+                                  {price.label}
+                                </h4>
+                                <span style={{
+                                  fontSize: '0.75rem',
+                                  padding: '2px 8px',
+                                  backgroundColor: 'rgba(239, 68, 68, 0.2)',
+                                  color: '#fca5a5',
+                                  borderRadius: '4px',
+                                  fontWeight: '500'
+                                }}>
+                                  21+ 限定
+                                </span>
+                              </div>
+                              <div style={{
+                                fontSize: '0.875rem',
+                                color: '#94a3b8',
+                                marginBottom: '8px'
+                              }}>
+                                包含：入场票 + 酒水票
+                              </div>
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px'
+                              }}>
+                                <span style={{
+                                  fontSize: '1.125rem',
+                                  fontWeight: 'bold',
+                                  color: '#22c55e'
+                                }}>
+                                  ${(price.amount / 100).toFixed(2)}
+                                </span>
+                                {price.inventory !== null && price.inventory !== undefined && (
+                                  <span style={{
+                                    fontSize: '0.875rem',
+                                    color: '#94a3b8'
+                                  }}>
+                                    Stock: {price.inventory > 0 ? '●' : '○'}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div style={{
+                              width: '20px',
+                              height: '20px',
+                              borderRadius: '50%',
+                              border: selectedPriceIndex === index ? '2px solid #7c3aed' : '2px solid #6b7280',
+                              backgroundColor: selectedPriceIndex === index ? '#7c3aed' : 'transparent',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0
+                            }}>
+                              {selectedPriceIndex === index && (
+                                <div style={{
+                                  width: '8px',
+                                  height: '8px',
+                                  borderRadius: '50%',
+                                  backgroundColor: 'white'
+                                }}></div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 其他类型 */}
+                {groupedPrices.other.length > 0 && (
+                  <div style={{ marginBottom: '32px' }}>
+                    <h3 style={{
+                      fontSize: '1.125rem',
+                      fontWeight: '600',
+                      color: 'white',
+                      marginBottom: '16px',
+                      paddingBottom: '8px',
+                      borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
+                    }}>
+                      其他
+                    </h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {groupedPrices.other.map(({ price, index }) => (
+                        <div key={price.id} style={{
+                          padding: '16px',
+                          backgroundColor: selectedPriceIndex === index ? 'rgba(124, 58, 237, 0.2)' : 'rgba(55, 65, 81, 0.3)',
+                          border: selectedPriceIndex === index ? '2px solid #7c3aed' : '1px solid rgba(255, 255, 255, 0.1)',
+                          borderRadius: '12px',
+                          cursor: 'pointer',
+                          transition: 'all 0.3s ease'
+                        }}
+                        onClick={() => setSelectedPriceIndex(index)}>
+                          <div style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center'
+                          }}>
+                            <div style={{ flex: 1 }}>
+                              <h4 style={{
+                                fontSize: '1rem',
+                                fontWeight: 'bold',
+                                color: 'white',
+                                marginBottom: '4px'
+                              }}>
+                                {price.label}
+                              </h4>
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px'
+                              }}>
+                                <span style={{
+                                  fontSize: '1.125rem',
+                                  fontWeight: 'bold',
+                                  color: '#22c55e'
+                                }}>
+                                  ${(price.amount / 100).toFixed(2)}
+                                </span>
+                                {price.inventory !== null && price.inventory !== undefined && (
+                                  <span style={{
+                                    fontSize: '0.875rem',
+                                    color: '#94a3b8'
+                                  }}>
+                                    Stock: {price.inventory > 0 ? '●' : '○'}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div style={{
+                              width: '20px',
+                              height: '20px',
+                              borderRadius: '50%',
+                              border: selectedPriceIndex === index ? '2px solid #7c3aed' : '2px solid #6b7280',
+                              backgroundColor: selectedPriceIndex === index ? '#7c3aed' : 'transparent',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0
+                            }}>
+                              {selectedPriceIndex === index && (
+                                <div style={{
+                                  width: '8px',
+                                  height: '8px',
+                                  borderRadius: '50%',
+                                  backgroundColor: 'white'
+                                }}></div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* 客户信息 */}

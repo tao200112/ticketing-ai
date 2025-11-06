@@ -115,9 +115,24 @@ export async function GET(request) {
         // Import ticket helpers
         const { isComboTicket, getComboTicketKinds, getTicketKindFromPriceName } = await import('@/lib/ticket-helpers')
         
+        // Get ticket_kind from price if available
+        let ticketKindFromPrice = null
+        const priceId = session.metadata?.price_id
+        if (priceId) {
+          const { data: priceData, error: priceError } = await supabase
+            .from('prices')
+            .select('ticket_kind')
+            .eq('id', priceId)
+            .single()
+          
+          if (!priceError && priceData?.ticket_kind) {
+            ticketKindFromPrice = priceData.ticket_kind
+          }
+        }
+        
         const priceName = session.metadata?.price_name || 'general'
-        const isCombo = isComboTicket(priceName)
-        const comboKinds = isCombo ? getComboTicketKinds(priceName) : [getTicketKindFromPriceName(priceName) || null]
+        const isCombo = isComboTicket(priceName, ticketKindFromPrice)
+        const comboKinds = isCombo ? getComboTicketKinds(priceName, ticketKindFromPrice) : [ticketKindFromPrice || getTicketKindFromPriceName(priceName) || null]
         
         for (let i = 0; i < quantity; i++) {
           const ticketKinds = isCombo ? comboKinds : [comboKinds[0]]

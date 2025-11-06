@@ -779,6 +779,7 @@ export default function NewEventWizardPage() {
                             <option value="entry_21_plus">正常票 - Entry (21+)</option>
                             <option value="queue">插队票 - Queue Pass</option>
                             <option value="drink">酒水票 - Drink Ticket</option>
+                            <option value="combo">Combo 套餐 - Entry + Drink (21+限定)</option>
                           </select>
                         </div>
                         

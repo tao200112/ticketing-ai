@@ -11,8 +11,9 @@ export const PriceSchema = z.object({
   label: z.string(),
   amount: z.number().min(0),
   currency: z.string().default('USD'),
-  inventory: z.number().min(0).optional(),
-  limit_per_user: z.number().min(1).optional()
+  inventory: z.number().min(0).nullable().optional(),
+  limit_per_user: z.number().min(1).optional(),
+  ticket_kind: z.enum(['entry_18_20', 'entry_21_plus', 'queue', 'drink', 'combo']).nullable().optional()
 })
 
 // 事件模型

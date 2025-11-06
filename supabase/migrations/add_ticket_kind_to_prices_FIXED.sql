@@ -20,7 +20,7 @@ BEGIN
         -- 添加 CHECK 约束（如果列不存在则添加约束）
         ALTER TABLE prices
         ADD CONSTRAINT prices_ticket_kind_check 
-        CHECK (ticket_kind IS NULL OR ticket_kind IN ('entry_18_20', 'entry_21_plus', 'queue', 'drink'));
+        CHECK (ticket_kind IS NULL OR ticket_kind IN ('entry_18_20', 'entry_21_plus', 'queue', 'drink', 'combo'));
         
         RAISE NOTICE 'ticket_kind column added to prices table';
     ELSE

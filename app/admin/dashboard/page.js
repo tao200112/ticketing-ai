@@ -1394,8 +1394,17 @@ export default function AdminDashboard() {
                         </div>
                       )}
                       <div style={{ flex: 1 }}>
-                        <p style={{
+                        <h3 style={{
                           color: 'white',
+                          fontSize: '18px',
+                          fontWeight: '600',
+                          marginBottom: '12px',
+                          lineHeight: '1.4'
+                        }}>
+                          {activity.title || 'Untitled Activity'}
+                        </h3>
+                        <p style={{
+                          color: 'rgba(255, 255, 255, 0.9)',
                           fontSize: '16px',
                           lineHeight: '1.6',
                           marginBottom: '16px',

@@ -36,6 +36,7 @@ export async function GET(request, { params }) {
 
     const supabase = createSupabaseClient()
 
+    // 查询事件详情，不限制 status（允许查看所有状态的事件）
     const { data: event, error } = await supabase
       .from('events')
       .select(`
@@ -46,13 +47,31 @@ export async function GET(request, { params }) {
       .eq('id', id)
       .single()
 
-    if (error || !event) {
+    if (error) {
+      logger.error('Error fetching event', { error, eventId: id })
+      // 如果是 PGRST116 (no rows found)，返回 404
+      if (error.code === 'PGRST116') {
+        throw ErrorHandler.notFoundError(
+          'EVENT_NOT_FOUND',
+          'Event not found'
+        )
+      }
+      // 其他错误也返回 404，避免泄露数据库结构
       throw ErrorHandler.notFoundError(
         'EVENT_NOT_FOUND',
         'Event not found'
       )
     }
 
+    if (!event) {
+      logger.warn('Event not found', { eventId: id })
+      throw ErrorHandler.notFoundError(
+        'EVENT_NOT_FOUND',
+        'Event not found'
+      )
+    }
+
+    logger.info('Event fetched successfully', { eventId: id, eventTitle: event.title })
     return NextResponse.json({ success: true, data: event })
 
   } catch (error) {

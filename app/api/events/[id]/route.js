@@ -41,23 +41,6 @@ export async function GET(request, { params }) {
       )
     }
 
-    if (finalId === 'ridiculous-chicken') {
-      const defaultEvent = {
-        id: 'ridiculous-chicken',
-        title: 'Ridiculous Chicken Night Event',
-        name: 'Ridiculous Chicken Night Event',
-        description: 'Enjoy delicious chicken and an amazing night at Virginia Tech\'s most popular event. We provide the freshest ingredients, the most unique cooking methods, and the warmest service.',
-        location: '201 N Main St SUITE A, Blacksburg, VA 24060',
-        address: '201 N Main St SUITE A, Blacksburg, VA 24060',
-        start_at: '2025-10-25T20:00:00Z',
-        merchants: { name: 'PartyTix Events' },
-        prices: [
-          { id: 'regular', name: 'Regular Ticket (21+)', amount_cents: 1500, inventory: 100 },
-          { id: 'special', name: 'Special Ticket (18-20)', amount_cents: 3000, inventory: 50 }
-        ]
-      }
-      return NextResponse.json({ success: true, data: defaultEvent })
-    }
 
     if (!isSupabaseConfigured()) {
       throw ErrorHandler.configurationError(
@@ -231,7 +214,7 @@ export async function DELETE(request, { params }) {
     }
 
     logger.success('Event deleted successfully', { eventId: id })
-    return NextResponse.json({ success: true, message: '活动删除成功' })
+    return NextResponse.json({ success: true, message: 'Event deleted successfully' })
 
   } catch (error) {
     return handleApiError(error, request, logger)
@@ -244,35 +227,6 @@ export async function PUT(request, { params }) {
     const id = resolvedParams?.id || resolvedParams?.id
     const body = await request.json()
     const { title, description, startTime, endTime, location, poster_url, status, prices } = body
-
-    // 处理默认活动 ridiculous-chicken
-    if (id === 'ridiculous-chicken') {
-      // 对于默认活动，我们返回成功但不实际更新数据库
-      // 因为这是一个虚拟的默认活动
-      const updatedEvent = {
-        id: 'ridiculous-chicken',
-        title: title || 'Ridiculous Chicken Night Event',
-        name: title || 'Ridiculous Chicken Night Event',
-        description: description || 'Enjoy delicious chicken and an amazing night at Virginia Tech\'s most popular event.',
-        location: location || '201 N Main St SUITE A, Blacksburg, VA 24060',
-        address: location || '201 N Main St SUITE A, Blacksburg, VA 24060',
-        start_at: startTime || '2025-10-25T20:00:00Z',
-        end_at: endTime || '2025-10-25T23:00:00Z',
-        status: status || 'published',
-        merchants: { name: 'PartyTix Events' },
-        prices: prices || [
-          { id: 'regular', name: 'Regular Ticket (21+)', amount_cents: 1500, inventory: 100 },
-          { id: 'special', name: 'Special Ticket (18-20)', amount_cents: 3000, inventory: 50 }
-        ]
-      }
-      
-      logger.info('Default event updated (virtual)', { title: updatedEvent.title })
-      return NextResponse.json({ 
-        success: true, 
-        data: updatedEvent, 
-        message: 'Default event updated successfully (Note: This is a virtual event and will not be saved to the database)' 
-      })
-    }
 
     if (!isSupabaseConfigured()) {
       throw ErrorHandler.configurationError(

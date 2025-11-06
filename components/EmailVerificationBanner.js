@@ -33,13 +33,13 @@ export default function EmailVerificationBanner({ user }) {
       const data = await response.json();
 
       if (data.success) {
-        setMessage('验证邮件已重新发送，请检查您的邮箱');
+        setMessage('Verification email has been resent, please check your inbox');
       } else {
-        setMessage(data.message || '发送失败，请稍后重试');
+        setMessage(data.message || 'Failed to send, please try again later');
       }
     } catch (error) {
       console.error('重新发送验证邮件失败:', error);
-      setMessage('网络错误，请稍后重试');
+      setMessage('Network error, please try again later');
     } finally {
       setIsResending(false);
     }
@@ -63,12 +63,12 @@ export default function EmailVerificationBanner({ user }) {
         </div>
         <div className="ml-3 flex-1">
           <h3 className="text-sm font-medium text-yellow-800">
-            需要验证邮箱
+            Email Verification Required
           </h3>
           <div className="mt-2 text-sm text-yellow-700">
             <p>
-              为了保障您的账户安全，请验证您的邮箱地址 <strong>{user.email}</strong>。
-              未验证邮箱将无法购票、创建活动或提现。
+              To ensure your account security, please verify your email address <strong>{user.email}</strong>.
+              Unverified emails cannot purchase tickets, create events, or withdraw funds.
             </p>
             {message && (
               <p className="mt-2 font-medium">{message}</p>
@@ -81,13 +81,13 @@ export default function EmailVerificationBanner({ user }) {
                 disabled={isResending}
                 className="bg-yellow-50 px-2 py-1.5 rounded-md text-sm font-medium text-yellow-800 hover:bg-yellow-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-yellow-50 focus:ring-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isResending ? '发送中...' : '重新发送验证邮件'}
+                {isResending ? 'Sending...' : 'Resend Verification Email'}
               </button>
               <button
                 onClick={handleDismiss}
                 className="ml-3 bg-yellow-50 px-2 py-1.5 rounded-md text-sm font-medium text-yellow-800 hover:bg-yellow-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-yellow-50 focus:ring-yellow-600"
               >
-                稍后提醒
+                Remind Me Later
               </button>
             </div>
           </div>

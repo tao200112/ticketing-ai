@@ -6,7 +6,6 @@ import NavbarPartyTix from "../components/NavbarPartyTix"
 import EventCard from "../components/EventCard"
 import { SkeletonGrid } from "../components/SkeletonCard"
 // import { hasSupabase } from "../lib/safeEnv" // 已移除，使用新的 API 客户端
-import { getDefaultEvents } from "../lib/default-events"
 import { useEvents } from "../lib/hooks/use-api"
 
 export default function Home() {
@@ -86,9 +85,6 @@ export default function Home() {
       console.log('⚠️ API 活动为空或无效:', apiEvents)
     }
     
-    // 添加默认的 ridiculous-chicken 活动
-    const defaultEvents = getDefaultEvents()
-    allEvents = [...allEvents, ...defaultEvents]
     
     // 过滤掉测试活动
     const filteredEvents = allEvents.filter(event => {

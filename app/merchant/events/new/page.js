@@ -775,11 +775,11 @@ export default function NewEventWizardPage() {
                             }}
                           >
                             <option value="">Select ticket kind...</option>
-                            <option value="entry_18_20">正常票 - Entry (18-20)</option>
-                            <option value="entry_21_plus">正常票 - Entry (21+)</option>
-                            <option value="queue">插队票 - Queue Pass</option>
-                            <option value="drink">酒水票 - Drink Ticket</option>
-                            <option value="combo">Combo 套餐 - Entry + Drink (21+限定)</option>
+                            <option value="entry_18_20">Entry Ticket (18-20)</option>
+                            <option value="entry_21_plus">Entry Ticket (21+)</option>
+                            <option value="queue">Queue Pass</option>
+                            <option value="drink">Drink Ticket</option>
+                            <option value="combo">Combo Package - Entry + Drink (21+ Only)</option>
                           </select>
                         </div>
                         

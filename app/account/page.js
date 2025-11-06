@@ -22,11 +22,11 @@ export default function AccountPage() {
   const [showLogin, setShowLogin] = useState(false)
   const [showRegister, setShowRegister] = useState(false)
   const [ticketsExpanded, setTicketsExpanded] = useState({
-    // Structure: { '正常票': { categoryExpanded: true, unused: true, used: true }, '酒水票': { categoryExpanded: true, unused: true, used: true }, etc. }
-    '正常票': { categoryExpanded: true, unused: true, used: true },
-    '酒水票': { categoryExpanded: true, unused: true, used: true },
-    '插队票': { categoryExpanded: true, unused: true, used: true },
-    '其他': { categoryExpanded: true, unused: true, used: true }
+    // Structure: { 'Entry Tickets': { categoryExpanded: true, unused: true, used: true }, 'Drink Tickets': { categoryExpanded: true, unused: true, used: true }, etc. }
+    'Entry Tickets': { categoryExpanded: true, unused: true, used: true },
+    'Drink Tickets': { categoryExpanded: true, unused: true, used: true },
+    'Queue Pass': { categoryExpanded: true, unused: true, used: true },
+    'Other': { categoryExpanded: true, unused: true, used: true }
   })
   const [ordersExpanded, setOrdersExpanded] = useState(true)
   const [clickingTickets, setClickingTickets] = useState({}) // Track triple-click state per ticket
@@ -426,7 +426,7 @@ export default function AccountPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
               {/* Categorize tickets by kind first, then by usage status */}
               {(() => {
-                // Group tickets by category (正常票, 酒水票, 插队票)
+                // Group tickets by category
                 const ticketsByCategory = {}
                 
                 ;(tickets || []).forEach(ticket => {
@@ -445,12 +445,12 @@ export default function AccountPage() {
                 })
                 
                 // Define category order and colors
-                const categoryOrder = ['正常票', '酒水票', '插队票', '其他']
+                const categoryOrder = ['Entry Tickets', 'Drink Tickets', 'Queue Pass', 'Other']
                 const categoryColors = {
-                  '正常票': { bg: 'rgba(59, 130, 246, 0.2)', color: '#3b82f6' },
-                  '酒水票': { bg: 'rgba(168, 85, 247, 0.2)', color: '#a855f7' },
-                  '插队票': { bg: 'rgba(236, 72, 153, 0.2)', color: '#ec4899' },
-                  '其他': { bg: 'rgba(107, 114, 128, 0.2)', color: '#6b7280' }
+                  'Entry Tickets': { bg: 'rgba(59, 130, 246, 0.2)', color: '#3b82f6' },
+                  'Drink Tickets': { bg: 'rgba(168, 85, 247, 0.2)', color: '#a855f7' },
+                  'Queue Pass': { bg: 'rgba(236, 72, 153, 0.2)', color: '#ec4899' },
+                  'Other': { bg: 'rgba(107, 114, 128, 0.2)', color: '#6b7280' }
                 }
                 
                 return (
@@ -462,7 +462,7 @@ export default function AccountPage() {
                       }
                       
                       const totalCount = categoryTickets.unused.length + categoryTickets.used.length
-                      const categoryColor = categoryColors[category] || categoryColors['其他']
+                      const categoryColor = categoryColors[category] || categoryColors['Other']
                       
                       return (
                         <div key={category} style={{ marginBottom: '24px' }}>
@@ -563,10 +563,10 @@ export default function AccountPage() {
                                         fontSize: '12px',
                                         fontWeight: '600'
                                       }}>
-                                        未使用
+                                        Unused
                                       </span>
                                       <span style={{ color: 'white', fontSize: '14px', fontWeight: '600' }}>
-                                        未使用票 ({categoryTickets.unused.length})
+                                        Unused ({categoryTickets.unused.length})
                                       </span>
                                     </div>
                                     <span style={{ 
@@ -847,10 +847,10 @@ export default function AccountPage() {
                                         fontSize: '12px',
                                         fontWeight: '600'
                                       }}>
-                                        已使用
+                                        Used
                                       </span>
                                       <span style={{ color: 'white', fontSize: '14px', fontWeight: '600' }}>
-                                        已使用票 ({categoryTickets.used.length})
+                                        Used ({categoryTickets.used.length})
                                       </span>
                                     </div>
                                     <span style={{ 

@@ -81,12 +81,12 @@ export default function PriceSelector({ prices = [], onSelectionChange, classNam
 
   return (
     <div className={`space-y-4 ${className}`}>
-      <h3 className="text-lg font-semibold text-white mb-4">选择票档</h3>
+      <h3 className="text-lg font-semibold text-white mb-4">Select Ticket Tier</h3>
       
       {prices.length === 0 ? (
         <div className="text-center py-8">
-          <div className="text-slate-400 mb-2">暂无票档</div>
-          <div className="text-sm text-slate-500">请联系主办方获取票务信息</div>
+          <div className="text-slate-400 mb-2">No ticket tiers available</div>
+          <div className="text-sm text-slate-500">Please contact the organizer for ticket information</div>
         </div>
       ) : (
         <>
@@ -116,7 +116,7 @@ export default function PriceSelector({ prices = [], onSelectionChange, classNam
                           {price.description && <span>{price.description}</span>}
                           {price.inventory && (
                             <span className="ml-2">
-                              剩余: {price.inventory} 张
+                              Remaining: {price.inventory} tickets
                             </span>
                           )}
                         </div>
@@ -164,13 +164,13 @@ export default function PriceSelector({ prices = [], onSelectionChange, classNam
           {calculateSubtotal() > 0 && (
             <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700/50">
               <div className="flex items-center justify-between text-lg font-semibold">
-                <span className="text-white">小计</span>
+                <span className="text-white">Subtotal</span>
                 <span className="text-partytix-gradient">
                   {formatPrice(calculateSubtotal())}
                 </span>
               </div>
               <div className="text-sm text-slate-400 mt-1">
-                共 {Object.values(quantities).reduce((sum, qty) => sum + qty, 0)} 张票
+                Total {Object.values(quantities).reduce((sum, qty) => sum + qty, 0)} tickets
               </div>
             </div>
           )}

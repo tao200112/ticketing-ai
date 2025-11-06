@@ -394,7 +394,7 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
                       paddingBottom: '8px',
                       borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
                     }}>
-                      常规入场票
+                      Entry Tickets
                     </h3>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                       {groupedPrices.entry.map(({ price, index }) => (
@@ -512,7 +512,7 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
                       paddingBottom: '8px',
                       borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
                     }}>
-                      插队票
+                      Queue Pass
                     </h3>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                       {groupedPrices.queue.map(({ price, index }) => (
@@ -599,7 +599,7 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
                       paddingBottom: '8px',
                       borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
                     }}>
-                      酒水票
+                      Drink Tickets
                     </h3>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                       {groupedPrices.drink.map(({ price, index }) => (
@@ -703,7 +703,7 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
                       paddingBottom: '8px',
                       borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
                     }}>
-                      Combo 套餐
+                      Combo Package
                     </h3>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                       {groupedPrices.combo.map(({ price, index }) => (
@@ -745,7 +745,7 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
                                   borderRadius: '4px',
                                   fontWeight: '500'
                                 }}>
-                                  21+ 限定
+                                  21+ Only
                                 </span>
                               </div>
                               <div style={{
@@ -753,7 +753,7 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
                                 color: '#94a3b8',
                                 marginBottom: '8px'
                               }}>
-                                包含：入场票 + 酒水票
+                                Includes: Entry Ticket + Drink Ticket
                               </div>
                               <div style={{
                                 display: 'flex',
@@ -815,7 +815,7 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
                       paddingBottom: '8px',
                       borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
                     }}>
-                      其他
+                      Other
                     </h3>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                       {groupedPrices.other.map(({ price, index }) => (

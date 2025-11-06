@@ -66,7 +66,7 @@ export class ErrorBoundary extends Component<Props, State> {
             color: '#ef4444',
             marginBottom: '0.5rem'
           }}>
-            页面加载出错
+            Page Load Error
           </h3>
           <p style={{
             color: '#94a3b8',
@@ -74,7 +74,7 @@ export class ErrorBoundary extends Component<Props, State> {
             marginBottom: '1rem',
             maxWidth: '400px'
           }}>
-            抱歉，页面遇到了一个错误。请刷新页面重试，或联系技术支持。
+            Sorry, the page encountered an error. Please refresh the page and try again, or contact technical support.
           </p>
           <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
             <button
@@ -89,7 +89,7 @@ export class ErrorBoundary extends Component<Props, State> {
                 fontWeight: '500'
               }}
             >
-              刷新页面
+              Refresh Page
             </button>
             <button
               onClick={() => window.history.back()}
@@ -103,7 +103,7 @@ export class ErrorBoundary extends Component<Props, State> {
                 fontWeight: '500'
               }}
             >
-              返回上页
+              Go Back
             </button>
           </div>
           {process.env.NODE_ENV === 'development' && this.state.error && (
@@ -118,7 +118,7 @@ export class ErrorBoundary extends Component<Props, State> {
               overflow: 'auto'
             }}>
               <summary style={{ cursor: 'pointer', marginBottom: '0.5rem' }}>
-                错误详情 (开发模式)
+                Error Details (Development Mode)
               </summary>
               <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
                 {this.state.error.toString()}

@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import EventCard from '../../components/EventCard'
-import { getDefaultEvents } from '../../lib/default-events'
 import { useEvents } from '../../lib/hooks/use-api'
 
 export default function EventsPage() {
@@ -94,9 +93,6 @@ export default function EventsPage() {
       console.log('⚠️ API 活动为空或无效:', apiEvents)
     }
     
-    // 添加默认的 ridiculous-chicken 活动
-    const defaultEvents = getDefaultEvents()
-    allEvents = [...allEvents, ...defaultEvents]
     
     // 过滤掉测试活动
     const filteredEvents = allEvents.filter(event => {

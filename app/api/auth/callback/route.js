@@ -256,6 +256,10 @@ export async function GET(request) {
       // User doesn't exist - create new user
       logger.info('Creating new user for Google OAuth', { email: userEmail })
       
+      // Get registration domain for tracking (same as email registration)
+      const hostname = request.headers.get('host') || ''
+      const registrationDomain = hostname.split(':')[0]
+      
       // Use targetRole determined from state/referer
       // Note: password_hash can be null for OAuth users
       // For merchant role, user should have already registered with invite code
@@ -267,7 +271,8 @@ export async function GET(request) {
         auth_provider: 'google',
         email_verified_at: supabaseUser.email_confirmed_at || new Date().toISOString(),
         role: targetRole, // Use the determined role (user, merchant, or admin)
-        password_hash: null // Explicitly set to NULL for Google OAuth users (can be set later in settings)
+        password_hash: null, // Explicitly set to NULL for Google OAuth users (can be set later in settings)
+        registration_domain: registrationDomain // Track registration domain (same as email registration)
       }
       
       // For merchant role, log a note that they may need to complete registration
@@ -295,32 +300,43 @@ export async function GET(request) {
 
       if (createError) {
         // Log full error details for debugging - including all possible error properties
+        // Try to extract error from nested structures (Supabase sometimes wraps errors)
+        const actualError = createError.error || createError.originalError || createError
         const errorInfo = {
           error: createError,
+          actualError: actualError,
           errorType: typeof createError,
-          errorCode: createError.code,
-          errorMessage: createError.message,
-          errorDetails: createError.details,
-          errorHint: createError.hint,
-          errorColumn: createError.column,
-          errorConstraint: createError.constraint,
-          errorTable: createError.table,
-          errorSchema: createError.schema,
+          errorCode: createError.code || actualError?.code || createError.error_code || actualError?.error_code,
+          errorMessage: createError.message || actualError?.message || createError.msg || actualError?.msg,
+          errorDetails: createError.details || actualError?.details || createError.detail || actualError?.detail,
+          errorHint: createError.hint || actualError?.hint,
+          errorColumn: createError.column || actualError?.column,
+          errorConstraint: createError.constraint || actualError?.constraint,
+          errorTable: createError.table || actualError?.table,
+          errorSchema: createError.schema || actualError?.schema,
           userData: newUserData,
           // Try to stringify the entire error object
           fullError: JSON.stringify(createError, Object.getOwnPropertyNames(createError), 2),
+          fullActualError: actualError ? JSON.stringify(actualError, Object.getOwnPropertyNames(actualError), 2) : null,
           // Also log as plain object to see all properties
           errorKeys: Object.keys(createError),
-          errorString: String(createError)
+          actualErrorKeys: actualError ? Object.keys(actualError) : [],
+          errorString: String(createError),
+          actualErrorString: actualError ? String(actualError) : null
         }
-        logger.error('Error creating user', errorInfo)
+        logger.error('Error creating user - Full error details:', errorInfo)
         
         // Provide specific error message based on error type
         // Priority: code-based messages > message > details > hint > default
         let errorMessage = 'Database error saving new user' // Default fallback (should rarely be used)
         
         // Extract error code (handle both string and number codes)
-        const errorCode = createError.code || createError.error_code || null
+        // Check multiple possible locations for error code
+        const errorCode = createError.code || 
+                         createError.error_code || 
+                         actualError?.code || 
+                         actualError?.error_code ||
+                         null
         
         // Handle specific PostgreSQL error codes
         // Note: PostgreSQL error codes are strings (e.g., '23505', '42P01')
@@ -363,19 +379,25 @@ export async function GET(request) {
           // Try to get message from various possible locations
           const possibleMessage = createError.message || 
                                  createError.error?.message || 
+                                 actualError?.message ||
                                  createError.msg || 
+                                 actualError?.msg ||
                                  createError.errorMessage ||
+                                 actualError?.errorMessage ||
                                  null
           
           // Try to get details from various possible locations
           const possibleDetails = createError.details || 
-                                createError.error?.details || 
-                                createError.detail ||
-                                null
+                                 createError.error?.details || 
+                                 actualError?.details ||
+                                 createError.detail ||
+                                 actualError?.detail ||
+                                 null
           
           // Try to get hint from various possible locations
           const possibleHint = createError.hint || 
                               createError.error?.hint ||
+                              actualError?.hint ||
                               null
           
           if (possibleMessage && possibleMessage.trim()) {

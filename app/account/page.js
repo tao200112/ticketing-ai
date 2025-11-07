@@ -8,6 +8,7 @@ import RegisterForm from '../../components/RegisterForm'
 import { createClient } from '@supabase/supabase-js'
 import { QRCodeSVG } from 'qrcode.react'
 import { getTicketKindDisplayName, getTicketKindCategoryName } from '@/lib/ticket-helpers'
+import { requiresPasswordSetup } from '@/lib/auth/password-placeholder'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -130,13 +131,14 @@ export default function AccountPage() {
       }
 
       if (userData) {
-        const hasPassword = !!userData.password_hash
+        const requiresPassword = requiresPasswordSetup(userData)
+        const hasPassword = !!userData.password_hash && !requiresPassword
 
         delete userData.password_hash
 
         // Track password setup status for Google OAuth users
         userData.has_password = hasPassword
-        userData.requires_password_setup = userData.auth_provider === 'google' && !hasPassword
+        userData.requires_password_setup = requiresPassword
 
         // Persist password status in local session (if available)
         try {
@@ -144,7 +146,7 @@ export default function AccountPage() {
           if (existingSession) {
             const parsedSession = JSON.parse(existingSession)
             parsedSession.has_password = hasPassword
-            parsedSession.requires_password_setup = userData.requires_password_setup
+            parsedSession.requires_password_setup = requiresPassword
             localStorage.setItem('userSession', JSON.stringify(parsedSession))
           }
         } catch (error) {

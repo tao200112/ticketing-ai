@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs'
 import { getPortalFromHostname, getRoleFromPortal } from '@/lib/domain-detector'
 import { ErrorHandler, handleApiError } from '@/lib/error-handler'
 import { createLogger } from '@/lib/logger'
+import { isGoogleOauthPasswordPlaceholder } from '@/lib/auth/password-placeholder'
 
 // Get Supabase configuration from environment variables
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -67,6 +68,22 @@ export async function POST(request) {
     }
 
     // Validate password
+    if (
+      !user.password_hash ||
+      isGoogleOauthPasswordPlaceholder(user.password_hash)
+    ) {
+      logger.warn('Password login attempted for OAuth-only user', {
+        userId: user.id,
+        email: user.email,
+        role: user.role,
+        authProvider: user.auth_provider
+      })
+      throw ErrorHandler.authenticationError(
+        'INVALID_CREDENTIALS',
+        'Invalid email or password'
+      )
+    }
+
     const isValidPassword = await bcrypt.compare(password, user.password_hash)
     if (!isValidPassword) {
       throw ErrorHandler.authenticationError(

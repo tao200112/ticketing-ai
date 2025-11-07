@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import bcrypt from 'bcryptjs'
+import { isGoogleOauthPasswordPlaceholder } from '@/lib/auth/password-placeholder'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -59,6 +60,24 @@ export async function POST(request) {
     }
 
     // 验证密码
+    if (
+      !user.password_hash ||
+      isGoogleOauthPasswordPlaceholder(user.password_hash)
+    ) {
+      console.log('❌ 管理员账户启用了 OAuth，需要使用 Google 登录', {
+        userId: user.id,
+        email: user.email
+      })
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'INVALID_CREDENTIALS',
+          message: '邮箱或密码错误'
+        },
+        { status: 401 }
+      )
+    }
+
     console.log('🔑 验证密码:', { password, hash: user.password_hash?.substring(0, 20) + '...' })
     const isValidPassword = await bcrypt.compare(password, user.password_hash)
     console.log('✅ 密码验证结果:', isValidPassword)

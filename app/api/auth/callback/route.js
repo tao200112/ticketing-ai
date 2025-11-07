@@ -3,8 +3,47 @@ import { createClient } from '@supabase/supabase-js'
 import { createSupabaseClient } from '@/lib/supabase-api'
 import { ErrorHandler, handleApiError } from '@/lib/error-handler'
 import { createLogger } from '@/lib/logger'
+import {
+  GOOGLE_OAUTH_PASSWORD_PLACEHOLDER_HASH,
+  requiresPasswordSetup
+} from '@/lib/auth/password-placeholder'
 
 const logger = createLogger('oauth-callback')
+
+function isPasswordHashConstraintError(error) {
+  if (!error) return false
+  const rawCode =
+    error.code ||
+    error.error_code ||
+    error?.originalError?.code ||
+    error?.originalError?.error_code
+  if (rawCode && String(rawCode) === '23502') {
+    const columnName =
+      error.column ||
+      error.details?.match(/column "(\w+)"/)?.[1] ||
+      error.message?.match(/column "(\w+)"/)?.[1] ||
+      null
+    return !columnName || columnName === 'password_hash'
+  }
+  const combinedMessage = [
+    error.message,
+    error.details,
+    error.hint,
+    error.errorMessage,
+    error?.originalError?.message,
+    error?.originalError?.details
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase()
+
+  return (
+    combinedMessage.includes('password_hash') &&
+    (combinedMessage.includes('null') ||
+      combinedMessage.includes('not null') ||
+      combinedMessage.includes('required'))
+  )
+}
 
 export async function GET(request) {
   try {
@@ -338,37 +377,113 @@ export async function GET(request) {
         note: 'Using Supabase auth user ID as primary key'
       })
 
+      let usedPasswordPlaceholder = false
+      let fallbackOriginalError = null
+
       const { data: createdUser, error: createError } = await adminSupabase
         .from('users')
         .insert(newUserData)
         .select()
         .single()
 
-      if (createError) {
+      let finalCreateError = createError
+      let finalCreatedUser = createdUser
+
+      if (finalCreateError && isPasswordHashConstraintError(finalCreateError)) {
+        fallbackOriginalError = finalCreateError
+        logger.warn(
+          'Password hash NOT NULL constraint detected when creating OAuth user, retrying with placeholder hash',
+          {
+            errorCode: finalCreateError.code,
+            errorMessage: finalCreateError.message,
+            errorDetails: finalCreateError.details,
+            userId: newUserData.id,
+            email: newUserData.email
+          }
+        )
+
+        const fallbackData = {
+          ...newUserData,
+          password_hash: GOOGLE_OAUTH_PASSWORD_PLACEHOLDER_HASH
+        }
+
+        const {
+          data: fallbackUser,
+          error: fallbackError
+        } = await adminSupabase
+          .from('users')
+          .insert(fallbackData)
+          .select()
+          .single()
+
+        if (fallbackError) {
+          logger.error('Fallback user creation with placeholder hash failed', {
+            error: fallbackError,
+            originalError: finalCreateError,
+            fallbackErrorCode: fallbackError.code,
+            fallbackErrorMessage: fallbackError.message,
+            fallbackErrorDetails: fallbackError.details,
+            userId: newUserData.id,
+            email: newUserData.email
+          })
+          finalCreateError = fallbackError
+        } else {
+          usedPasswordPlaceholder = true
+          finalCreateError = null
+          finalCreatedUser = fallbackUser
+          logger.info('Created OAuth user with password placeholder hash', {
+            userId: fallbackUser.id,
+            email: fallbackUser.email
+          })
+        }
+      }
+
+      if (finalCreateError) {
         // Log full error details for debugging - including all possible error properties
         // Try to extract error from nested structures (Supabase sometimes wraps errors)
-        const actualError = createError.error || createError.originalError || createError
+        const actualError =
+          finalCreateError.error || finalCreateError.originalError || finalCreateError
         const errorInfo = {
-          error: createError,
+          error: finalCreateError,
           actualError: actualError,
-          errorType: typeof createError,
-          errorCode: createError.code || actualError?.code || createError.error_code || actualError?.error_code,
-          errorMessage: createError.message || actualError?.message || createError.msg || actualError?.msg,
-          errorDetails: createError.details || actualError?.details || createError.detail || actualError?.detail,
-          errorHint: createError.hint || actualError?.hint,
-          errorColumn: createError.column || actualError?.column,
-          errorConstraint: createError.constraint || actualError?.constraint,
-          errorTable: createError.table || actualError?.table,
-          errorSchema: createError.schema || actualError?.schema,
+          errorType: typeof finalCreateError,
+          errorCode:
+            finalCreateError.code ||
+            actualError?.code ||
+            finalCreateError.error_code ||
+            actualError?.error_code,
+          errorMessage:
+            finalCreateError.message ||
+            actualError?.message ||
+            finalCreateError.msg ||
+            actualError?.msg,
+          errorDetails:
+            finalCreateError.details ||
+            actualError?.details ||
+            finalCreateError.detail ||
+            actualError?.detail,
+          errorHint: finalCreateError.hint || actualError?.hint,
+          errorColumn: finalCreateError.column || actualError?.column,
+          errorConstraint: finalCreateError.constraint || actualError?.constraint,
+          errorTable: finalCreateError.table || actualError?.table,
+          errorSchema: finalCreateError.schema || actualError?.schema,
           userData: newUserData,
           // Try to stringify the entire error object
-          fullError: JSON.stringify(createError, Object.getOwnPropertyNames(createError), 2),
+          fullError: JSON.stringify(
+            finalCreateError,
+            Object.getOwnPropertyNames(finalCreateError),
+            2
+          ),
           fullActualError: actualError ? JSON.stringify(actualError, Object.getOwnPropertyNames(actualError), 2) : null,
           // Also log as plain object to see all properties
-          errorKeys: Object.keys(createError),
+          errorKeys: Object.keys(finalCreateError),
           actualErrorKeys: actualError ? Object.keys(actualError) : [],
-          errorString: String(createError),
+          errorString: String(finalCreateError),
           actualErrorString: actualError ? String(actualError) : null
+        }
+
+        if (fallbackOriginalError) {
+          errorInfo.originalPasswordHashError = fallbackOriginalError
         }
         logger.error('Error creating user - Full error details:', errorInfo)
         
@@ -378,8 +493,8 @@ export async function GET(request) {
         
         // Extract error code (handle both string and number codes)
         // Check multiple possible locations for error code
-        const errorCode = createError.code || 
-                         createError.error_code || 
+        const errorCode = finalCreateError.code || 
+                         finalCreateError.error_code || 
                          actualError?.code || 
                          actualError?.error_code ||
                          null
@@ -392,27 +507,30 @@ export async function GET(request) {
           errorMessage = 'User with this email already exists'
         } else if (errorCode === '23502' || errorCode === 23502 || String(errorCode) === '23502') {
           // Not null constraint violation
-          const fieldName = createError.column || 
-                           createError.details?.match(/column "(\w+)"/)?.[1] || 
-                           createError.message?.match(/column "(\w+)"/)?.[1] ||
+          const fieldName = finalCreateError.column || 
+                           finalCreateError.details?.match(/column "(\w+)"/)?.[1] || 
+                           finalCreateError.message?.match(/column "(\w+)"/)?.[1] ||
                            'unknown field'
           errorMessage = `Missing required field: ${fieldName}`
+          if (fieldName === 'password_hash') {
+            errorMessage = 'Password setup is required for this account. Please contact support.'
+          }
         } else if (errorCode === '23514' || errorCode === 23514 || String(errorCode) === '23514') {
           // Check constraint violation
-          const constraintName = createError.constraint || 
-                                createError.details?.match(/constraint "(\w+)"/)?.[1] ||
+          const constraintName = finalCreateError.constraint || 
+                                finalCreateError.details?.match(/constraint "(\w+)"/)?.[1] ||
                                 'validation'
           errorMessage = `Data validation failed: ${constraintName}`
-          if (createError.details) {
-            errorMessage += ` - ${createError.details}`
+          if (finalCreateError.details) {
+            errorMessage += ` - ${finalCreateError.details}`
           }
         } else if (errorCode === '42P01' || String(errorCode) === '42P01') {
           // Table does not exist (PostgreSQL codes with letters are always strings)
           errorMessage = 'Database table not found. Please contact support.'
         } else if (errorCode === '42703' || String(errorCode) === '42703') {
           // Column does not exist (PostgreSQL codes with letters are always strings)
-          const columnName = createError.column || 
-                            createError.details?.match(/column "(\w+)"/)?.[1] || 
+          const columnName = finalCreateError.column || 
+                            finalCreateError.details?.match(/column "(\w+)"/)?.[1] || 
                             'unknown column'
           errorMessage = `Database column not found: ${columnName}. Please contact support.`
         } else if (errorCode === 'PGRST116' || createError.code === 'PGRST116' || String(errorCode) === 'PGRST116') {
@@ -423,26 +541,26 @@ export async function GET(request) {
           // Priority: message > details > hint > string representation > default
           
           // Try to get message from various possible locations
-          const possibleMessage = createError.message || 
-                                 createError.error?.message || 
+          const possibleMessage = finalCreateError.message || 
+                                 finalCreateError.error?.message || 
                                  actualError?.message ||
-                                 createError.msg || 
+                                 finalCreateError.msg || 
                                  actualError?.msg ||
-                                 createError.errorMessage ||
+                                 finalCreateError.errorMessage ||
                                  actualError?.errorMessage ||
                                  null
           
           // Try to get details from various possible locations
-          const possibleDetails = createError.details || 
-                                 createError.error?.details || 
+          const possibleDetails = finalCreateError.details || 
+                                 finalCreateError.error?.details || 
                                  actualError?.details ||
-                                 createError.detail ||
+                                 finalCreateError.detail ||
                                  actualError?.detail ||
                                  null
           
           // Try to get hint from various possible locations
-          const possibleHint = createError.hint || 
-                              createError.error?.hint ||
+          const possibleHint = finalCreateError.hint || 
+                              finalCreateError.error?.hint ||
                               actualError?.hint ||
                               null
           
@@ -463,12 +581,12 @@ export async function GET(request) {
           } else {
             // Last resort: try to extract from error string or JSON
             try {
-              const errorStr = String(createError)
+              const errorStr = String(finalCreateError)
               if (errorStr && errorStr !== '[object Object]' && errorStr.length > 0) {
                 errorMessage = errorStr
               } else {
                 // Try JSON stringify
-                const errorJson = JSON.stringify(createError)
+                const errorJson = JSON.stringify(finalCreateError)
                 if (errorJson && errorJson !== '{}' && errorJson.length < 200) {
                   errorMessage = `Database error: ${errorJson}`
                 }
@@ -480,15 +598,15 @@ export async function GET(request) {
             // If we still have default message, log a warning with full error info
             if (errorMessage === 'Database error saving new user') {
               logger.warn('Using default error message - error object structure may be unexpected', {
-                errorType: typeof createError,
-                errorKeys: Object.keys(createError),
-                errorString: String(createError),
-                errorJson: JSON.stringify(createError),
-                fullErrorObject: createError
+                errorType: typeof finalCreateError,
+                errorKeys: Object.keys(finalCreateError),
+                errorString: String(finalCreateError),
+                errorJson: JSON.stringify(finalCreateError),
+                fullErrorObject: finalCreateError
               })
               // Even with default message, try to add any available info
-              if (Object.keys(createError).length > 0) {
-                errorMessage = `Database error: ${Object.keys(createError).join(', ')}`
+              if (Object.keys(finalCreateError).length > 0) {
+                errorMessage = `Database error: ${Object.keys(finalCreateError).join(', ')}`
               }
             }
           }
@@ -504,10 +622,15 @@ export async function GET(request) {
         )
       }
 
-      userRecord = createdUser
+      userRecord = finalCreatedUser
+      if (usedPasswordPlaceholder) {
+        userRecord.password_hash = GOOGLE_OAUTH_PASSWORD_PLACEHOLDER_HASH
+      }
     }
 
     // Remove sensitive data
+    const passwordNeedsSetup = requiresPasswordSetup(userRecord)
+    const hasPassword = !!userRecord.password_hash && !passwordNeedsSetup
     delete userRecord.password_hash
 
     // Create session data compatible with our existing system
@@ -520,7 +643,9 @@ export async function GET(request) {
       auth_provider: userRecord.auth_provider,
       email_verified_at: userRecord.email_verified_at,
       created_at: userRecord.created_at,
-      updated_at: userRecord.updated_at
+      updated_at: userRecord.updated_at,
+      has_password: hasPassword,
+      requires_password_setup: passwordNeedsSetup
     }
 
     // Redirect to account page with session data in URL hash (will be handled client-side)

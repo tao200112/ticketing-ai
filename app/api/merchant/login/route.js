@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import bcrypt from 'bcryptjs'
+import { isGoogleOauthPasswordPlaceholder } from '@/lib/auth/password-placeholder'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -59,7 +60,10 @@ export async function POST(request) {
     }
 
     // Validate password
-    if (!user.password_hash) {
+    if (
+      !user.password_hash ||
+      isGoogleOauthPasswordPlaceholder(user.password_hash)
+    ) {
       console.log('❌ User has no password hash')
       return NextResponse.json(
         {

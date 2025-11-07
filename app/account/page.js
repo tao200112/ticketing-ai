@@ -223,10 +223,53 @@ export default function AccountPage() {
       
       const result = await response.json()
       
-      if (result.success) {
-        setVerificationMessage('Verification email has been resent, please check your inbox')
+      // Check response status first
+      if (response.status === 429) {
+        // Rate limit error
+        let message = result.details || result.message || 'Too many requests. Please wait before trying again.'
+        
+        // Add retry time if available (check both result.retryAfter and result.details.retryAfter)
+        const retryAfter = result.retryAfter || result.details?.retryAfter
+        if (retryAfter) {
+          const retryDate = new Date(retryAfter)
+          const now = new Date()
+          const minutesLeft = Math.ceil((retryDate - now) / (1000 * 60))
+          
+          if (minutesLeft > 0) {
+            message = `Too many requests. Please wait ${minutesLeft} minute${minutesLeft > 1 ? 's' : ''} before trying again.`
+          } else {
+            message = 'Too many requests. Please wait a moment before trying again.'
+          }
+        }
+        
+        setVerificationMessage(message)
+        return
+      }
+      
+      if (response.status === 403) {
+        // Forbidden error
+        setVerificationMessage(result.details || result.message || 'Access denied. Please check your account permissions.')
+        return
+      }
+      
+      if (response.status === 404) {
+        // User not found
+        setVerificationMessage(result.details || result.message || 'User not found. Please contact support.')
+        return
+      }
+      
+      if (response.status >= 500) {
+        // Server error
+        setVerificationMessage(result.details || result.message || 'Server error. Please try again later or contact support.')
+        return
+      }
+      
+      // Success case
+      if (result.success || response.ok) {
+        setVerificationMessage(result.message || 'Verification email has been resent, please check your inbox')
       } else {
-        setVerificationMessage(result.message || 'Failed to send, please try again later')
+        // Other error cases
+        setVerificationMessage(result.details || result.message || 'Failed to send, please try again later')
       }
     } catch (error) {
       console.error('Error resending verification email:', error)

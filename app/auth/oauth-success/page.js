@@ -19,12 +19,33 @@ function OAuthSuccessContent() {
     try {
       const sessionData = JSON.parse(decodeURIComponent(sessionParam))
       
-      // Save session to localStorage (same format as email/password login)
-      localStorage.setItem('userSession', JSON.stringify(sessionData))
-      console.log('✅ Google OAuth session saved to localStorage', sessionData)
-      
-      // Redirect to account page
-      router.replace('/account')
+      // Save session to localStorage based on role
+      if (sessionData.role === 'merchant') {
+        // For merchant users, save to merchantUser (same format as merchant login)
+        const merchantUser = {
+          id: sessionData.id,
+          email: sessionData.email,
+          name: sessionData.name,
+          role: sessionData.role
+        }
+        localStorage.setItem('merchantUser', JSON.stringify(merchantUser))
+        localStorage.setItem('merchantToken', 'merchant-logged-in')
+        console.log('✅ Google OAuth merchant session saved to localStorage', merchantUser)
+        
+        // Redirect to merchant dashboard
+        router.replace('/merchant')
+      } else {
+        // For regular users and admins, save to userSession
+        localStorage.setItem('userSession', JSON.stringify(sessionData))
+        console.log('✅ Google OAuth session saved to localStorage', sessionData)
+        
+        // Redirect based on role
+        if (sessionData.role === 'admin') {
+          router.replace('/admin')
+        } else {
+          router.replace('/account')
+        }
+      }
     } catch (error) {
       console.error('❌ Failed to parse session data:', error)
       router.replace('/auth/login?error=invalid_session')

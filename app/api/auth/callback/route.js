@@ -12,6 +12,39 @@ export async function GET(request) {
     const code = searchParams.get('code')
     const error = searchParams.get('error')
     const errorDescription = searchParams.get('error_description')
+    const state = searchParams.get('state') // Get state parameter (may contain role info)
+    
+    // Determine role from state or referer
+    // Default to 'user' if not specified
+    let targetRole = 'user'
+    
+    // Check if state contains role information
+    if (state) {
+      try {
+        const stateData = JSON.parse(decodeURIComponent(state))
+        if (stateData.role && ['user', 'merchant', 'admin'].includes(stateData.role)) {
+          targetRole = stateData.role
+        }
+      } catch (e) {
+        // State might not be JSON, check if it's a simple role string
+        if (['user', 'merchant', 'admin'].includes(state)) {
+          targetRole = state
+        }
+      }
+    }
+    
+    // Fallback: Check referer header to determine if from merchant login
+    const referer = request.headers.get('referer') || ''
+    if (referer.includes('/merchant/auth/login') && targetRole === 'user') {
+      targetRole = 'merchant'
+    }
+    
+    logger.info('OAuth callback received', { 
+      hasCode: !!code, 
+      hasError: !!error,
+      targetRole,
+      referer: referer.substring(0, 100) // Log first 100 chars
+    })
 
     // Handle OAuth errors
     if (error) {
@@ -78,11 +111,31 @@ export async function GET(request) {
     const userAvatar = supabaseUser.user_metadata?.avatar_url || null
 
     // Check if user already exists in our users table
-    const { data: existingUser, error: userQueryError } = await adminSupabase
-      .from('users')
-      .select('*')
-      .eq('email', userEmail)
-      .single()
+    // For merchant role, check specifically for merchant users
+    // For user role, check for any user with this email
+    let existingUser = null
+    let userQueryError = null
+    
+    if (targetRole === 'merchant') {
+      // For merchant login, only check merchant role users
+      const { data, error } = await adminSupabase
+        .from('users')
+        .select('*')
+        .eq('email', userEmail)
+        .eq('role', 'merchant')
+        .single()
+      existingUser = data
+      userQueryError = error
+    } else {
+      // For user/admin login, check any user with this email
+      const { data, error } = await adminSupabase
+        .from('users')
+        .select('*')
+        .eq('email', userEmail)
+        .single()
+      existingUser = data
+      userQueryError = error
+    }
 
     let userRecord = null
 
@@ -146,16 +199,26 @@ export async function GET(request) {
       // User doesn't exist - create new user
       logger.info('Creating new user for Google OAuth', { email: userEmail })
       
-      // Default role is 'user', age is required but we'll set a default
+      // Use targetRole determined from state/referer
       // Note: password_hash can be null for OAuth users
+      // For merchant role, user should have already registered with invite code
+      // But we allow Google OAuth to create merchant users (they can complete registration later)
       const newUserData = {
         email: userEmail,
         name: userName || 'User', // Ensure name is not empty
         age: 18, // Default age, user can update later (must be >= 16)
         auth_provider: 'google',
         email_verified_at: supabaseUser.email_confirmed_at || new Date().toISOString(),
-        role: 'user'
+        role: targetRole // Use the determined role (user, merchant, or admin)
         // password_hash is intentionally omitted (null) for Google OAuth users
+      }
+      
+      // For merchant role, log a note that they may need to complete registration
+      if (targetRole === 'merchant') {
+        logger.info('Creating merchant user via Google OAuth', { 
+          email: userEmail,
+          note: 'User may need to complete merchant registration with invite code'
+        })
       }
 
       logger.info('Attempting to create user with data:', {

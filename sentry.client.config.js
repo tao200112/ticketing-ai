@@ -29,6 +29,7 @@ Sentry.init({
   ignoreErrors: [
     'ResizeObserver loop limit exceeded',
     'Non-Error promise rejection captured',
+    'merchantID is required', // 临时忽略 merchantID 错误，直到找到根本原因
   ],
   
   // 过滤敏感数据

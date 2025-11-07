@@ -208,20 +208,23 @@ export async function GET(request) {
         let errorMessage = 'Database error updating user' // Default fallback
         
         // Handle specific PostgreSQL error codes
-        if (updateError.code === '23505') {
+        // Extract error code (handle both string and number codes)
+        const updateErrorCode = updateError.code || updateError.error_code || null
+        
+        if (updateErrorCode === '23505' || updateErrorCode === 23505 || String(updateErrorCode) === '23505') {
           errorMessage = 'User data conflict. Please contact support.'
-        } else if (updateError.code === '23502') {
+        } else if (updateErrorCode === '23502' || updateErrorCode === 23502 || String(updateErrorCode) === '23502') {
           const fieldName = updateError.column || updateError.details?.match(/column "(\w+)"/)?.[1] || 'unknown field'
           errorMessage = `Missing required field: ${fieldName}`
-        } else if (updateError.code === '23514') {
+        } else if (updateErrorCode === '23514' || updateErrorCode === 23514 || String(updateErrorCode) === '23514') {
           const constraintName = updateError.constraint || 'validation'
           errorMessage = `Data validation failed: ${constraintName}`
           if (updateError.details) {
             errorMessage += ` - ${updateError.details}`
           }
-        } else if (updateError.code === '42P01') {
+        } else if (updateErrorCode === '42P01' || String(updateErrorCode) === '42P01') {
           errorMessage = 'Database table not found. Please contact support.'
-        } else if (updateError.code === '42703') {
+        } else if (updateErrorCode === '42703' || String(updateErrorCode) === '42703') {
           const columnName = updateError.column || updateError.details?.match(/column "(\w+)"/)?.[1] || 'unknown column'
           errorMessage = `Database column not found: ${columnName}. Please contact support.`
         } else if (updateError.message) {
@@ -320,17 +323,19 @@ export async function GET(request) {
         const errorCode = createError.code || createError.error_code || null
         
         // Handle specific PostgreSQL error codes
-        if (errorCode === '23505' || errorCode === 23505) {
+        // Note: PostgreSQL error codes are strings (e.g., '23505', '42P01')
+        // Some may also come as numbers (e.g., 23505), so we check both
+        if (errorCode === '23505' || errorCode === 23505 || String(errorCode) === '23505') {
           // Unique constraint violation
           errorMessage = 'User with this email already exists'
-        } else if (errorCode === '23502' || errorCode === 23502) {
+        } else if (errorCode === '23502' || errorCode === 23502 || String(errorCode) === '23502') {
           // Not null constraint violation
           const fieldName = createError.column || 
                            createError.details?.match(/column "(\w+)"/)?.[1] || 
                            createError.message?.match(/column "(\w+)"/)?.[1] ||
                            'unknown field'
           errorMessage = `Missing required field: ${fieldName}`
-        } else if (errorCode === '23514' || errorCode === 23514) {
+        } else if (errorCode === '23514' || errorCode === 23514 || String(errorCode) === '23514') {
           // Check constraint violation
           const constraintName = createError.constraint || 
                                 createError.details?.match(/constraint "(\w+)"/)?.[1] ||
@@ -339,16 +344,16 @@ export async function GET(request) {
           if (createError.details) {
             errorMessage += ` - ${createError.details}`
           }
-        } else if (errorCode === '42P01' || errorCode === 42P01) {
-          // Table does not exist
+        } else if (errorCode === '42P01' || String(errorCode) === '42P01') {
+          // Table does not exist (PostgreSQL codes with letters are always strings)
           errorMessage = 'Database table not found. Please contact support.'
-        } else if (errorCode === '42703' || errorCode === 42703) {
-          // Column does not exist
+        } else if (errorCode === '42703' || String(errorCode) === '42703') {
+          // Column does not exist (PostgreSQL codes with letters are always strings)
           const columnName = createError.column || 
                             createError.details?.match(/column "(\w+)"/)?.[1] || 
                             'unknown column'
           errorMessage = `Database column not found: ${columnName}. Please contact support.`
-        } else if (errorCode === 'PGRST116' || createError.code === 'PGRST116') {
+        } else if (errorCode === 'PGRST116' || createError.code === 'PGRST116' || String(errorCode) === 'PGRST116') {
           // PostgREST: no rows returned (shouldn't happen on insert, but handle it)
           errorMessage = 'Failed to create user account. Please try again.'
         } else {

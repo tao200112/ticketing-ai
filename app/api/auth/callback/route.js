@@ -145,11 +145,30 @@ export async function GET(request) {
         error: userQueryError,
         errorCode: userQueryError.code,
         errorMessage: userQueryError.message,
+        errorDetails: userQueryError.details,
+        errorHint: userQueryError.hint,
         email: userEmail
       })
       
+      // Provide specific error message
+      let errorMessage = 'Database query error'
+      
+      if (userQueryError.code === '42P01') {
+        errorMessage = 'Database table not found. Please contact support.'
+      } else if (userQueryError.code === '42703') {
+        const columnName = userQueryError.column || userQueryError.details?.match(/column "(\w+)"/)?.[1] || 'unknown column'
+        errorMessage = `Database column not found: ${columnName}. Please contact support.`
+      } else if (userQueryError.message) {
+        errorMessage = userQueryError.message
+        if (userQueryError.details && !errorMessage.includes(userQueryError.details)) {
+          errorMessage += ` - ${userQueryError.details}`
+        }
+      } else if (userQueryError.details) {
+        errorMessage = userQueryError.details
+      }
+      
       return NextResponse.redirect(
-        new URL(`/auth/login?error=${encodeURIComponent(userQueryError.message || 'Database query error')}`, request.url)
+        new URL(`/auth/login?error=${encodeURIComponent(errorMessage)}`, request.url)
       )
     }
 
@@ -180,13 +199,48 @@ export async function GET(request) {
           error: updateError,
           errorCode: updateError.code,
           errorMessage: updateError.message,
+          errorDetails: updateError.details,
+          errorHint: updateError.hint,
           userId: existingUser.id
         })
         
-        // Provide more specific error message
-        let errorMessage = 'Database error updating user'
-        if (updateError.message) {
+        // Provide specific error message based on error type
+        let errorMessage = 'Database error updating user' // Default fallback
+        
+        // Handle specific PostgreSQL error codes
+        if (updateError.code === '23505') {
+          errorMessage = 'User data conflict. Please contact support.'
+        } else if (updateError.code === '23502') {
+          const fieldName = updateError.column || updateError.details?.match(/column "(\w+)"/)?.[1] || 'unknown field'
+          errorMessage = `Missing required field: ${fieldName}`
+        } else if (updateError.code === '23514') {
+          const constraintName = updateError.constraint || 'validation'
+          errorMessage = `Data validation failed: ${constraintName}`
+          if (updateError.details) {
+            errorMessage += ` - ${updateError.details}`
+          }
+        } else if (updateError.code === '42P01') {
+          errorMessage = 'Database table not found. Please contact support.'
+        } else if (updateError.code === '42703') {
+          const columnName = updateError.column || updateError.details?.match(/column "(\w+)"/)?.[1] || 'unknown column'
+          errorMessage = `Database column not found: ${columnName}. Please contact support.`
+        } else if (updateError.message) {
           errorMessage = updateError.message
+          if (updateError.details && !errorMessage.includes(updateError.details)) {
+            errorMessage += ` - ${updateError.details}`
+          }
+          if (updateError.hint && !errorMessage.includes(updateError.hint)) {
+            errorMessage += ` (Hint: ${updateError.hint})`
+          }
+        } else if (updateError.details) {
+          errorMessage = updateError.details
+        } else if (updateError.hint) {
+          errorMessage = `Database error: ${updateError.hint}`
+        }
+        
+        // Truncate if too long for URL
+        if (errorMessage.length > 200) {
+          errorMessage = errorMessage.substring(0, 197) + '...'
         }
         
         return NextResponse.redirect(
@@ -248,38 +302,54 @@ export async function GET(request) {
           fullError: JSON.stringify(createError, null, 2)
         })
         
-        // Provide more specific error message with full details
-        let errorMessage = 'Database error saving new user'
+        // Provide specific error message based on error type
+        let errorMessage = 'Database error saving new user' // Default fallback
         
-        // Build detailed error message
-        const errorParts = []
-        if (createError.code) {
-          errorParts.push(`Code: ${createError.code}`)
-        }
-        if (createError.message) {
-          errorParts.push(createError.message)
-        }
-        if (createError.details) {
-          errorParts.push(`Details: ${createError.details}`)
-        }
-        if (createError.hint) {
-          errorParts.push(`Hint: ${createError.hint}`)
-        }
-        
+        // Handle specific PostgreSQL error codes
         if (createError.code === '23505') {
+          // Unique constraint violation
           errorMessage = 'User with this email already exists'
         } else if (createError.code === '23502') {
-          errorMessage = 'Missing required field: ' + (createError.message || createError.details || 'unknown field')
+          // Not null constraint violation
+          const fieldName = createError.column || createError.details?.match(/column "(\w+)"/)?.[1] || 'unknown field'
+          errorMessage = `Missing required field: ${fieldName}`
         } else if (createError.code === '23514') {
-          errorMessage = 'Data validation failed: ' + (createError.message || 'check constraint violation')
+          // Check constraint violation
+          const constraintName = createError.constraint || 'validation'
+          errorMessage = `Data validation failed: ${constraintName}`
           if (createError.details) {
-            errorMessage += ' - ' + createError.details
+            errorMessage += ` - ${createError.details}`
           }
-        } else if (errorParts.length > 0) {
-          errorMessage = errorParts.join(' | ')
+        } else if (createError.code === '42P01') {
+          // Table does not exist
+          errorMessage = 'Database table not found. Please contact support.'
+        } else if (createError.code === '42703') {
+          // Column does not exist
+          const columnName = createError.column || createError.details?.match(/column "(\w+)"/)?.[1] || 'unknown column'
+          errorMessage = `Database column not found: ${columnName}. Please contact support.`
+        } else if (createError.code === 'PGRST116') {
+          // PostgREST: no rows returned (shouldn't happen on insert, but handle it)
+          errorMessage = 'Failed to create user account. Please try again.'
+        } else if (createError.message) {
+          // Use the actual error message if available
+          errorMessage = createError.message
+          // Add details if available and not already in message
+          if (createError.details && !errorMessage.includes(createError.details)) {
+            errorMessage += ` - ${createError.details}`
+          }
+          // Add hint if available
+          if (createError.hint && !errorMessage.includes(createError.hint)) {
+            errorMessage += ` (Hint: ${createError.hint})`
+          }
+        } else if (createError.details) {
+          // Fallback to details if message is not available
+          errorMessage = createError.details
+        } else if (createError.hint) {
+          // Fallback to hint if nothing else is available
+          errorMessage = `Database error: ${createError.hint}`
         }
         
-        // Truncate if too long for URL
+        // Truncate if too long for URL (keep it readable)
         if (errorMessage.length > 200) {
           errorMessage = errorMessage.substring(0, 197) + '...'
         }

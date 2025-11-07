@@ -111,34 +111,61 @@ export async function GET(request) {
     const userAvatar = supabaseUser.user_metadata?.avatar_url || null
 
     // Check if user already exists in our users table
-    // IMPORTANT: Check for ANY user with this email first (regardless of role)
+    // IMPORTANT: First check by Supabase auth user ID (most reliable)
+    // Then check by email as fallback
     // This prevents duplicate user creation when email is UNIQUE
-    // If user exists but with different role, we'll update their auth_provider
-    // but keep their existing role (role changes should be done through proper channels)
     let existingUser = null
     let userQueryError = null
     
-    // First, try to find any user with this email (regardless of role)
-    const { data: allUsers, error: allUsersError } = await adminSupabase
+    // First, try to find user by Supabase auth ID (most reliable match)
+    const { data: userById, error: userByIdError } = await adminSupabase
       .from('users')
       .select('*')
-      .eq('email', userEmail)
+      .eq('id', supabaseUser.id)
+      .single()
     
-    if (allUsersError && allUsersError.code !== 'PGRST116') {
-      // PGRST116 means no rows found, which is expected for new users
-      userQueryError = allUsersError
-    } else if (allUsers && allUsers.length > 0) {
-      // User exists - use the first one (email should be unique, so there should only be one)
-      existingUser = allUsers[0]
+    if (userById && !userByIdError) {
+      // User exists with matching ID
+      existingUser = userById
+      logger.info('Found existing user by ID', { 
+        userId: supabaseUser.id,
+        email: userEmail,
+        existingRole: existingUser.role
+      })
+    } else {
+      // If not found by ID, try to find by email (fallback)
+      // This handles cases where user exists in auth.users but not in public.users
+      const { data: allUsers, error: allUsersError } = await adminSupabase
+        .from('users')
+        .select('*')
+        .eq('email', userEmail)
       
-      // Log if role mismatch (user exists but with different role than requested)
-      if (existingUser.role !== targetRole) {
-        logger.info('User exists with different role', {
-          email: userEmail,
-          existingRole: existingUser.role,
-          requestedRole: targetRole,
-          note: 'Will update auth_provider but keep existing role'
-        })
+      if (allUsersError && allUsersError.code !== 'PGRST116') {
+        // PGRST116 means no rows found, which is expected for new users
+        userQueryError = allUsersError
+      } else if (allUsers && allUsers.length > 0) {
+        // User exists - use the first one (email should be unique, so there should only be one)
+        existingUser = allUsers[0]
+        
+        // Log if ID mismatch (user exists with same email but different ID)
+        if (existingUser.id !== supabaseUser.id) {
+          logger.warn('User exists with same email but different ID', {
+            email: userEmail,
+            existingUserId: existingUser.id,
+            supabaseUserId: supabaseUser.id,
+            note: 'This may indicate a data inconsistency'
+          })
+        }
+        
+        // Log if role mismatch
+        if (existingUser.role !== targetRole) {
+          logger.info('User exists with different role', {
+            email: userEmail,
+            existingRole: existingUser.role,
+            requestedRole: targetRole,
+            note: 'Will update auth_provider but keep existing role'
+          })
+        }
       }
     }
 
@@ -278,7 +305,10 @@ export async function GET(request) {
       // Note: password_hash can be null for OAuth users
       // For merchant role, user should have already registered with invite code
       // But we allow Google OAuth to create merchant users (they can complete registration later)
+      // IMPORTANT: Use Supabase auth user ID as the primary key
+      // This ensures consistency between auth.users and public.users
       const newUserData = {
+        id: supabaseUser.id, // Use Supabase auth user ID as primary key
         email: userEmail,
         name: userName || 'User', // Ensure name is not empty
         age: 18, // Default age, user can update later (must be >= 16)
@@ -298,12 +328,14 @@ export async function GET(request) {
       }
 
       logger.info('Attempting to create user with data:', {
+        id: newUserData.id,
         email: newUserData.email,
         name: newUserData.name,
         age: newUserData.age,
         auth_provider: newUserData.auth_provider,
         role: newUserData.role,
-        hasEmailVerified: !!newUserData.email_verified_at
+        hasEmailVerified: !!newUserData.email_verified_at,
+        note: 'Using Supabase auth user ID as primary key'
       })
 
       const { data: createdUser, error: createError } = await adminSupabase

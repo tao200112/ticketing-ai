@@ -458,18 +458,50 @@ export async function GET(request) {
     return NextResponse.redirect(redirectUrl)
 
   } catch (error) {
-    logger.error('OAuth callback error', { 
+    // Log comprehensive error information
+    const errorInfo = {
       error,
-      errorMessage: error.message,
-      errorStack: error.stack
-    })
+      errorType: typeof error,
+      errorMessage: error?.message,
+      errorDetails: error?.details,
+      errorHint: error?.hint,
+      errorCode: error?.code,
+      errorStack: error?.stack,
+      errorKeys: error ? Object.keys(error) : [],
+      errorString: String(error),
+      errorJson: error ? JSON.stringify(error, Object.getOwnPropertyNames(error), 2) : null
+    }
+    logger.error('OAuth callback error', errorInfo)
     
-    // Extract meaningful error message
-    let errorMessage = 'OAuth authentication failed'
-    if (error.message) {
-      errorMessage = error.message
-    } else if (error.details) {
-      errorMessage = error.details
+    // Extract meaningful error message with multiple fallbacks
+    let errorMessage = 'OAuth authentication failed' // Default fallback
+    
+    // Try various possible error message locations
+    const possibleMessage = error?.message || 
+                           error?.error?.message || 
+                           error?.msg || 
+                           error?.errorMessage ||
+                           error?.details ||
+                           error?.error?.details ||
+                           null
+    
+    if (possibleMessage && possibleMessage.trim()) {
+      errorMessage = possibleMessage.trim()
+    } else if (error?.hint) {
+      errorMessage = `OAuth error: ${error.hint}`
+    } else if (error?.code) {
+      errorMessage = `OAuth error (code: ${error.code})`
+    } else {
+      // Last resort: try to extract from error string
+      const errorStr = String(error)
+      if (errorStr && errorStr !== '[object Object]' && errorStr.length > 0) {
+        errorMessage = errorStr
+      }
+    }
+    
+    // Truncate if too long for URL
+    if (errorMessage.length > 200) {
+      errorMessage = errorMessage.substring(0, 197) + '...'
     }
     
     return NextResponse.redirect(

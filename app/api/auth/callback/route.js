@@ -111,30 +111,35 @@ export async function GET(request) {
     const userAvatar = supabaseUser.user_metadata?.avatar_url || null
 
     // Check if user already exists in our users table
-    // For merchant role, check specifically for merchant users
-    // For user role, check for any user with this email
+    // IMPORTANT: Check for ANY user with this email first (regardless of role)
+    // This prevents duplicate user creation when email is UNIQUE
+    // If user exists but with different role, we'll update their auth_provider
+    // but keep their existing role (role changes should be done through proper channels)
     let existingUser = null
     let userQueryError = null
     
-    if (targetRole === 'merchant') {
-      // For merchant login, only check merchant role users
-      const { data, error } = await adminSupabase
-        .from('users')
-        .select('*')
-        .eq('email', userEmail)
-        .eq('role', 'merchant')
-        .single()
-      existingUser = data
-      userQueryError = error
-    } else {
-      // For user/admin login, check any user with this email
-      const { data, error } = await adminSupabase
-        .from('users')
-        .select('*')
-        .eq('email', userEmail)
-        .single()
-      existingUser = data
-      userQueryError = error
+    // First, try to find any user with this email (regardless of role)
+    const { data: allUsers, error: allUsersError } = await adminSupabase
+      .from('users')
+      .select('*')
+      .eq('email', userEmail)
+    
+    if (allUsersError && allUsersError.code !== 'PGRST116') {
+      // PGRST116 means no rows found, which is expected for new users
+      userQueryError = allUsersError
+    } else if (allUsers && allUsers.length > 0) {
+      // User exists - use the first one (email should be unique, so there should only be one)
+      existingUser = allUsers[0]
+      
+      // Log if role mismatch (user exists but with different role than requested)
+      if (existingUser.role !== targetRole) {
+        logger.info('User exists with different role', {
+          email: userEmail,
+          existingRole: existingUser.role,
+          requestedRole: targetRole,
+          note: 'Will update auth_provider but keep existing role'
+        })
+      }
     }
 
     let userRecord = null
@@ -174,7 +179,13 @@ export async function GET(request) {
 
     if (existingUser) {
       // User exists - update auth_provider and email_verified_at
-      logger.info('Updating existing user for Google OAuth', { userId: existingUser.id })
+      // NOTE: We keep the existing role - don't change role via OAuth
+      // Role changes should be done through proper admin/merchant registration channels
+      logger.info('Updating existing user for Google OAuth', { 
+        userId: existingUser.id,
+        existingRole: existingUser.role,
+        requestedRole: targetRole
+      })
       
       const updateData = {
         auth_provider: 'google',
@@ -186,6 +197,9 @@ export async function GET(request) {
       if (!existingUser.name || existingUser.name === existingUser.email?.split('@')[0]) {
         updateData.name = userName
       }
+      
+      // DO NOT update role - keep existing role
+      // If user wants to change role, they should use proper registration flow
 
       const { data: updatedUser, error: updateError } = await adminSupabase
         .from('users')

@@ -209,8 +209,8 @@ export async function GET(request) {
         age: 18, // Default age, user can update later (must be >= 16)
         auth_provider: 'google',
         email_verified_at: supabaseUser.email_confirmed_at || new Date().toISOString(),
-        role: targetRole // Use the determined role (user, merchant, or admin)
-        // password_hash is intentionally omitted (null) for Google OAuth users
+        role: targetRole, // Use the determined role (user, merchant, or admin)
+        password_hash: null // Explicitly set to NULL for Google OAuth users (can be set later in settings)
       }
       
       // For merchant role, log a note that they may need to complete registration

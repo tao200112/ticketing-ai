@@ -651,7 +651,7 @@ export async function GET(request) {
     // Redirect to account page with session data in URL hash (will be handled client-side)
     // We'll use a temporary token approach instead
     const redirectUrl = new URL('/auth/oauth-success', request.url)
-    redirectUrl.searchParams.set('session', encodeURIComponent(JSON.stringify(sessionData)))
+    redirectUrl.searchParams.set('session', JSON.stringify(sessionData))
 
     return NextResponse.redirect(redirectUrl)
 

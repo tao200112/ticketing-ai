@@ -17,7 +17,7 @@ function OAuthSuccessContent() {
     }
 
     try {
-      const sessionData = JSON.parse(decodeURIComponent(sessionParam))
+      const sessionData = JSON.parse(sessionParam)
       
       // Save session to localStorage based on role
       if (sessionData.role === 'merchant') {

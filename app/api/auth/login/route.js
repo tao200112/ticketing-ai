@@ -75,9 +75,13 @@ export async function POST(request) {
       )
     }
 
-    // Check email verification (optional, can be disabled)
-    // Only block if email verification is strictly required
-    if (!user.email_verified_at && process.env.REQUIRE_EMAIL_VERIFICATION === 'true') {
+    // Check email verification based on REQUIRE_EMAIL_VERIFICATION environment variable
+    // Default: allow login without verification (REQUIRE_EMAIL_VERIFICATION !== 'true')
+    // If REQUIRE_EMAIL_VERIFICATION === 'true', block login for unverified users
+    const requireEmailVerification = process.env.REQUIRE_EMAIL_VERIFICATION === 'true'
+    
+    if (!user.email_verified_at && requireEmailVerification) {
+      logger.info('Login blocked: email not verified', { userId: user.id, email: user.email })
       throw ErrorHandler.authenticationError(
         'EMAIL_NOT_VERIFIED',
         'Please verify your email before logging in',
@@ -87,6 +91,11 @@ export async function POST(request) {
           requiresEmailVerification: true
         }
       )
+    }
+    
+    // Log verification status for monitoring (even if not required)
+    if (!user.email_verified_at) {
+      logger.info('User logged in with unverified email', { userId: user.id, email: user.email })
     }
 
     // Update last login domain

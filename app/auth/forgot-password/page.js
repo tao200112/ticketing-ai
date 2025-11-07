@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
 export default function ForgotPasswordPage() {
@@ -8,6 +8,20 @@ export default function ForgotPasswordPage() {
   const [status, setStatus] = useState('');
   const [message, setMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [userSession, setUserSession] = useState(null);
+  
+  // Check if user is logged in
+  useEffect(() => {
+    try {
+      const session = localStorage.getItem('userSession');
+      if (session) {
+        const parsed = JSON.parse(session);
+        setUserSession(parsed);
+      }
+    } catch (error) {
+      console.error('Failed to parse user session:', error);
+    }
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -27,16 +41,37 @@ export default function ForgotPasswordPage() {
       const data = await response.json();
 
       if (data.success) {
-        setStatus('success');
-        setMessage(data.message);
+        // Check if user is logged in and email is not verified
+        // If user is logged in but email is not verified, show specific message
+        if (userSession && !userSession.email_verified_at) {
+          // Check if the email matches the logged-in user's email
+          if (email.toLowerCase() === userSession.email?.toLowerCase()) {
+            // User is logged in and trying to reset password for their own unverified email
+            setStatus('error');
+            setMessage('Please verify your email before resetting your password.');
+          } else {
+            // User is logged in but trying to reset password for different email
+            // Show generic success message (maintains security)
+            setStatus('success');
+            setMessage(data.message);
+          }
+        } else if (data._internal?.emailNotVerified) {
+          // Email not verified but user might not be logged in
+          // Show generic success message (maintains security)
+          setStatus('success');
+          setMessage(data.message);
+        } else {
+          setStatus('success');
+          setMessage(data.message);
+        }
       } else {
         setStatus('error');
-        setMessage(data.message || '发送失败，请稍后重试');
+        setMessage(data.message || 'Failed to send, please try again later');
       }
     } catch (error) {
-      console.error('发送重置邮件失败:', error);
+      console.error('Failed to send reset email:', error);
       setStatus('error');
-      setMessage('网络错误，请稍后重试');
+      setMessage('Network error, please try again later');
     } finally {
       setIsLoading(false);
     }

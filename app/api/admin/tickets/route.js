@@ -12,15 +12,30 @@ export async function GET() {
 
     const supabase = createClient(supabaseUrl, supabaseKey)
 
-    // 查询所有票据
+    // 查询所有票据（明确包含 used_at 字段用于事后核验）
     const { data: tickets, error: ticketsError } = await supabase
       .from('tickets')
       .select(`
-        *,
+        id,
+        short_id,
+        order_id,
+        event_id,
+        tier,
+        holder_email,
+        holder_name,
+        holder_age,
+        status,
+        used,
+        used_at,
+        used_method,
+        used_context,
+        qr_payload,
+        created_at,
         orders (
           id,
           stripe_session_id,
           customer_email,
+          customer_name,
           total_amount_cents,
           currency,
           status,

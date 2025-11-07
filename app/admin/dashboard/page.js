@@ -1225,7 +1225,14 @@ export default function AdminDashboard() {
                         </span>
                         {ticket.used_at && (
                           <span style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.6)' }}>
-                            Used: {new Date(ticket.used_at).toLocaleDateString()}
+                            Used At: {new Date(ticket.used_at).toLocaleString('en-US', {
+                              year: 'numeric',
+                              month: '2-digit',
+                              day: '2-digit',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              second: '2-digit'
+                            })}
                           </span>
                         )}
                       </div>

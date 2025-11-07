@@ -73,19 +73,34 @@ export async function POST(request) {
       );
     }
 
-    // 查找用户
+    // 查找用户（包含邮箱验证状态）
     const { data: user, error: userError } = await supabase
       .from('users')
-      .select('id, email, name, last_password_reset_sent_at, reset_token_expire_at')
+      .select('id, email, name, email_verified_at, last_password_reset_sent_at, reset_token_expire_at')
       .eq('email', email)
       .single();
 
     if (userError || !user) {
-      // 为了安全，即使用户不存在也返回成功
+      // 为了安全，即使用户不存在也返回成功（防枚举攻击）
       return NextResponse.json({
         success: true,
-        message: '如果该邮箱已注册，您将收到密码重置邮件',
+        message: 'If this email is registered and verified, you will receive a password reset email',
         requestId
+      });
+    }
+
+    // 检查邮箱是否已验证 - 仅对已验证邮箱发送重置邮件
+    if (!user.email_verified_at) {
+      // 不发送邮件，但返回统一响应（保持防枚举逻辑）
+      // 如果用户已登录，前端会显示提示
+      return NextResponse.json({
+        success: true,
+        message: 'If this email is registered and verified, you will receive a password reset email',
+        requestId,
+        // 内部标记：邮箱未验证（前端可根据登录状态显示不同提示）
+        _internal: {
+          emailNotVerified: true
+        }
       });
     }
 

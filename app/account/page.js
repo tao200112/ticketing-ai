@@ -36,6 +36,8 @@ export default function AccountPage() {
   const [profileData, setProfileData] = useState({ name: '', email: '', age: '' }) // Profile form data
   const [showTicketsModal, setShowTicketsModal] = useState(false) // Show tickets modal
   const [showOrdersModal, setShowOrdersModal] = useState(false) // Show orders modal
+  const [resendingVerification, setResendingVerification] = useState(false) // Resending verification email
+  const [verificationMessage, setVerificationMessage] = useState('') // Verification message
 
   useEffect(() => {
     // Check if user session exists
@@ -130,13 +132,9 @@ export default function AccountPage() {
       if (userData) {
         delete userData.password_hash
         
-        // Check if email is verified
-        if (!userData.email_verified_at) {
-          console.log('❌ Email not verified, redirecting to verification page')
-          setLoading(false)
-          router.push('/auth/verify-email?message=Please verify your email to access your account')
-          return
-        }
+        // Allow access even if email is not verified
+        // Email verification is optional unless REQUIRE_EMAIL_VERIFICATION=true
+        // We'll show a banner reminder instead of blocking access
         
         setUser(userData)
         setProfileData({
@@ -206,6 +204,36 @@ export default function AccountPage() {
     setTickets([])
     setOrders([])
     router.push('/')
+  }
+
+  const handleResendVerification = async () => {
+    if (!user?.email) return
+    
+    setResendingVerification(true)
+    setVerificationMessage('')
+    
+    try {
+      const response = await fetch('/api/auth/send-verification', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: user.email }),
+      })
+      
+      const result = await response.json()
+      
+      if (result.success) {
+        setVerificationMessage('Verification email has been resent, please check your inbox')
+      } else {
+        setVerificationMessage(result.message || 'Failed to send, please try again later')
+      }
+    } catch (error) {
+      console.error('Error resending verification email:', error)
+      setVerificationMessage('Network error, please try again later')
+    } finally {
+      setResendingVerification(false)
+    }
   }
 
   if (loading) {
@@ -314,15 +342,105 @@ export default function AccountPage() {
         <div style={{
           marginBottom: '24px'
         }}>
-          <h1 style={{
+            <h1 style={{
             fontSize: '28px', 
-            fontWeight: 'bold',
-            color: 'white',
+              fontWeight: 'bold',
+              color: 'white',
             margin: 0
-          }}>
+            }}>
             Account
-          </h1>
+            </h1>
         </div>
+
+        {/* Email Verification Banner - Only show if email is not verified */}
+        {user && !user.email_verified_at && (
+          <div style={{
+            background: 'rgba(251, 191, 36, 0.15)',
+            border: '2px solid rgba(251, 191, 36, 0.4)',
+            borderRadius: '12px',
+            padding: '20px',
+            marginBottom: '24px',
+            backdropFilter: 'blur(12px)',
+            boxShadow: '0 4px 16px rgba(251, 191, 36, 0.2)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
+              <div style={{
+                fontSize: '24px',
+                flexShrink: 0,
+                marginTop: '2px'
+              }}>
+                ⚠️
+              </div>
+              <div style={{ flex: 1 }}>
+                <h3 style={{
+                  color: '#fbbf24',
+                  fontSize: '16px',
+                  fontWeight: '600',
+                  marginBottom: '8px'
+                }}>
+                  Email Verification Required
+                </h3>
+                <p style={{
+                  color: 'rgba(255, 255, 255, 0.9)',
+                  fontSize: '14px',
+                  lineHeight: '1.6',
+                  marginBottom: '12px'
+                }}>
+                  Your email address has not been verified. Please verify your email to protect your account and receive event notifications.
+                </p>
+                {verificationMessage && (
+                  <div style={{
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    marginBottom: '12px',
+                    fontSize: '13px',
+                    background: verificationMessage.includes('resent') || verificationMessage.includes('sent')
+                      ? 'rgba(34, 197, 94, 0.2)'
+                      : 'rgba(239, 68, 68, 0.2)',
+                    color: verificationMessage.includes('resent') || verificationMessage.includes('sent')
+                      ? '#22c55e'
+                      : '#ef4444',
+                    border: `1px solid ${verificationMessage.includes('resent') || verificationMessage.includes('sent')
+                      ? 'rgba(34, 197, 94, 0.3)'
+                      : 'rgba(239, 68, 68, 0.3)'}`
+                  }}>
+                    {verificationMessage}
+                  </div>
+                )}
+                <button
+                  onClick={handleResendVerification}
+                  disabled={resendingVerification}
+                  style={{
+                    background: resendingVerification 
+                      ? 'rgba(251, 191, 36, 0.3)' 
+                      : 'rgba(251, 191, 36, 0.2)',
+                    border: '1px solid rgba(251, 191, 36, 0.5)',
+                    color: '#fbbf24',
+                    padding: '10px 20px',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    cursor: resendingVerification ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.3s ease',
+                    opacity: resendingVerification ? 0.6 : 1
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!resendingVerification) {
+                      e.currentTarget.style.background = 'rgba(251, 191, 36, 0.3)'
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!resendingVerification) {
+                      e.currentTarget.style.background = 'rgba(251, 191, 36, 0.2)'
+                    }
+                  }}
+                >
+                  {resendingVerification ? 'Sending...' : 'Resend Verification Email'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* User Profile Card */}
         <div style={{
@@ -370,25 +488,25 @@ export default function AccountPage() {
                 margin: 0
               }}>
                 {user?.email || 'No email'}
-              </p>
-            </div>
+            </p>
+          </div>
           </div>
           
           {/* View My Profile Button */}
-          <button
+            <button
             onClick={() => setShowProfileDetails(true)}
-            style={{
+              style={{
               width: '100%',
               background: 'linear-gradient(135deg, #3b82f6 0%, #22d3ee 100%)',
-              color: 'white',
+                color: 'white',
               border: 'none',
               borderRadius: '12px',
               padding: '14px',
               fontSize: '15px',
-              fontWeight: '600',
+                fontWeight: '600',
               cursor: 'pointer',
-              transition: 'all 0.3s ease'
-            }}
+                transition: 'all 0.3s ease'
+              }}
             onMouseEnter={(e) => {
               e.currentTarget.style.opacity = '0.9'
               e.currentTarget.style.transform = 'translateY(-1px)'
@@ -399,7 +517,7 @@ export default function AccountPage() {
             }}
           >
             View My Profile
-          </button>
+            </button>
         </div>
 
         {/* Shortcuts Section */}
@@ -452,7 +570,7 @@ export default function AccountPage() {
                 fontSize: '24px'
               }}>
                 🎫
-              </div>
+          </div>
               <span style={{
                 color: 'white',
                 fontSize: '14px',
@@ -468,7 +586,7 @@ export default function AccountPage() {
               style={{
                 background: 'rgba(255, 255, 255, 0.08)',
                 border: '1px solid rgba(255, 255, 255, 0.1)',
-                borderRadius: '16px',
+          borderRadius: '16px',
                 padding: '24px 16px',
                 display: 'flex',
                 flexDirection: 'column',
@@ -515,7 +633,7 @@ export default function AccountPage() {
               }}
               style={{
                 background: 'rgba(255, 255, 255, 0.08)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
                 borderRadius: '16px',
                 padding: '24px 16px',
                 display: 'flex',
@@ -545,17 +663,17 @@ export default function AccountPage() {
                 fontSize: '24px'
               }}>
                 ⚙️
-              </div>
-              <span style={{
-                color: 'white',
+            </div>
+              <span style={{ 
+                color: 'white', 
                 fontSize: '14px',
                 fontWeight: '600'
               }}>
                 Settings
               </span>
             </button>
+            </div>
           </div>
-        </div>
 
         {/* Logout Button */}
         <div style={{ marginTop: '40px', marginBottom: '20px' }}>
@@ -1199,7 +1317,7 @@ export default function AccountPage() {
 
       {/* My Tickets Modal */}
       {showTicketsModal && (
-        <div style={{
+          <div style={{
           position: 'fixed',
           top: 0,
           left: 0,
@@ -1248,7 +1366,7 @@ export default function AccountPage() {
               }}>
                 My Tickets ({tickets?.length || 0})
               </h2>
-              <button
+            <button
                 onClick={() => setShowTicketsModal(false)}
                 style={{
                   background: 'transparent',
@@ -1329,11 +1447,11 @@ export default function AccountPage() {
                                   categoryExpanded: !prev[category]?.categoryExpanded
                                 }
                               }))}
-                              style={{
-                                width: '100%',
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
+              style={{
+                width: '100%',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
                                 background: categoryColor.bg,
                                 border: `1px solid ${categoryColor.color}40`,
                                 borderRadius: '12px',
@@ -1346,7 +1464,7 @@ export default function AccountPage() {
                               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                 <span style={{ 
                                   background: categoryColor.color,
-                                  color: 'white',
+                color: 'white', 
                                   padding: '6px 12px',
                                   borderRadius: '6px',
                                   fontSize: '14px',
@@ -1358,16 +1476,16 @@ export default function AccountPage() {
                                   {category} ({totalCount})
                                 </span>
                               </div>
-                              <span style={{ 
-                                color: 'rgba(255, 255, 255, 0.6)',
-                                fontSize: '20px',
+              <span style={{ 
+                color: 'rgba(255, 255, 255, 0.6)',
+                fontSize: '20px',
                                 transform: ticketsExpanded[category]?.categoryExpanded !== false ? 'rotate(180deg)' : 'rotate(0deg)',
-                                transition: 'transform 0.3s ease'
-                              }}>
-                                ▼
-                              </span>
-                            </button>
-                            
+                transition: 'transform 0.3s ease'
+              }}>
+                ▼
+              </span>
+            </button>
+            
                             {/* Category Content */}
                             {ticketsExpanded[category]?.categoryExpanded !== false && (
                               <div style={{ paddingLeft: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -1914,51 +2032,51 @@ export default function AccountPage() {
                 <div style={{ fontSize: '14px' }}>Your purchase history will appear here</div>
               </div>
             ) : (
-              <div style={{ display: 'grid', gap: '16px' }}>
-                {(orders || []).map(order => (
-                  <div
-                    key={order.id}
-                    style={{
-                      background: 'rgba(255, 255, 255, 0.03)',
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                      borderRadius: '12px',
-                      padding: '20px',
-                      transition: 'all 0.3s ease',
-                      boxShadow: '0 4px 16px rgba(0, 0, 0, 0.2)'
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '12px' }}>
-                      <div>
-                        <h3 style={{ color: 'white', fontSize: '16px', marginBottom: '4px' }}>
-                          Order #{order.id.substring(0, 8)}
-                        </h3>
-                        <div style={{ display: 'flex', gap: '16px', fontSize: '12px', color: 'rgba(255, 255, 255, 0.6)' }}>
-                          <span>💰 Total: ${order.total_amount_cents ? (order.total_amount_cents / 100).toFixed(2) : '0.00'}</span>
-                          <span>📅 Date: {new Date(order.created_at).toLocaleDateString()}</span>
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <span style={{
-                          background: order.status === 'completed' || order.status === 'paid' ? 'rgba(34, 197, 94, 0.2)' : 
-                                     order.status === 'pending' ? 'rgba(251, 191, 36, 0.2)' : 'rgba(239, 68, 68, 0.2)',
-                          color: order.status === 'completed' || order.status === 'paid' ? '#22c55e' : 
-                                 order.status === 'pending' ? '#fbbf24' : '#ef4444',
-                          padding: '4px 8px',
-                          borderRadius: '4px',
-                          fontSize: '12px',
-                          textTransform: 'capitalize'
-                        }}>
-                          {order.status || 'Unknown'}
-                        </span>
+            <div style={{ display: 'grid', gap: '16px' }}>
+              {(orders || []).map(order => (
+                <div
+                  key={order.id}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.03)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: '12px',
+                    padding: '20px',
+                    transition: 'all 0.3s ease',
+                    boxShadow: '0 4px 16px rgba(0, 0, 0, 0.2)'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '12px' }}>
+                    <div>
+                      <h3 style={{ color: 'white', fontSize: '16px', marginBottom: '4px' }}>
+                        Order #{order.id.substring(0, 8)}
+                      </h3>
+                      <div style={{ display: 'flex', gap: '16px', fontSize: '12px', color: 'rgba(255, 255, 255, 0.6)' }}>
+                        <span>💰 Total: ${order.total_amount_cents ? (order.total_amount_cents / 100).toFixed(2) : '0.00'}</span>
+                        <span>📅 Date: {new Date(order.created_at).toLocaleDateString()}</span>
                       </div>
                     </div>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <span style={{
+                        background: order.status === 'completed' || order.status === 'paid' ? 'rgba(34, 197, 94, 0.2)' : 
+                                   order.status === 'pending' ? 'rgba(251, 191, 36, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                        color: order.status === 'completed' || order.status === 'paid' ? '#22c55e' : 
+                               order.status === 'pending' ? '#fbbf24' : '#ef4444',
+                        padding: '4px 8px',
+                        borderRadius: '4px',
+                        fontSize: '12px',
+                        textTransform: 'capitalize'
+                      }}>
+                        {order.status || 'Unknown'}
+                      </span>
+                    </div>
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
+            </div>
             )}
           </div>
-        </div>
-      )}
+          </div>
+        )}
 
       {/* Profile Details Modal */}
       {showProfileDetails && (
@@ -2031,7 +2149,7 @@ export default function AccountPage() {
               >
                 ×
               </button>
-            </div>
+      </div>
 
             {/* Profile Content */}
             {!editingProfile ? (

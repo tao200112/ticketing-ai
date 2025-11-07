@@ -130,12 +130,31 @@ export default function AccountPage() {
       }
 
       if (userData) {
+        const hasPassword = !!userData.password_hash
+
         delete userData.password_hash
-        
+
+        // Track password setup status for Google OAuth users
+        userData.has_password = hasPassword
+        userData.requires_password_setup = userData.auth_provider === 'google' && !hasPassword
+
+        // Persist password status in local session (if available)
+        try {
+          const existingSession = localStorage.getItem('userSession')
+          if (existingSession) {
+            const parsedSession = JSON.parse(existingSession)
+            parsedSession.has_password = hasPassword
+            parsedSession.requires_password_setup = userData.requires_password_setup
+            localStorage.setItem('userSession', JSON.stringify(parsedSession))
+          }
+        } catch (error) {
+          console.warn('⚠️ Failed to persist password status to session storage:', error)
+        }
+
         // Allow access even if email is not verified
         // Email verification is optional unless REQUIRE_EMAIL_VERIFICATION=true
         // We'll show a banner reminder instead of blocking access
-        
+
         setUser(userData)
         setProfileData({
           name: userData.name || '',
@@ -277,6 +296,10 @@ export default function AccountPage() {
     } finally {
       setResendingVerification(false)
     }
+  }
+
+  const handleSetPasswordReminder = () => {
+    router.push('/auth/forgot-password')
   }
 
   if (loading) {
@@ -485,6 +508,84 @@ export default function AccountPage() {
           </div>
         )}
 
+        {/* Google OAuth users without password - prompt to set password */}
+        {user && user.auth_provider === 'google' && (user.requires_password_setup || user.has_password === false) && (
+          <div style={{
+            background: 'rgba(96, 165, 250, 0.15)',
+            border: '2px solid rgba(96, 165, 250, 0.4)',
+            borderRadius: '12px',
+            padding: '20px',
+            marginBottom: '24px',
+            backdropFilter: 'blur(12px)',
+            boxShadow: '0 4px 16px rgba(96, 165, 250, 0.2)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
+              <div style={{
+                fontSize: '24px',
+                flexShrink: 0,
+                marginTop: '2px'
+              }}>
+                🔐
+              </div>
+              <div style={{ flex: 1 }}>
+                <h3 style={{
+                  color: '#60a5fa',
+                  fontSize: '16px',
+                  fontWeight: '600',
+                  marginBottom: '8px'
+                }}>
+                  Set a Password for Backup Login
+                </h3>
+                <p style={{
+                  color: 'rgba(255, 255, 255, 0.9)',
+                  fontSize: '14px',
+                  lineHeight: '1.6',
+                  marginBottom: '12px'
+                }}>
+                  You signed in with Google and haven&#39;t created a password yet. Adding a password lets you log in by email if Google is unavailable and keeps your account more secure.
+                </p>
+                <div style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: '12px'
+                }}>
+                  <button
+                    onClick={handleSetPasswordReminder}
+                    style={{
+                      background: 'linear-gradient(135deg, #3b82f6 0%, #22d3ee 100%)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '10px',
+                      padding: '12px 18px',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      transition: 'all 0.3s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.opacity = '0.9'
+                      e.currentTarget.style.transform = 'translateY(-1px)'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.opacity = '1'
+                      e.currentTarget.style.transform = 'translateY(0)'
+                    }}
+                  >
+                    Set Password Now
+                  </button>
+                  <div style={{
+                    color: 'rgba(255, 255, 255, 0.7)',
+                    fontSize: '13px',
+                    lineHeight: '1.6'
+                  }}>
+                    We will send a password setup link to <strong>{user.email}</strong>. Follow the instructions in the email to create your password.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* User Profile Card */}
         <div style={{
           background: 'rgba(255, 255, 255, 0.08)',
@@ -542,7 +643,7 @@ export default function AccountPage() {
               width: '100%',
               background: 'linear-gradient(135deg, #3b82f6 0%, #22d3ee 100%)',
                 color: 'white',
-              border: 'none',
+                border: 'none',
               borderRadius: '12px',
               padding: '14px',
               fontSize: '15px',
@@ -573,7 +674,7 @@ export default function AccountPage() {
           }}>
             Shortcuts
           </h3>
-          <div style={{
+        <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
             gap: '16px'
@@ -584,7 +685,7 @@ export default function AccountPage() {
               style={{
                 background: 'rgba(255, 255, 255, 0.08)',
                 border: '1px solid rgba(255, 255, 255, 0.1)',
-                borderRadius: '16px',
+          borderRadius: '16px',
                 padding: '24px 16px',
                 display: 'flex',
                 flexDirection: 'column',
@@ -628,7 +729,7 @@ export default function AccountPage() {
               onClick={() => setShowOrdersModal(true)}
               style={{
                 background: 'rgba(255, 255, 255, 0.08)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
           borderRadius: '16px',
                 padding: '24px 16px',
                 display: 'flex',
@@ -658,7 +759,7 @@ export default function AccountPage() {
                 fontSize: '24px'
               }}>
                 📋
-              </div>
+            </div>
               <span style={{
                 color: 'white',
                 fontSize: '14px',
@@ -1502,8 +1603,8 @@ export default function AccountPage() {
                                 cursor: 'pointer',
                                 transition: 'all 0.3s ease',
                                 marginBottom: '12px'
-                              }}
-                            >
+              }}
+            >
                               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                 <span style={{ 
                                   background: categoryColor.color,
@@ -1512,7 +1613,7 @@ export default function AccountPage() {
                                   borderRadius: '6px',
                                   fontSize: '14px',
                                   fontWeight: '600'
-                                }}>
+              }}>
                                   {category}
                                 </span>
                                 <span style={{ color: 'white', fontSize: '16px', fontWeight: '600' }}>

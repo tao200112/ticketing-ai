@@ -291,62 +291,134 @@ export async function GET(request) {
         .single()
 
       if (createError) {
-        // Log full error details for debugging
-        logger.error('Error creating user', { 
-          error: createError, 
+        // Log full error details for debugging - including all possible error properties
+        const errorInfo = {
+          error: createError,
+          errorType: typeof createError,
           errorCode: createError.code,
           errorMessage: createError.message,
           errorDetails: createError.details,
           errorHint: createError.hint,
+          errorColumn: createError.column,
+          errorConstraint: createError.constraint,
+          errorTable: createError.table,
+          errorSchema: createError.schema,
           userData: newUserData,
-          fullError: JSON.stringify(createError, null, 2)
-        })
+          // Try to stringify the entire error object
+          fullError: JSON.stringify(createError, Object.getOwnPropertyNames(createError), 2),
+          // Also log as plain object to see all properties
+          errorKeys: Object.keys(createError),
+          errorString: String(createError)
+        }
+        logger.error('Error creating user', errorInfo)
         
         // Provide specific error message based on error type
-        let errorMessage = 'Database error saving new user' // Default fallback
+        // Priority: code-based messages > message > details > hint > default
+        let errorMessage = 'Database error saving new user' // Default fallback (should rarely be used)
+        
+        // Extract error code (handle both string and number codes)
+        const errorCode = createError.code || createError.error_code || null
         
         // Handle specific PostgreSQL error codes
-        if (createError.code === '23505') {
+        if (errorCode === '23505' || errorCode === 23505) {
           // Unique constraint violation
           errorMessage = 'User with this email already exists'
-        } else if (createError.code === '23502') {
+        } else if (errorCode === '23502' || errorCode === 23502) {
           // Not null constraint violation
-          const fieldName = createError.column || createError.details?.match(/column "(\w+)"/)?.[1] || 'unknown field'
+          const fieldName = createError.column || 
+                           createError.details?.match(/column "(\w+)"/)?.[1] || 
+                           createError.message?.match(/column "(\w+)"/)?.[1] ||
+                           'unknown field'
           errorMessage = `Missing required field: ${fieldName}`
-        } else if (createError.code === '23514') {
+        } else if (errorCode === '23514' || errorCode === 23514) {
           // Check constraint violation
-          const constraintName = createError.constraint || 'validation'
+          const constraintName = createError.constraint || 
+                                createError.details?.match(/constraint "(\w+)"/)?.[1] ||
+                                'validation'
           errorMessage = `Data validation failed: ${constraintName}`
           if (createError.details) {
             errorMessage += ` - ${createError.details}`
           }
-        } else if (createError.code === '42P01') {
+        } else if (errorCode === '42P01' || errorCode === 42P01) {
           // Table does not exist
           errorMessage = 'Database table not found. Please contact support.'
-        } else if (createError.code === '42703') {
+        } else if (errorCode === '42703' || errorCode === 42703) {
           // Column does not exist
-          const columnName = createError.column || createError.details?.match(/column "(\w+)"/)?.[1] || 'unknown column'
+          const columnName = createError.column || 
+                            createError.details?.match(/column "(\w+)"/)?.[1] || 
+                            'unknown column'
           errorMessage = `Database column not found: ${columnName}. Please contact support.`
-        } else if (createError.code === 'PGRST116') {
+        } else if (errorCode === 'PGRST116' || createError.code === 'PGRST116') {
           // PostgREST: no rows returned (shouldn't happen on insert, but handle it)
           errorMessage = 'Failed to create user account. Please try again.'
-        } else if (createError.message) {
-          // Use the actual error message if available
-          errorMessage = createError.message
-          // Add details if available and not already in message
-          if (createError.details && !errorMessage.includes(createError.details)) {
-            errorMessage += ` - ${createError.details}`
+        } else {
+          // No matching error code - use message/details/hint
+          // Priority: message > details > hint > string representation > default
+          
+          // Try to get message from various possible locations
+          const possibleMessage = createError.message || 
+                                 createError.error?.message || 
+                                 createError.msg || 
+                                 createError.errorMessage ||
+                                 null
+          
+          // Try to get details from various possible locations
+          const possibleDetails = createError.details || 
+                                createError.error?.details || 
+                                createError.detail ||
+                                null
+          
+          // Try to get hint from various possible locations
+          const possibleHint = createError.hint || 
+                              createError.error?.hint ||
+                              null
+          
+          if (possibleMessage && possibleMessage.trim()) {
+            errorMessage = possibleMessage.trim()
+            // Add details if available and not already in message
+            if (possibleDetails && !errorMessage.includes(possibleDetails)) {
+              errorMessage += ` - ${possibleDetails}`
+            }
+            // Add hint if available
+            if (possibleHint && !errorMessage.includes(possibleHint)) {
+              errorMessage += ` (Hint: ${possibleHint})`
+            }
+          } else if (possibleDetails && possibleDetails.trim()) {
+            errorMessage = possibleDetails.trim()
+          } else if (possibleHint && possibleHint.trim()) {
+            errorMessage = `Database error: ${possibleHint.trim()}`
+          } else {
+            // Last resort: try to extract from error string or JSON
+            try {
+              const errorStr = String(createError)
+              if (errorStr && errorStr !== '[object Object]' && errorStr.length > 0) {
+                errorMessage = errorStr
+              } else {
+                // Try JSON stringify
+                const errorJson = JSON.stringify(createError)
+                if (errorJson && errorJson !== '{}' && errorJson.length < 200) {
+                  errorMessage = `Database error: ${errorJson}`
+                }
+              }
+            } catch (e) {
+              // JSON stringify failed, use default
+            }
+            
+            // If we still have default message, log a warning with full error info
+            if (errorMessage === 'Database error saving new user') {
+              logger.warn('Using default error message - error object structure may be unexpected', {
+                errorType: typeof createError,
+                errorKeys: Object.keys(createError),
+                errorString: String(createError),
+                errorJson: JSON.stringify(createError),
+                fullErrorObject: createError
+              })
+              // Even with default message, try to add any available info
+              if (Object.keys(createError).length > 0) {
+                errorMessage = `Database error: ${Object.keys(createError).join(', ')}`
+              }
+            }
           }
-          // Add hint if available
-          if (createError.hint && !errorMessage.includes(createError.hint)) {
-            errorMessage += ` (Hint: ${createError.hint})`
-          }
-        } else if (createError.details) {
-          // Fallback to details if message is not available
-          errorMessage = createError.details
-        } else if (createError.hint) {
-          // Fallback to hint if nothing else is available
-          errorMessage = `Database error: ${createError.hint}`
         }
         
         // Truncate if too long for URL (keep it readable)

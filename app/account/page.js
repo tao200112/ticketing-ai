@@ -395,8 +395,8 @@ export default function AccountPage() {
             </h1>
         </div>
 
-        {/* Email Verification Banner - Only show if email is not verified */}
-        {user && !user.email_verified_at && (
+        {/* Email Verification Banner - Only show if email is not verified and not Google OAuth user */}
+        {user && !user.email_verified_at && user.auth_provider !== 'google' && (
           <div style={{
             background: 'rgba(251, 191, 36, 0.15)',
             border: '2px solid rgba(251, 191, 36, 0.4)',

@@ -88,8 +88,16 @@ export async function GET(request) {
 
     if (userQueryError && userQueryError.code !== 'PGRST116') {
       // PGRST116 means no rows found, which is expected for new users
-      logger.error('Error querying user', { error: userQueryError })
-      throw ErrorHandler.fromSupabaseError(userQueryError, 'DATABASE_QUERY_ERROR')
+      logger.error('Error querying user', { 
+        error: userQueryError,
+        errorCode: userQueryError.code,
+        errorMessage: userQueryError.message,
+        email: userEmail
+      })
+      
+      return NextResponse.redirect(
+        new URL(`/auth/login?error=${encodeURIComponent(userQueryError.message || 'Database query error')}`, request.url)
+      )
     }
 
     if (existingUser) {
@@ -115,8 +123,22 @@ export async function GET(request) {
         .single()
 
       if (updateError) {
-        logger.error('Error updating user', { error: updateError })
-        throw ErrorHandler.fromSupabaseError(updateError, 'DATABASE_UPDATE_ERROR')
+        logger.error('Error updating user', { 
+          error: updateError,
+          errorCode: updateError.code,
+          errorMessage: updateError.message,
+          userId: existingUser.id
+        })
+        
+        // Provide more specific error message
+        let errorMessage = 'Database error updating user'
+        if (updateError.message) {
+          errorMessage = updateError.message
+        }
+        
+        return NextResponse.redirect(
+          new URL(`/auth/login?error=${encodeURIComponent(errorMessage)}`, request.url)
+        )
       }
 
       userRecord = updatedUser
@@ -142,8 +164,26 @@ export async function GET(request) {
         .single()
 
       if (createError) {
-        logger.error('Error creating user', { error: createError })
-        throw ErrorHandler.fromSupabaseError(createError, 'DATABASE_CREATE_ERROR')
+        logger.error('Error creating user', { 
+          error: createError, 
+          errorCode: createError.code,
+          errorMessage: createError.message,
+          userData: newUserData 
+        })
+        
+        // Provide more specific error message
+        let errorMessage = 'Database error saving new user'
+        if (createError.code === '23505') {
+          errorMessage = 'User with this email already exists'
+        } else if (createError.code === '23502') {
+          errorMessage = 'Missing required field: ' + createError.message
+        } else if (createError.message) {
+          errorMessage = createError.message
+        }
+        
+        return NextResponse.redirect(
+          new URL(`/auth/login?error=${encodeURIComponent(errorMessage)}`, request.url)
+        )
       }
 
       userRecord = createdUser
@@ -173,9 +213,22 @@ export async function GET(request) {
     return NextResponse.redirect(redirectUrl)
 
   } catch (error) {
-    logger.error('OAuth callback error', { error })
+    logger.error('OAuth callback error', { 
+      error,
+      errorMessage: error.message,
+      errorStack: error.stack
+    })
+    
+    // Extract meaningful error message
+    let errorMessage = 'OAuth authentication failed'
+    if (error.message) {
+      errorMessage = error.message
+    } else if (error.details) {
+      errorMessage = error.details
+    }
+    
     return NextResponse.redirect(
-      new URL(`/auth/login?error=${encodeURIComponent(error.message || 'oauth_error')}`, request.url)
+      new URL(`/auth/login?error=${encodeURIComponent(errorMessage)}`, request.url)
     )
   }
 }

@@ -35,6 +35,11 @@ if (!STRIPE_SECRET_KEY) {
   console.warn('⚠️  STRIPE_SECRET_KEY 未配置，支付功能将不可用');
 }
 
+// 信任代理设置（必须在 rate limiting 之前）
+// 当应用部署在反向代理（如 Vercel、Nginx）后面时，需要信任代理
+// 这样 express-rate-limit 才能正确读取 X-Forwarded-For 头
+app.set('trust proxy', true);
+
 // 中间件
 app.use(helmet());
 app.use(cors({

@@ -150,14 +150,22 @@ export async function GET(request) {
       // Note: password_hash can be null for OAuth users
       const newUserData = {
         email: userEmail,
-        name: userName,
-        age: 18, // Default age, user can update later
+        name: userName || 'User', // Ensure name is not empty
+        age: 18, // Default age, user can update later (must be >= 16)
         auth_provider: 'google',
         email_verified_at: supabaseUser.email_confirmed_at || new Date().toISOString(),
         role: 'user'
         // password_hash is intentionally omitted (null) for Google OAuth users
-        // If the column has NOT NULL constraint, we need to handle it differently
       }
+
+      logger.info('Attempting to create user with data:', {
+        email: newUserData.email,
+        name: newUserData.name,
+        age: newUserData.age,
+        auth_provider: newUserData.auth_provider,
+        role: newUserData.role,
+        hasEmailVerified: !!newUserData.email_verified_at
+      })
 
       const { data: createdUser, error: createError } = await adminSupabase
         .from('users')
@@ -166,21 +174,51 @@ export async function GET(request) {
         .single()
 
       if (createError) {
+        // Log full error details for debugging
         logger.error('Error creating user', { 
           error: createError, 
           errorCode: createError.code,
           errorMessage: createError.message,
-          userData: newUserData 
+          errorDetails: createError.details,
+          errorHint: createError.hint,
+          userData: newUserData,
+          fullError: JSON.stringify(createError, null, 2)
         })
         
-        // Provide more specific error message
+        // Provide more specific error message with full details
         let errorMessage = 'Database error saving new user'
+        
+        // Build detailed error message
+        const errorParts = []
+        if (createError.code) {
+          errorParts.push(`Code: ${createError.code}`)
+        }
+        if (createError.message) {
+          errorParts.push(createError.message)
+        }
+        if (createError.details) {
+          errorParts.push(`Details: ${createError.details}`)
+        }
+        if (createError.hint) {
+          errorParts.push(`Hint: ${createError.hint}`)
+        }
+        
         if (createError.code === '23505') {
           errorMessage = 'User with this email already exists'
         } else if (createError.code === '23502') {
-          errorMessage = 'Missing required field: ' + createError.message
-        } else if (createError.message) {
-          errorMessage = createError.message
+          errorMessage = 'Missing required field: ' + (createError.message || createError.details || 'unknown field')
+        } else if (createError.code === '23514') {
+          errorMessage = 'Data validation failed: ' + (createError.message || 'check constraint violation')
+          if (createError.details) {
+            errorMessage += ' - ' + createError.details
+          }
+        } else if (errorParts.length > 0) {
+          errorMessage = errorParts.join(' | ')
+        }
+        
+        // Truncate if too long for URL
+        if (errorMessage.length > 200) {
+          errorMessage = errorMessage.substring(0, 197) + '...'
         }
         
         return NextResponse.redirect(

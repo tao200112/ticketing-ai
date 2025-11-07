@@ -57,6 +57,28 @@ END $$;
 -- Create index for auth_provider
 CREATE INDEX IF NOT EXISTS idx_users_auth_provider ON users(auth_provider);
 
+-- Ensure password_hash allows NULL for OAuth users
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_name = 'users'
+        AND column_name = 'password_hash'
+        AND is_nullable = 'NO'
+    ) THEN
+        ALTER TABLE users
+        ALTER COLUMN password_hash DROP NOT NULL;
+        
+        RAISE NOTICE 'Removed NOT NULL constraint from password_hash column';
+    ELSE
+        RAISE NOTICE 'password_hash column already allows NULL';
+    END IF;
+END $$;
+
+-- Create index for auth_provider
+CREATE INDEX IF NOT EXISTS idx_users_auth_provider ON users(auth_provider);
+
 -- Update existing users to have 'email' as auth_provider if null
 UPDATE users 
 SET auth_provider = 'email' 

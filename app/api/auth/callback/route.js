@@ -147,14 +147,16 @@ export async function GET(request) {
       logger.info('Creating new user for Google OAuth', { email: userEmail })
       
       // Default role is 'user', age is required but we'll set a default
+      // Note: password_hash can be null for OAuth users
       const newUserData = {
         email: userEmail,
         name: userName,
         age: 18, // Default age, user can update later
         auth_provider: 'google',
         email_verified_at: supabaseUser.email_confirmed_at || new Date().toISOString(),
-        role: 'user',
-        password_hash: null // Google users don't have passwords
+        role: 'user'
+        // password_hash is intentionally omitted (null) for Google OAuth users
+        // If the column has NOT NULL constraint, we need to handle it differently
       }
 
       const { data: createdUser, error: createError } = await adminSupabase

@@ -137,14 +137,18 @@ function LoginPageContent() {
     setMessage('')
     
     try {
-      console.log('Google login: start (page)')
+      console.log('[OAuth] Google login button clicked (page)')
 
-      const redirectTo =
+      const siteOrigin =
         typeof window !== 'undefined'
-          ? `${window.location.origin}/auth/oauth-success`
-          : undefined
+          ? window.location.origin
+          : process.env.NEXT_PUBLIC_SITE_URL || ''
 
-      console.log('ℹ️ Google login initiated', {
+      const redirectTo = siteOrigin
+        ? `${siteOrigin.replace(/\/$/, '')}/auth/oauth-success`
+        : undefined
+
+      console.log('[OAuth] Google login initiated (page)', {
         path: typeof window !== 'undefined' ? window.location.pathname : 'unknown',
         provider: 'google',
         redirectTo
@@ -157,6 +161,10 @@ function LoginPageContent() {
         return
       }
 
+      if (!redirectTo) {
+        console.warn('[OAuth] redirectTo is undefined – Supabase may fall back to default callback')
+      }
+
       // Initiate Google OAuth sign-in
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -164,10 +172,10 @@ function LoginPageContent() {
           redirectTo
         }
       })
-      console.log('Google login result (page):', { data, error, redirectTo })
+      console.log('[OAuth] signInWithOAuth result (page)', { data, error, redirectTo })
 
       if (error) {
-        console.error('⚠️ Google OAuth error:', error)
+        console.error('[OAuth] Google OAuth error (page):', error)
         setMessage(`Google 登录失败：${error.message || 'unknown_error'}`)
         if (typeof window !== 'undefined') {
           alert(`Google 登录失败：${error.message || 'Unknown error'}`)
@@ -177,7 +185,7 @@ function LoginPageContent() {
       }
 
       if (data?.url) {
-        console.log('➡️ Redirecting to provider URL:', data.url)
+        console.log('[OAuth] Redirecting to', data.url)
       }
 
       // The redirect will happen automatically
@@ -186,25 +194,25 @@ function LoginPageContent() {
         const { data: sessionInfo } = await supabase.auth.getSession()
         const oauthSession = sessionInfo?.session
         if (oauthSession?.user) {
-          console.log('✅ Google login successful', {
+          console.log('[OAuth] Google login successful (page)', {
             email: oauthSession.user.email,
             sessionExpires: oauthSession.expires_at,
             provider: 'google'
           })
         } else {
-          console.log('ℹ️ Google login handed off to Supabase', {
+          console.log('[OAuth] Google login handed off to Supabase (page)', {
             provider: 'google',
             note: 'No session yet (expect redirect)',
             path: typeof window !== 'undefined' ? window.location.pathname : 'unknown'
           })
         }
       } catch (sessionError) {
-        console.warn('⚠️ Unable to verify session after Google login handoff', {
+        console.warn('[OAuth] Unable to verify session after Google login handoff (page)', {
           error: sessionError
         })
       }
     } catch (error) {
-      console.error('❌ Google login error:', error)
+      console.error('[OAuth] Unexpected Google login error (page):', error)
       setMessage('Network error during Google login. Please try again.')
       setGoogleLoading(false)
     }

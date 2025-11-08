@@ -1,8 +1,6 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 import jwt from 'jsonwebtoken'
-import { cookies } from 'next/headers'
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { createSupabaseClient } from '@/lib/supabase-api'
 import { createLogger } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
@@ -10,118 +8,103 @@ export const dynamic = 'force-dynamic'
 const logger = createLogger('login-from-supabase')
 const SUPPORTED_ROLES = ['user', 'merchant', 'admin']
 
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+)
+
 function createToken(payload) {
   const secret = process.env.JWT_SECRET
   if (!secret) {
     throw new Error('JWT_SECRET is not configured')
   }
-  return jwt.sign(payload, secret, { expiresIn: '24h' })
+  return jwt.sign(payload, secret, { expiresIn: '7d' })
 }
 
 export async function POST(request) {
   try {
-    const supabaseRouteClient = createRouteHandlerClient({ cookies })
+    const body = await request.json().catch(() => ({}))
     const {
-      data: { user },
-      error: userError
-    } = await supabaseRouteClient.auth.getUser()
+      email,
+      provider,
+      userId,
+      role: requestedRole,
+      name,
+      registrationDomain
+    } = body || {}
 
-    console.log('login-from-supabase getUser', {
-      hasUser: !!user,
-      error: userError
-    })
+    console.log('[login-from-supabase] input', { email, provider, userId, requestedRole })
 
-    if (userError || !user) {
-      logger.warn('No Supabase auth user when bridging', { error: userError })
+    if (!email) {
+      console.error('[login-from-supabase] missing email')
       return NextResponse.json(
-        { success: false, error: 'UNAUTHENTICATED' },
-        { status: 401 }
+        { success: false, error: 'MISSING_EMAIL' },
+        { status: 400 }
       )
     }
 
-    const body = await request.json().catch(() => ({}))
-    const requestedRole = body?.role
-    const roleFromMetadata = user.user_metadata?.role
-    const resolvedRole =
-      (requestedRole && SUPPORTED_ROLES.includes(requestedRole)
-        ? requestedRole
-        : undefined) ||
-      (roleFromMetadata && SUPPORTED_ROLES.includes(roleFromMetadata)
-        ? roleFromMetadata
-        : 'user')
-
-    const adminSupabase = createSupabaseClient()
-
-    const registrationDomain =
-      body?.registrationDomain ||
-      request.headers.get('host')?.split(':')[0] ||
-      null
-
-    const upsertPayload = {
-      id: user.id,
-      email: user.email,
-      name:
-        user.user_metadata?.full_name ||
-        user.user_metadata?.name ||
-        user.user_metadata?.display_name ||
-        user.email,
-      role: resolvedRole,
-      auth_provider: user.app_metadata?.provider || 'google',
-      email_verified_at: user.email_confirmed_at || new Date().toISOString(),
-      registration_domain: registrationDomain,
-      updated_at: new Date().toISOString()
+    if (!userId) {
+      console.error('[login-from-supabase] missing userId')
+      return NextResponse.json(
+        { success: false, error: 'MISSING_USER_ID' },
+        { status: 400 }
+      )
     }
 
-    const { data: upsertedUser, error: upsertError } = await adminSupabase
+    const resolvedRole = SUPPORTED_ROLES.includes(requestedRole)
+      ? requestedRole
+      : 'user'
+
+    const hostDomain = request.headers.get('host')?.split(':')[0] || null
+
+    const payload = {
+      id: userId,
+      email,
+      role: resolvedRole,
+      auth_provider: provider || 'google',
+      email_verified_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      registration_domain: registrationDomain || hostDomain
+    }
+
+    if (name) {
+      payload.name = name
+    }
+
+    const { data: upsertedUser, error: upsertError } = await supabaseAdmin
       .from('users')
-      .upsert(upsertPayload, { onConflict: 'email,role', ignoreDuplicates: false })
+      .upsert(payload, { onConflict: 'email,role', ignoreDuplicates: false })
       .select()
       .single()
 
-    if (upsertError) {
-      logger.error('Failed to bridge Supabase user into public.users', {
-        error: upsertError,
-        email: user.email,
-        role: resolvedRole
-      })
+    if (upsertError || !upsertedUser) {
+      console.error('[login-from-supabase] upsert error', upsertError)
       return NextResponse.json(
-        { success: false, error: 'UPSERT_FAILED', details: upsertError.message },
+        { success: false, error: 'UPSERT_FAILED' },
         { status: 500 }
       )
     }
 
-    const token = createToken({
-      userId: upsertedUser.id,
-      email: upsertedUser.email
-    })
-
-    const responseUser = {
+    const authToken = createToken({
       id: upsertedUser.id,
       email: upsertedUser.email,
-      name: upsertedUser.name,
-      role: upsertedUser.role,
-      auth_provider: upsertedUser.auth_provider,
-      email_verified_at: upsertedUser.email_verified_at
-    }
+      role: upsertedUser.role
+    })
 
-    logger.info('Bridged Supabase session to local token', {
-      email: responseUser.email,
-      role: responseUser.role
+    console.log('[login-from-supabase] success', {
+      email: upsertedUser.email,
+      role: upsertedUser.role
     })
 
     return NextResponse.json({
       success: true,
-      data: {
-        user: responseUser,
-        token
-      }
+      auth_token: authToken,
+      userSession: upsertedUser
     })
   } catch (error) {
-    logger.error('Unexpected error during Supabase login bridge', {
-      error: error.message
-    })
+    console.error('[login-from-supabase] exception', error)
     return NextResponse.json(
-      { success: false, error: 'INTERNAL_ERROR', message: error.message },
+      { success: false, error: 'INTERNAL_ERROR' },
       { status: 500 }
     )
   }

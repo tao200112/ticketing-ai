@@ -66,14 +66,18 @@ export default function LoginForm({ onSuccess, onSwitchToRegister }) {
     setError('')
     
     try {
-      console.log('Google login: start (form)')
+      console.log('[OAuth] Google login button clicked (form)')
 
-      const redirectTo =
+      const siteOrigin =
         typeof window !== 'undefined'
-          ? `${window.location.origin}/auth/oauth-success`
-          : undefined
+          ? window.location.origin
+          : process.env.NEXT_PUBLIC_SITE_URL || ''
 
-      console.log('ℹ️ Google login initiated (form)', {
+      const redirectTo = siteOrigin
+        ? `${siteOrigin.replace(/\/$/, '')}/auth/oauth-success`
+        : undefined
+
+      console.log('[OAuth] Google login initiated (form)', {
         path: typeof window !== 'undefined' ? window.location.pathname : 'unknown',
         provider: 'google',
         redirectTo
@@ -86,6 +90,10 @@ export default function LoginForm({ onSuccess, onSwitchToRegister }) {
         return
       }
 
+      if (!redirectTo) {
+        console.warn('[OAuth] redirectTo is undefined – Supabase may fall back to default callback')
+      }
+
       // Initiate Google OAuth sign-in
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -93,10 +101,10 @@ export default function LoginForm({ onSuccess, onSwitchToRegister }) {
           redirectTo
         }
       })
-      console.log('Google login result (form):', { data, error, redirectTo })
+      console.log('[OAuth] signInWithOAuth result (form)', { data, error, redirectTo })
 
       if (error) {
-        console.error('⚠️ Google login error', error)
+        console.error('[OAuth] Google login error (form)', error)
         setError(`Google 登录失败：${error.message}`)
         if (typeof window !== 'undefined') {
           alert(`Google 登录失败：${error.message}`)
@@ -106,7 +114,7 @@ export default function LoginForm({ onSuccess, onSwitchToRegister }) {
       }
 
       if (data?.url) {
-        console.log('➡️ Redirecting to provider URL:', data.url)
+        console.log('[OAuth] Redirecting to', data.url)
       }
 
       // The redirect will happen automatically
@@ -115,25 +123,25 @@ export default function LoginForm({ onSuccess, onSwitchToRegister }) {
         const { data: sessionInfo } = await supabase.auth.getSession()
         const oauthSession = sessionInfo?.session
         if (oauthSession?.user) {
-          console.log('✅ Google login successful (form)', {
+          console.log('[OAuth] Google login successful (form)', {
             email: oauthSession.user.email,
             sessionExpires: oauthSession.expires_at,
             provider: 'google'
           })
         } else {
-          console.log('ℹ️ Google login handed off to Supabase (form)', {
+          console.log('[OAuth] Google login handed off to Supabase (form)', {
             provider: 'google',
             note: 'No session yet (expect redirect)',
             path: typeof window !== 'undefined' ? window.location.pathname : 'unknown'
           })
         }
       } catch (sessionError) {
-        console.warn('⚠️ Unable to verify session after Google login handoff (form)', {
+        console.warn('[OAuth] Unable to verify session after Google login handoff (form)', {
           error: sessionError
         })
       }
     } catch (error) {
-      console.error('❌ Google login error:', error)
+      console.error('[OAuth] Unexpected Google login error (form)', error)
       setError('Network error during Google login. Please try again.')
       setGoogleLoading(false)
     }

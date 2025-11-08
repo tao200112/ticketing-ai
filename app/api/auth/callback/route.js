@@ -198,8 +198,20 @@ export async function GET(request) {
         // PGRST116 means no rows found, which is expected for new users
         userQueryError = allUsersError
       } else if (allUsers && allUsers.length > 0) {
-        // User exists - use the first one (email should be unique, so there should only be one)
-        existingUser = allUsers[0]
+        const desiredRole =
+          targetRole && ['user', 'merchant', 'admin'].includes(targetRole)
+            ? targetRole
+            : 'user'
+        const sameRoleUser =
+          allUsers.find((candidate) => candidate.role === desiredRole) || null
+        const matchingSupabaseId = allUsers.find(
+          (candidate) => candidate.id === supabaseUser.id
+        )
+        existingUser =
+          matchingSupabaseId ||
+          sameRoleUser ||
+          allUsers.find((candidate) => candidate.role === 'user') ||
+          allUsers[0]
         
         // Log if ID mismatch (user exists with same email but different ID)
         if (existingUser.id !== supabaseUser.id) {

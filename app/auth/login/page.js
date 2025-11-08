@@ -145,7 +145,7 @@ function LoginPageContent() {
 
       // Get the current site URL for redirect
       const siteUrl = typeof window !== 'undefined' ? window.location.origin : ''
-      const redirectUrl = `${siteUrl}/api/auth/callback`
+      const redirectUrlObj = new URL('/api/auth/callback', siteUrl)
 
       // Determine role from current path (default to 'user' for regular login page)
       // This allows the callback to know what role the user is trying to log in as
@@ -154,17 +154,15 @@ function LoginPageContent() {
                    currentPath.includes('/admin') ? 'admin' : 
                    'user'
       
-      // Pass role in state parameter so callback knows the intended role
-      const state = JSON.stringify({ role })
+      // Pass role via redirect URL query parameter (avoid overriding Supabase state)
+      redirectUrlObj.searchParams.set('target_role', role)
+      const redirectUrl = redirectUrlObj.toString()
 
       // Initiate Google OAuth sign-in
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: redirectUrl,
-          queryParams: {
-            state: state
-          }
+          redirectTo: redirectUrl
         }
       })
 

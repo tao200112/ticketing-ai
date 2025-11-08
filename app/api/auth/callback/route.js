@@ -51,14 +51,18 @@ export async function GET(request) {
     const code = searchParams.get('code')
     const error = searchParams.get('error')
     const errorDescription = searchParams.get('error_description')
-    const state = searchParams.get('state') // Get state parameter (may contain role info)
+    const state = searchParams.get('state') // Supabase state (used for CSRF)
+    const targetRoleFromQuery = searchParams.get('target_role')
     
     // Determine role from state or referer
     // Default to 'user' if not specified
     let targetRole = 'user'
+    if (targetRoleFromQuery && ['user', 'merchant', 'admin'].includes(targetRoleFromQuery)) {
+      targetRole = targetRoleFromQuery
+    }
     
     // Check if state contains role information
-    if (state) {
+    if (state && !targetRoleFromQuery) {
       try {
         const stateData = JSON.parse(decodeURIComponent(state))
         if (stateData.role && ['user', 'merchant', 'admin'].includes(stateData.role)) {

@@ -2,103 +2,34 @@
 
 import { useEffect, useState, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { useAuth } from '@/lib/auth-context'
 
 function OAuthSuccessContent() {
   const router = useRouter()
-  const [statusMessage, setStatusMessage] = useState('Signing you in...')
-  const [errorMessage, setErrorMessage] = useState(null)
-  const supabase = createClientComponentClient()
+  const { loading, isAuthenticated, user } = useAuth()
+  const [statusMessage, setStatusMessage] = useState('Completing login...')
 
   useEffect(() => {
-    const processSession = async () => {
-      const { data: sessionInfo, error: sessionError } = await supabase.auth.getSession()
-      console.log('[OAuth] getSession result', {
-        session: sessionInfo?.session,
-        error: sessionError
-      })
+    console.log('[OAuth] oauth-success page mounted')
+  }, [])
 
-      if (sessionError) {
-        setErrorMessage('Failed to read Supabase session. Please try again.')
-        return
-      }
+  useEffect(() => {
+    if (loading) return
 
-      const sessionUser = sessionInfo?.session?.user
-      if (!sessionUser?.email) {
-        console.error('[OAuth] missing session or email', { sessionUser })
-        setErrorMessage('Missing OAuth session. Please return to login and try again.')
-        return
-      }
+    if (isAuthenticated()) {
+      const destination =
+        user?.role === 'merchant'
+          ? '/merchant'
+          : user?.role === 'admin'
+          ? '/account/merchant/admin'
+          : '/account'
 
-      const payload = {
-        email: sessionUser.email,
-        provider: sessionUser.app_metadata?.provider || 'google',
-        userId: sessionUser.id,
-        role: sessionUser.user_metadata?.role || 'user',
-        name:
-          sessionUser.user_metadata?.full_name ||
-          sessionUser.user_metadata?.name ||
-          sessionUser.user_metadata?.display_name ||
-          sessionUser.email
-      }
-
-      console.log('[OAuth] calling login-from-supabase', payload)
-
-      try {
-        const response = await fetch('/api/auth/login-from-supabase', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(payload)
-        })
-
-        const result = await response.json().catch(() => null)
-        console.log('[OAuth] login-from-supabase result', {
-          status: response.status,
-          data: result
-        })
-
-        if (!response.ok || !result?.success) {
-          console.error('[OAuth] bridge failed', result)
-          setErrorMessage('Google 登录失败，请返回重试。')
-          return
-        }
-
-        const { auth_token: authToken, userSession } = result
-        if (!authToken || !userSession) {
-          console.error('[OAuth] bridge response missing auth_token or userSession', result)
-          setErrorMessage('Login bridge response invalid. Please try again.')
-          return
-        }
-
-        localStorage.setItem('auth_token', authToken)
-        localStorage.setItem('userSession', JSON.stringify(userSession))
-
-        if (userSession.role === 'merchant') {
-          localStorage.setItem('merchantUser', JSON.stringify(userSession))
-          localStorage.setItem('merchantToken', 'merchant-logged-in')
-        }
-
-        setStatusMessage('Login successful, redirecting...')
-
-        const destination =
-          userSession.role === 'merchant'
-            ? '/merchant'
-            : userSession.role === 'admin'
-            ? '/account/merchant/admin'
-            : '/account'
-
-        router.replace(destination)
-      } catch (bridgeError) {
-        console.error('[OAuth] bridge request exception', bridgeError)
-        setErrorMessage('Unexpected bridge error. Please try again.')
-        return
-      }
+      setStatusMessage('Login successful, redirecting...')
+      router.replace(destination)
+    } else {
+      setStatusMessage('Waiting for Supabase session...')
     }
-
-    processSession()
-  }, [router, supabase])
+  }, [loading, isAuthenticated, user, router])
 
   return (
     <div style={{
@@ -128,7 +59,7 @@ function OAuthSuccessContent() {
           margin: '0 auto 16px'
         }}></div>
         <p style={{ fontSize: '1rem', margin: 0 }}>
-          {errorMessage || statusMessage}
+          {statusMessage}
         </p>
         <style jsx>{`
           @keyframes spin {

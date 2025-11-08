@@ -79,6 +79,14 @@ export async function POST(request) {
 
     if (upsertError || !upsertedUser) {
       console.error('[login-from-supabase] upsert error', upsertError)
+      if (upsertError) {
+        console.error('[login-from-supabase] upsert error detail', {
+          message: upsertError.message,
+          details: upsertError.details,
+          hint: upsertError.hint,
+          code: upsertError.code
+        })
+      }
       return NextResponse.json(
         { success: false, error: 'UPSERT_FAILED' },
         { status: 500 }

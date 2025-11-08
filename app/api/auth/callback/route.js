@@ -441,260 +441,214 @@ export async function GET(request) {
         role: updatedUser.role
       })
     } else {
-      // User doesn't exist - create new user
-      logger.info('Creating new user for Google OAuth', { email: userEmail })
-      
-      // Get registration domain for tracking (same as email registration)
+      // User doesn't exist - upsert using email + role
+      logger.info('Creating or updating Google OAuth user via upsert', { email: userEmail })
       const hostname = request.headers.get('host') || ''
       const registrationDomain = hostname.split(':')[0]
-      
-      // Use targetRole determined from state/referer
-      // Note: password_hash can be null for OAuth users
-      // For merchant role, user should have already registered with invite code
-      // But we allow Google OAuth to create merchant users (they can complete registration later)
-      // IMPORTANT: Use Supabase auth user ID as the primary key
-      // This ensures consistency between auth.users and public.users
+      const resolvedRole = targetRole || 'user'
       const emailVerifiedAt = supabaseUser.email_confirmed_at || new Date().toISOString()
 
-      const newUserData = {
-        id: supabaseUser.id, // Use Supabase auth user ID as primary key
+      const baseUserData = {
         email: userEmail,
-        name: userName || 'User', // Ensure name is not empty
-        age: defaultAge, // Can be null; user may update later
+        name: userName || 'User',
         auth_provider: 'google',
         email_verified_at: emailVerifiedAt,
-        role: targetRole || 'user', // Default to user role
-        password_hash: null, // Explicitly set to NULL for Google OAuth users (can be set later in settings)
-        registration_domain: registrationDomain // Track registration domain (same as email registration)
-      }
-      
-      // For merchant role, log a note that they may need to complete registration
-      if (targetRole === 'merchant') {
-        logger.info('Creating merchant user via Google OAuth', { 
-          email: userEmail,
-          note: 'User may need to complete merchant registration with invite code'
-        })
+        role: resolvedRole,
+        password_hash: null,
+        registration_domain: registrationDomain,
+        updated_at: new Date().toISOString()
       }
 
-      logger.info('Attempting to create user with data:', {
-        id: newUserData.id,
-        email: newUserData.email,
-        name: newUserData.name,
-        age: newUserData.age,
-        auth_provider: newUserData.auth_provider,
-        role: newUserData.role,
-        hasEmailVerified: !!newUserData.email_verified_at,
-        note: 'Using Supabase auth user ID as primary key'
-      })
+      if (defaultAge !== null) {
+        baseUserData.age = defaultAge
+      }
 
+      const upsertPayload = {
+        ...baseUserData,
+        id: userTargetBeforeUpsert?.id || supabaseUser.id
+      }
+
+      let upsertError = null
+      let upsertedUser = null
       let usedPasswordPlaceholder = false
       let fallbackOriginalError = null
 
-      const { data: createdUser, error: createError } = await adminSupabase
+      const { data: primaryUpsertUser, error: primaryUpsertError } = await adminSupabase
         .from('users')
-        .insert(newUserData)
+        .upsert(upsertPayload, {
+          onConflict: 'email,role',
+          ignoreDuplicates: false
+        })
         .select()
         .single()
 
-      let finalCreateError = createError
-      let finalCreatedUser = createdUser
+      upsertError = primaryUpsertError
+      upsertedUser = primaryUpsertUser
 
-      if (finalCreateError) {
-        logger.error('Primary insert for OAuth user failed', {
-          error: finalCreateError,
-          errorMessage: finalCreateError.message,
-          errorDetails: finalCreateError.details,
-          errorCode: finalCreateError.code,
-          email: newUserData.email,
-          role: newUserData.role
-        })
-        if (isRlsError(finalCreateError)) {
-          logger.warn(
-            `RLS policy blocked insert/update: user id=${newUserData.id ?? 'unknown'}, email=${newUserData.email}, role=${newUserData.role}`,
-            {
-              email: newUserData.email,
-              role: newUserData.role,
-              userId: newUserData.id
-            }
-          )
+      if (upsertError && isPasswordHashConstraintError(upsertError)) {
+        fallbackOriginalError = upsertError
+        logger.warn(
+          'Password hash NOT NULL constraint detected during upsert, retrying with placeholder hash',
+          {
+            errorCode: upsertError.code,
+            errorMessage: upsertError.message,
+            errorDetails: upsertError.details,
+            email: userEmail,
+            role: resolvedRole
+          }
+        )
+
+        const fallbackUpsertPayload = {
+          ...upsertPayload,
+          password_hash: GOOGLE_OAUTH_PASSWORD_PLACEHOLDER_HASH
+        }
+
+        const { data: fallbackUser, error: fallbackUpsertError } = await adminSupabase
+          .from('users')
+          .upsert(fallbackUpsertPayload, {
+            onConflict: 'email,role',
+            ignoreDuplicates: false
+          })
+          .select()
+          .single()
+
+        if (fallbackUpsertError) {
+          logger.error('Upsert with password placeholder hash failed', {
+            error: fallbackUpsertError,
+            originalError: fallbackOriginalError,
+            email: userEmail,
+            role: resolvedRole
+          })
+          if (isRlsError(fallbackUpsertError)) {
+            logger.warn(
+              `RLS policy blocked insert/update: user id=${upsertPayload.id ?? 'unknown'}, email=${userEmail}, role=${resolvedRole}`,
+              {
+                email: userEmail,
+                role: resolvedRole,
+                stage: 'upsert-fallback',
+                userId: upsertPayload.id
+              }
+            )
+          }
+          upsertError = fallbackUpsertError
+        } else {
+          upsertError = null
+          upsertedUser = fallbackUser
+          usedPasswordPlaceholder = true
+          logger.info('Google OAuth: user upserted with placeholder password hash', {
+            id: fallbackUser.id,
+            email: fallbackUser.email,
+            role: fallbackUser.role
+          })
         }
       }
 
-      if (!finalCreateError && finalCreatedUser) {
-        logger.info('Google OAuth: user inserted', {
-          id: finalCreatedUser.id,
-          email: finalCreatedUser.email,
-          role: finalCreatedUser.role
-        })
-      }
-
       if (
-        finalCreateError &&
-        (isDuplicateKeyError(finalCreateError) || isTransactionAbortedError(finalCreateError))
+        upsertError &&
+        (isDuplicateKeyError(upsertError) || isTransactionAbortedError(upsertError))
       ) {
         logger.warn('Duplicate key on email+role detected, fallback to update.', {
-          email: newUserData.email,
-          role: newUserData.role,
-          error: finalCreateError
+          email: userEmail,
+          role: resolvedRole,
+          error: upsertError
         })
 
-        const duplicateUpdateData = {
+        const fallbackUpdateData = {
           auth_provider: 'google',
           email_verified_at: emailVerifiedAt,
           updated_at: new Date().toISOString()
         }
 
         if (userName) {
-          duplicateUpdateData.name = userName
+          fallbackUpdateData.name = userName
         }
         if (defaultAge !== null) {
-          duplicateUpdateData.age = defaultAge
+          fallbackUpdateData.age = defaultAge
         }
 
         const {
-          data: duplicateUpdatedUser,
-          error: duplicateUpdateError
+          data: fallbackUpdatedUser,
+          error: fallbackUpdateError
         } = await adminSupabase
           .from('users')
-          .update(duplicateUpdateData)
-          .eq('email', newUserData.email)
-          .eq('role', newUserData.role)
+          .update(fallbackUpdateData)
+          .eq('email', userEmail)
+          .eq('role', resolvedRole)
           .select()
           .single()
 
-        if (duplicateUpdateError) {
+        if (fallbackUpdateError) {
           logger.error('Duplicate fallback update failed', {
-            error: duplicateUpdateError,
-            errorCode: duplicateUpdateError.code,
-            errorMessage: duplicateUpdateError.message,
-            errorDetails: duplicateUpdateError.details,
-            email: newUserData.email,
-            role: newUserData.role
+            error: fallbackUpdateError,
+            errorCode: fallbackUpdateError.code,
+            errorMessage: fallbackUpdateError.message,
+            errorDetails: fallbackUpdateError.details,
+            email: userEmail,
+            role: resolvedRole
           })
-          if (isRlsError(duplicateUpdateError)) {
+          if (isRlsError(fallbackUpdateError)) {
             logger.warn(
-              `RLS policy blocked insert/update: user id=${newUserData.id ?? 'unknown'}, email=${newUserData.email}, role=${newUserData.role}`,
+              `RLS policy blocked insert/update: user id=${upsertPayload.id ?? 'unknown'}, email=${userEmail}, role=${resolvedRole}`,
               {
-                email: newUserData.email,
-                role: newUserData.role,
-                userId: newUserData.id
+                email: userEmail,
+                role: resolvedRole,
+                userId: upsertPayload.id
               }
             )
           }
-          finalCreateError = duplicateUpdateError
+          upsertError = fallbackUpdateError
         } else {
-          finalCreatedUser = duplicateUpdatedUser
-          finalCreateError = null
-          userTarget = duplicateUpdatedUser
+          upsertError = null
+          upsertedUser = fallbackUpdatedUser
           logger.info('Google OAuth: existing user updated', {
-            id: duplicateUpdatedUser.id,
-            email: duplicateUpdatedUser.email,
-            role: duplicateUpdatedUser.role
+            id: fallbackUpdatedUser.id,
+            email: fallbackUpdatedUser.email,
+            role: fallbackUpdatedUser.role
           })
         }
       }
 
-      if (finalCreateError && isPasswordHashConstraintError(finalCreateError)) {
-        fallbackOriginalError = finalCreateError
-        logger.warn(
-          'Password hash NOT NULL constraint detected when creating OAuth user, retrying with placeholder hash',
-          {
-            errorCode: finalCreateError.code,
-            errorMessage: finalCreateError.message,
-            errorDetails: finalCreateError.details,
-            userId: newUserData.id,
-            email: newUserData.email
-          }
-        )
-
-        const fallbackData = {
-          ...newUserData,
-          password_hash: GOOGLE_OAUTH_PASSWORD_PLACEHOLDER_HASH
-        }
-
-        const {
-          data: fallbackUser,
-          error: fallbackError
-        } = await adminSupabase
-          .from('users')
-          .insert(fallbackData)
-          .select()
-          .single()
-
-        if (fallbackError) {
-          logger.error('Fallback user creation with placeholder hash failed', {
-            error: fallbackError,
-            originalError: finalCreateError,
-            fallbackErrorCode: fallbackError.code,
-            fallbackErrorMessage: fallbackError.message,
-            fallbackErrorDetails: fallbackError.details,
-            userId: newUserData.id,
-            email: newUserData.email
-          })
-          if (isRlsError(fallbackError)) {
-            logger.warn(
-              `RLS policy blocked insert/update: user id=${newUserData.id ?? 'unknown'}, email=${newUserData.email}, role=${newUserData.role}`,
-              {
-                email: newUserData.email,
-                role: newUserData.role,
-                stage: 'fallback',
-                userId: newUserData.id
-              }
-            )
-          }
-          finalCreateError = fallbackError
-        } else {
-          usedPasswordPlaceholder = true
-          finalCreateError = null
-          finalCreatedUser = fallbackUser
-          logger.info('Created OAuth user with password placeholder hash', {
-            userId: fallbackUser.id,
-            email: fallbackUser.email
-          })
-        }
-      }
-
-      if (finalCreateError) {
+      if (upsertError) {
         // Log full error details for debugging - including all possible error properties
         // Try to extract error from nested structures (Supabase sometimes wraps errors)
         const actualError =
-          finalCreateError.error || finalCreateError.originalError || finalCreateError
+          upsertError.error || upsertError.originalError || upsertError
         const errorInfo = {
-          error: finalCreateError,
+          error: upsertError,
           actualError: actualError,
-          errorType: typeof finalCreateError,
+          errorType: typeof upsertError,
           errorCode:
-            finalCreateError.code ||
+            upsertError.code ||
             actualError?.code ||
-            finalCreateError.error_code ||
+            upsertError.error_code ||
             actualError?.error_code,
           errorMessage:
-            finalCreateError.message ||
+            upsertError.message ||
             actualError?.message ||
-            finalCreateError.msg ||
+            upsertError.msg ||
             actualError?.msg,
           errorDetails:
-            finalCreateError.details ||
+            upsertError.details ||
             actualError?.details ||
-            finalCreateError.detail ||
+            upsertError.detail ||
             actualError?.detail,
-          errorHint: finalCreateError.hint || actualError?.hint,
-          errorColumn: finalCreateError.column || actualError?.column,
-          errorConstraint: finalCreateError.constraint || actualError?.constraint,
-          errorTable: finalCreateError.table || actualError?.table,
-          errorSchema: finalCreateError.schema || actualError?.schema,
-          userData: newUserData,
+          errorHint: upsertError.hint || actualError?.hint,
+          errorColumn: upsertError.column || actualError?.column,
+          errorConstraint: upsertError.constraint || actualError?.constraint,
+          errorTable: upsertError.table || actualError?.table,
+          errorSchema: upsertError.schema || actualError?.schema,
+          userData: upsertPayload,
           // Try to stringify the entire error object
           fullError: JSON.stringify(
-            finalCreateError,
-            Object.getOwnPropertyNames(finalCreateError),
+            upsertError,
+            Object.getOwnPropertyNames(upsertError),
             2
           ),
           fullActualError: actualError ? JSON.stringify(actualError, Object.getOwnPropertyNames(actualError), 2) : null,
           // Also log as plain object to see all properties
-          errorKeys: Object.keys(finalCreateError),
+          errorKeys: Object.keys(upsertError),
           actualErrorKeys: actualError ? Object.keys(actualError) : [],
-          errorString: String(finalCreateError),
+          errorString: String(upsertError),
           actualErrorString: actualError ? String(actualError) : null
         }
 
@@ -709,8 +663,8 @@ export async function GET(request) {
         
         // Extract error code (handle both string and number codes)
         // Check multiple possible locations for error code
-        const errorCode = finalCreateError.code || 
-                         finalCreateError.error_code || 
+        const errorCode = upsertError.code || 
+                         upsertError.error_code || 
                          actualError?.code || 
                          actualError?.error_code ||
                          null
@@ -723,9 +677,9 @@ export async function GET(request) {
           errorMessage = 'User with this email already exists'
         } else if (errorCode === '23502' || errorCode === 23502 || String(errorCode) === '23502') {
           // Not null constraint violation
-          const fieldName = finalCreateError.column || 
-                           finalCreateError.details?.match(/column "(\w+)"/)?.[1] || 
-                           finalCreateError.message?.match(/column "(\w+)"/)?.[1] ||
+          const fieldName = upsertError.column || 
+                           upsertError.details?.match(/column "(\w+)"/)?.[1] || 
+                           upsertError.message?.match(/column "(\w+)"/)?.[1] ||
                            'unknown field'
           errorMessage = `Missing required field: ${fieldName}`
           if (fieldName === 'password_hash') {
@@ -733,23 +687,23 @@ export async function GET(request) {
           }
         } else if (errorCode === '23514' || errorCode === 23514 || String(errorCode) === '23514') {
           // Check constraint violation
-          const constraintName = finalCreateError.constraint || 
-                                finalCreateError.details?.match(/constraint "(\w+)"/)?.[1] ||
+          const constraintName = upsertError.constraint || 
+                                upsertError.details?.match(/constraint "(\w+)"/)?.[1] ||
                                 'validation'
           errorMessage = `Data validation failed: ${constraintName}`
-          if (finalCreateError.details) {
-            errorMessage += ` - ${finalCreateError.details}`
+          if (upsertError.details) {
+            errorMessage += ` - ${upsertError.details}`
           }
         } else if (errorCode === '42P01' || String(errorCode) === '42P01') {
           // Table does not exist (PostgreSQL codes with letters are always strings)
           errorMessage = 'Database table not found. Please contact support.'
         } else if (errorCode === '42703' || String(errorCode) === '42703') {
           // Column does not exist (PostgreSQL codes with letters are always strings)
-          const columnName = finalCreateError.column || 
-                            finalCreateError.details?.match(/column "(\w+)"/)?.[1] || 
+          const columnName = upsertError.column || 
+                            upsertError.details?.match(/column "(\w+)"/)?.[1] || 
                             'unknown column'
           errorMessage = `Database column not found: ${columnName}. Please contact support.`
-        } else if (errorCode === 'PGRST116' || createError.code === 'PGRST116' || String(errorCode) === 'PGRST116') {
+        } else if (errorCode === 'PGRST116' || String(errorCode) === 'PGRST116') {
           // PostgREST: no rows returned (shouldn't happen on insert, but handle it)
           errorMessage = 'Failed to create user account. Please try again.'
         } else {
@@ -757,26 +711,26 @@ export async function GET(request) {
           // Priority: message > details > hint > string representation > default
           
           // Try to get message from various possible locations
-          const possibleMessage = finalCreateError.message || 
-                                 finalCreateError.error?.message || 
+          const possibleMessage = upsertError.message || 
+                                 upsertError.error?.message || 
                                  actualError?.message ||
-                                 finalCreateError.msg || 
+                                 upsertError.msg || 
                                  actualError?.msg ||
-                                 finalCreateError.errorMessage ||
+                                 upsertError.errorMessage ||
                                  actualError?.errorMessage ||
                                  null
           
           // Try to get details from various possible locations
-          const possibleDetails = finalCreateError.details || 
-                                 finalCreateError.error?.details || 
+          const possibleDetails = upsertError.details || 
+                                 upsertError.error?.details || 
                                  actualError?.details ||
-                                 finalCreateError.detail ||
+                                 upsertError.detail ||
                                  actualError?.detail ||
                                  null
           
           // Try to get hint from various possible locations
-          const possibleHint = finalCreateError.hint || 
-                              finalCreateError.error?.hint ||
+          const possibleHint = upsertError.hint || 
+                              upsertError.error?.hint ||
                               actualError?.hint ||
                               null
           
@@ -797,12 +751,12 @@ export async function GET(request) {
           } else {
             // Last resort: try to extract from error string or JSON
             try {
-              const errorStr = String(finalCreateError)
+              const errorStr = String(upsertError)
               if (errorStr && errorStr !== '[object Object]' && errorStr.length > 0) {
                 errorMessage = errorStr
               } else {
                 // Try JSON stringify
-                const errorJson = JSON.stringify(finalCreateError)
+                const errorJson = JSON.stringify(upsertError)
                 if (errorJson && errorJson !== '{}' && errorJson.length < 200) {
                   errorMessage = `Database error: ${errorJson}`
                 }
@@ -814,15 +768,15 @@ export async function GET(request) {
             // If we still have default message, log a warning with full error info
             if (errorMessage === 'Database error saving new user') {
               logger.warn('Using default error message - error object structure may be unexpected', {
-                errorType: typeof finalCreateError,
-                errorKeys: Object.keys(finalCreateError),
-                errorString: String(finalCreateError),
-                errorJson: JSON.stringify(finalCreateError),
-                fullErrorObject: finalCreateError
+                errorType: typeof upsertError,
+                errorKeys: Object.keys(upsertError),
+                errorString: String(upsertError),
+                errorJson: JSON.stringify(upsertError),
+                fullErrorObject: upsertError
               })
               // Even with default message, try to add any available info
-              if (Object.keys(finalCreateError).length > 0) {
-                errorMessage = `Database error: ${Object.keys(finalCreateError).join(', ')}`
+              if (Object.keys(upsertError).length > 0) {
+                errorMessage = `Database error: ${Object.keys(upsertError).join(', ')}`
               }
             }
           }
@@ -838,11 +792,23 @@ export async function GET(request) {
         )
       }
 
-      userRecord = finalCreatedUser
-      if (usedPasswordPlaceholder) {
+      userRecord = upsertedUser
+      if (usedPasswordPlaceholder && userRecord) {
         userRecord.password_hash = GOOGLE_OAUTH_PASSWORD_PLACEHOLDER_HASH
       }
-      userTarget = finalCreatedUser
+      if (upsertedUser) {
+        userTarget = upsertedUser
+        logger.info(
+          userTargetBeforeUpsert
+            ? 'Google OAuth: existing user updated'
+            : 'Google OAuth: user inserted',
+          {
+            id: upsertedUser.id,
+            email: upsertedUser.email,
+            role: upsertedUser.role
+          }
+        )
+      }
     }
 
     // Remove sensitive data

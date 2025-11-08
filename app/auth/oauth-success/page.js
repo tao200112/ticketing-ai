@@ -18,6 +18,29 @@ function OAuthSuccessContent() {
 
     try {
       const sessionData = JSON.parse(sessionParam)
+      const bridgeRole = sessionData.role || 'user'
+      try {
+        console.log('ℹ️ Attempting to bridge Supabase session to local token via API', {
+          role: bridgeRole
+        })
+        const response = await fetch('/api/auth/login-from-supabase', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ role: bridgeRole })
+        })
+        const result = await response.json().catch(() => null)
+        if (response.ok && result?.success) {
+          localStorage.setItem('auth_token', result.data.token)
+          localStorage.setItem('userSession', JSON.stringify(result.data.user))
+          console.log('✅ Supabase session bridged to local auth token')
+        } else {
+          console.warn('⚠️ Failed to bridge Supabase session', result)
+        }
+      } catch (bridgeError) {
+        console.warn('⚠️ Unexpected error bridging Supabase session', bridgeError)
+      }
       
       // Save session to localStorage based on role
       if (sessionData.role === 'merchant') {
@@ -40,11 +63,13 @@ function OAuthSuccessContent() {
         console.log('✅ Google OAuth session saved to localStorage', sessionData)
         
         // Redirect based on role
-        if (sessionData.role === 'admin') {
-          router.replace('/admin')
-        } else {
-          router.replace('/account')
-        }
+        setTimeout(() => {
+          if (sessionData.role === 'admin') {
+            router.replace('/admin')
+          } else {
+            router.replace('/account')
+          }
+        }, 100)
       }
     } catch (error) {
       console.error('❌ Failed to parse session data:', error)

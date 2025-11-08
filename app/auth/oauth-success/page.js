@@ -1,84 +1,111 @@
 'use client'
 
-import { useEffect, Suspense } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { getSupabaseClient } from '@/lib/supabase-client'
 
 function OAuthSuccessContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const [statusMessage, setStatusMessage] = useState('Signing you in...')
+  const [errorMessage, setErrorMessage] = useState(null)
 
   useEffect(() => {
     const sessionParam = searchParams.get('session')
-    
-    if (!sessionParam) {
-      console.error('❌ No session data in OAuth success page')
-      router.replace('/auth/login?error=missing_session')
-      return
-    }
 
-    const handleSession = async () => {
+    const processSession = async () => {
+      if (!sessionParam) {
+        console.error('❌ No session data in OAuth success page')
+        setErrorMessage('Missing OAuth session data. Please try logging in again.')
+        router.replace('/auth/login?error=missing_session')
+        return
+      }
+
+      const supabase = getSupabaseClient()
+      if (!supabase) {
+        console.warn('oauth-success: Supabase client not available')
+        setErrorMessage('Supabase client not available. Please retry login.')
+        return
+      }
+
+      const { data: sessionInfo, error: sessionError } = await supabase.auth.getSession()
+      console.log('oauth-success session', {
+        session: sessionInfo?.session,
+        error: sessionError
+      })
+
+      if (sessionError) {
+        setErrorMessage('Failed to read Supabase session. Please try again.')
+        router.replace('/auth/login?error=supabase_session_error')
+        return
+      }
+
+      if (!sessionInfo?.session?.user) {
+        setErrorMessage('No Supabase session found. Please log in again.')
+        router.replace('/auth/login?error=no_supabase_session')
+        return
+      }
+
+      let parsedSession
       try {
-        const sessionData = JSON.parse(sessionParam)
-        const bridgeRole = sessionData.role || 'user'
-        try {
-          console.log('ℹ️ Attempting to bridge Supabase session to local token via API', {
-            role: bridgeRole
-          })
-          const response = await fetch('/api/auth/login-from-supabase', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ role: bridgeRole })
-          })
-          const result = await response.json().catch(() => null)
-          if (response.ok && result?.success) {
-            localStorage.setItem('auth_token', result.data.token)
-            localStorage.setItem('userSession', JSON.stringify(result.data.user))
-            console.log('✅ Supabase session bridged to local auth token')
-          } else {
-            console.warn('⚠️ Failed to bridge Supabase session', result)
-          }
-        } catch (bridgeError) {
-          console.warn('⚠️ Unexpected error bridging Supabase session', bridgeError)
+        parsedSession = JSON.parse(sessionParam)
+      } catch (parseError) {
+        console.warn('oauth-success: failed to parse session param', parseError)
+      }
+
+      const bridgeRole = parsedSession?.role || 'user'
+      try {
+        console.log('ℹ️ Attempting to bridge Supabase session to local token via API', {
+          role: bridgeRole
+        })
+
+        const response = await fetch('/api/auth/login-from-supabase', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ role: bridgeRole })
+        })
+
+        const result = await response.json().catch(() => null)
+
+        if (!response.ok || !result?.success) {
+          console.warn('oauth-success login-from-supabase failed', result)
+          setErrorMessage('Unable to complete Google login. Please try again.')
+          router.replace('/auth/login?error=oauth_bridge_failed')
+          return
         }
-        
-        // Save session to localStorage based on role
-        if (sessionData.role === 'merchant') {
-          // For merchant users, save to merchantUser (same format as merchant login)
-          const merchantUser = {
-            id: sessionData.id,
-            email: sessionData.email,
-            name: sessionData.name,
-            role: sessionData.role
-          }
-          localStorage.setItem('merchantUser', JSON.stringify(merchantUser))
+
+        const { user, token } = result.data
+        localStorage.setItem('auth_token', token)
+        localStorage.setItem('userSession', JSON.stringify(user))
+        console.log('✅ Supabase session bridged to local auth token', {
+          email: user.email,
+          role: user.role
+        })
+
+        if (user.role === 'merchant') {
+          localStorage.setItem('merchantUser', JSON.stringify(user))
           localStorage.setItem('merchantToken', 'merchant-logged-in')
-          console.log('✅ Google OAuth merchant session saved to localStorage', merchantUser)
-          
-          // Redirect to merchant dashboard
-          router.replace('/merchant')
-        } else {
-          // For regular users and admins, save to userSession
-          localStorage.setItem('userSession', JSON.stringify(sessionData))
-          console.log('✅ Google OAuth session saved to localStorage', sessionData)
-          
-          // Redirect based on role
-          setTimeout(() => {
-            if (sessionData.role === 'admin') {
-              router.replace('/admin')
-            } else {
-              router.replace('/account')
-            }
-          }, 100)
         }
-      } catch (error) {
-        console.error('❌ Failed to parse session data:', error)
-        router.replace('/auth/login?error=invalid_session')
+
+        const destination =
+          user.role === 'merchant'
+            ? '/merchant'
+            : user.role === 'admin'
+            ? '/admin'
+            : '/account'
+
+        setStatusMessage('Login successful, redirecting...')
+        router.replace(destination)
+      } catch (bridgeError) {
+        console.warn('⚠️ Unexpected error bridging Supabase session', bridgeError)
+        setErrorMessage('Unexpected error bridging Supabase session. Please try again.')
+        router.replace('/auth/login?error=oauth_bridge_exception')
       }
     }
 
-    handleSession()
+    processSession()
   }, [searchParams, router])
 
   return (
@@ -109,7 +136,7 @@ function OAuthSuccessContent() {
           margin: '0 auto 16px'
         }}></div>
         <p style={{ fontSize: '1rem', margin: 0 }}>
-          Signing you in...
+          {errorMessage || statusMessage}
         </p>
         <style jsx>{`
           @keyframes spin {

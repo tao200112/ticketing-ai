@@ -137,11 +137,17 @@ function LoginPageContent() {
     setMessage('')
     
     try {
-      console.log('ℹ️ Google login button clicked')
+      console.log('Google login: start (page)')
+
+      const redirectTo =
+        typeof window !== 'undefined'
+          ? `${window.location.origin}/auth/oauth-success`
+          : undefined
 
       console.log('ℹ️ Google login initiated', {
         path: typeof window !== 'undefined' ? window.location.pathname : 'unknown',
-        provider: 'google'
+        provider: 'google',
+        redirectTo
       })
 
       const supabase = getSupabaseClient()
@@ -153,15 +159,18 @@ function LoginPageContent() {
 
       // Initiate Google OAuth sign-in
       const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google'
+        provider: 'google',
+        options: {
+          redirectTo
+        }
       })
-      console.log('ℹ️ signInWithOAuth result:', { data, error })
+      console.log('Google login result (page):', { data, error, redirectTo })
 
       if (error) {
-        console.error('⚠️ Google login error', error)
-        setMessage(`Google 登录失败：${error.message}`)
+        console.error('⚠️ Google OAuth error:', error)
+        setMessage(`Google 登录失败：${error.message || 'unknown_error'}`)
         if (typeof window !== 'undefined') {
-          alert(`Google 登录失败：${error.message}`)
+          alert(`Google 登录失败：${error.message || 'Unknown error'}`)
         }
         setGoogleLoading(false)
         return

@@ -66,11 +66,17 @@ export default function LoginForm({ onSuccess, onSwitchToRegister }) {
     setError('')
     
     try {
-      console.log('ℹ️ Google login button clicked')
+      console.log('Google login: start (form)')
+
+      const redirectTo =
+        typeof window !== 'undefined'
+          ? `${window.location.origin}/auth/oauth-success`
+          : undefined
 
       console.log('ℹ️ Google login initiated (form)', {
         path: typeof window !== 'undefined' ? window.location.pathname : 'unknown',
-        provider: 'google'
+        provider: 'google',
+        redirectTo
       })
 
       const supabase = getSupabaseClient()
@@ -82,9 +88,12 @@ export default function LoginForm({ onSuccess, onSwitchToRegister }) {
 
       // Initiate Google OAuth sign-in
       const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google'
+        provider: 'google',
+        options: {
+          redirectTo
+        }
       })
-      console.log('ℹ️ signInWithOAuth result:', { data, error })
+      console.log('Google login result (form):', { data, error, redirectTo })
 
       if (error) {
         console.error('⚠️ Google login error', error)

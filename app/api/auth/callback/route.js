@@ -1,4 +1,8 @@
 // Google OAuth integration – Supabase Auth (2025-11-08) – dedupe existing users and avoid RLS issues
+// Data flow:
+// 1. auth.users receives the OAuth account; database trigger (handle_new_auth_user_to_users) upserts into public.users by (email, role).
+// 2. This route enriches the business row (name, role overrides, domains, placeholders) via the same onConflict strategy.
+// 3. public.users must only ever be touched through upsert/email+role aware logic to honour users_email_role_unique.
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { createSupabaseClient } from '@/lib/supabase-api'

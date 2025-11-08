@@ -154,7 +154,7 @@ export async function GET(request) {
                      'User'
     const userAvatar = supabaseUser.user_metadata?.avatar_url || null
     const rawAgeMetadata = supabaseUser.user_metadata?.age
-    let defaultAge = 18
+    let defaultAge = null
     if (typeof rawAgeMetadata === 'number' && Number.isFinite(rawAgeMetadata)) {
       defaultAge = Math.max(16, Math.floor(rawAgeMetadata))
     } else if (typeof rawAgeMetadata === 'string') {
@@ -307,8 +307,8 @@ export async function GET(request) {
         updateData.name = userName
       }
       if (
-        typeof userTarget.age !== 'number' ||
-        !Number.isFinite(userTarget.age)
+        defaultAge !== null &&
+        (typeof userTarget.age !== 'number' || !Number.isFinite(userTarget.age))
       ) {
         updateData.age = defaultAge
       }
@@ -411,7 +411,7 @@ export async function GET(request) {
         id: supabaseUser.id, // Use Supabase auth user ID as primary key
         email: userEmail,
         name: userName || 'User', // Ensure name is not empty
-        age: defaultAge, // Default age, user can update later (must be >= 16)
+        age: defaultAge, // Can be null; user may update later
         auth_provider: 'google',
         email_verified_at: emailVerifiedAt,
         role: targetRole || 'user', // Default to user role

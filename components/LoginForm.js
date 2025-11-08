@@ -72,33 +72,17 @@ export default function LoginForm({ onSuccess, onSwitchToRegister }) {
         return
       }
 
-      // Get the current site URL for redirect
-      const siteUrl = typeof window !== 'undefined' ? window.location.origin : ''
-      const redirectUrl = `${siteUrl}/api/auth/callback`
-
-      // Determine role from current path (default to 'user' for regular login)
-      const currentPath = typeof window !== 'undefined' ? window.location.pathname : ''
-      const role = currentPath.includes('/merchant') ? 'merchant' : 
-                   currentPath.includes('/admin') ? 'admin' : 
-                   'user'
-      
-      // Pass role in state parameter so callback knows the intended role
-      const state = JSON.stringify({ role })
-
       // Initiate Google OAuth sign-in
       const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: redirectUrl,
-          queryParams: {
-            state: state
-          }
-        }
+        provider: 'google'
       })
 
       if (error) {
         console.error('❌ Google OAuth error:', error)
         setError('Failed to initiate Google login. Please try again.')
+        if (typeof window !== 'undefined') {
+          alert('Failed to initiate Google login. Please try again.')
+        }
         setGoogleLoading(false)
       } else {
         // The redirect will happen automatically

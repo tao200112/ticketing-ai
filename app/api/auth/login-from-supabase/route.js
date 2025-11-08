@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import jwt from 'jsonwebtoken'
 import { createLogger } from '@/lib/logger'
@@ -56,67 +56,135 @@ export async function POST(request) {
       : 'user'
 
     const hostDomain = request.headers.get('host')?.split(':')[0] || null
+    const now = new Date().toISOString()
 
-    const payload = {
-      id: userId,
-      email,
-      role: resolvedRole,
-      auth_provider: provider || 'google',
-      email_verified_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      registration_domain: registrationDomain || hostDomain
-    }
-
-    if (name) {
-      payload.name = name
-    }
-
-    const { data: upsertedUser, error: upsertError } = await supabaseAdmin
+    const { data: existingUser, error: fetchError } = await supabaseAdmin
       .from('users')
-      .upsert(payload, { onConflict: 'email', ignoreDuplicates: false })
-      .select()
-      .single()
+      .select('*')
+      .eq('email', email)
+      .eq('role', resolvedRole)
+      .maybeSingle()
 
-    if (upsertError || !upsertedUser) {
-      console.error('[login-from-supabase] upsert error', upsertError)
-      if (upsertError) {
-        console.error('[login-from-supabase] upsert error detail', {
-          message: upsertError.message,
-          details: upsertError.details,
-          hint: upsertError.hint,
-          code: upsertError.code
-        })
-      }
+    if (fetchError && fetchError.code !== 'PGRST116') {
+      console.error('[login-from-supabase] fetch existing user error', fetchError)
       return NextResponse.json(
         {
           success: false,
-          error: 'UPSERT_FAILED',
+          error: 'FETCH_FAILED',
           dbError: {
-            message: upsertError?.message,
-            details: upsertError?.details,
-            hint: upsertError?.hint,
-            code: upsertError?.code,
+            message: fetchError.message,
+            details: fetchError.details,
+            hint: fetchError.hint,
+            code: fetchError.code
           }
         },
         { status: 500 }
       )
     }
 
+    let userRow
+
+    if (existingUser) {
+      const updatePayload = {
+        name: name || existingUser.name || email,
+        auth_provider: provider || existingUser.auth_provider || 'google',
+        email_verified_at: now,
+        updated_at: now,
+        registration_domain: registrationDomain || hostDomain || existingUser.registration_domain
+      }
+
+      const { data, error: updateError } = await supabaseAdmin
+        .from('users')
+        .update(updatePayload)
+        .eq('id', existingUser.id)
+        .select()
+        .single()
+
+      if (updateError || !data) {
+        console.error('[login-from-supabase] update error', updateError)
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'UPDATE_FAILED',
+            dbError: {
+              message: updateError?.message,
+              details: updateError?.details,
+              hint: updateError?.hint,
+              code: updateError?.code
+            }
+          },
+          { status: 500 }
+        )
+      }
+
+      if (existingUser.id !== userId) {
+        console.warn('[login-from-supabase] Supabase auth id differs from existing user record', {
+          existingId: existingUser.id,
+          authUserId: userId,
+          email,
+          role: resolvedRole
+        })
+      }
+
+      userRow = data
+    } else {
+      const insertPayload = {
+        id: userId,
+        email,
+        name: name || email,
+        role: resolvedRole,
+        auth_provider: provider || 'google',
+        email_verified_at: now,
+        registration_domain: registrationDomain || hostDomain,
+        updated_at: now
+      }
+
+      const { data, error: insertError } = await supabaseAdmin
+        .from('users')
+        .insert(insertPayload)
+        .select()
+        .single()
+
+      if (insertError || !data) {
+        console.error('[login-from-supabase] insert error', insertError)
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'INSERT_FAILED',
+            dbError: {
+              message: insertError?.message,
+              details: insertError?.details,
+              hint: insertError?.hint,
+              code: insertError?.code
+            }
+          },
+          { status: 500 }
+        )
+      }
+
+      userRow = data
+    }
+
     const authToken = createToken({
-      id: upsertedUser.id,
-      email: upsertedUser.email,
-      role: upsertedUser.role
+      id: userRow.id,
+      email: userRow.email,
+      role: userRow.role
     })
 
     console.log('[login-from-supabase] success', {
-      email: upsertedUser.email,
-      role: upsertedUser.role
+      email: userRow.email,
+      role: userRow.role
     })
+
+    const sanitizedUser = { ...userRow }
+    if ('password_hash' in sanitizedUser) {
+      delete sanitizedUser.password_hash
+    }
 
     return NextResponse.json({
       success: true,
       auth_token: authToken,
-      userSession: upsertedUser
+      userSession: sanitizedUser
     })
   } catch (error) {
     console.error('[login-from-supabase] exception', error)

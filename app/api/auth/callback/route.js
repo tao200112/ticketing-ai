@@ -1,4 +1,4 @@
-// Google OAuth callback flow fix – dedupe existing users and avoid RLS issues
+// Google OAuth integration – Supabase Auth (2025-11-08) – dedupe existing users and avoid RLS issues
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { createSupabaseClient } from '@/lib/supabase-api'

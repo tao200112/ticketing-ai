@@ -1,5 +1,6 @@
 'use client'
 
+// Google OAuth integration – Supabase Auth (2025-11-08)
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '../../../lib/auth-context'
@@ -136,6 +137,10 @@ function LoginPageContent() {
     setMessage('')
     
     try {
+      console.log('ℹ️ Google login initiated', {
+        path: typeof window !== 'undefined' ? window.location.pathname : 'unknown'
+      })
+
       const supabase = getSupabaseClient()
       if (!supabase) {
         setMessage('Supabase client not available. Please check configuration.')
@@ -158,7 +163,10 @@ function LoginPageContent() {
       } else {
         // The redirect will happen automatically
         // User will be redirected to Google, then back to our callback
-        console.log('✅ Google OAuth initiated, redirecting...')
+        console.log('✅ Google login handed off to Supabase', {
+          provider: 'google',
+          path: typeof window !== 'undefined' ? window.location.pathname : 'unknown'
+        })
       }
     } catch (error) {
       console.error('❌ Google login error:', error)

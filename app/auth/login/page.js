@@ -138,7 +138,8 @@ function LoginPageContent() {
     
     try {
       console.log('ℹ️ Google login initiated', {
-        path: typeof window !== 'undefined' ? window.location.pathname : 'unknown'
+        path: typeof window !== 'undefined' ? window.location.pathname : 'unknown',
+        provider: 'google'
       })
 
       const supabase = getSupabaseClient()
@@ -154,7 +155,11 @@ function LoginPageContent() {
       })
 
       if (error) {
-        console.error('❌ Google OAuth error:', error)
+        console.error('❌ Google OAuth error', {
+          code: error?.code,
+          message: error?.message,
+          error
+        })
         setMessage('Failed to initiate Google login. Please try again.')
         if (typeof window !== 'undefined') {
           alert('Failed to initiate Google login. Please try again.')
@@ -163,10 +168,27 @@ function LoginPageContent() {
       } else {
         // The redirect will happen automatically
         // User will be redirected to Google, then back to our callback
-        console.log('✅ Google login handed off to Supabase', {
-          provider: 'google',
-          path: typeof window !== 'undefined' ? window.location.pathname : 'unknown'
-        })
+        try {
+          const { data: sessionInfo } = await supabase.auth.getSession()
+          const oauthSession = sessionInfo?.session
+          if (oauthSession?.user) {
+            console.log('✅ Google login successful', {
+              email: oauthSession.user.email,
+              sessionExpires: oauthSession.expires_at,
+              provider: 'google'
+            })
+          } else {
+            console.log('ℹ️ Google login handed off to Supabase', {
+              provider: 'google',
+              note: 'No session yet (expect redirect)',
+              path: typeof window !== 'undefined' ? window.location.pathname : 'unknown'
+            })
+          }
+        } catch (sessionError) {
+          console.warn('⚠️ Unable to verify session after Google login handoff', {
+            error: sessionError
+          })
+        }
       }
     } catch (error) {
       console.error('❌ Google login error:', error)

@@ -67,7 +67,8 @@ export default function LoginForm({ onSuccess, onSwitchToRegister }) {
     
     try {
       console.log('ℹ️ Google login initiated (form)', {
-        path: typeof window !== 'undefined' ? window.location.pathname : 'unknown'
+        path: typeof window !== 'undefined' ? window.location.pathname : 'unknown',
+        provider: 'google'
       })
 
       const supabase = getSupabaseClient()
@@ -83,7 +84,11 @@ export default function LoginForm({ onSuccess, onSwitchToRegister }) {
       })
 
       if (error) {
-        console.error('❌ Google OAuth error:', error)
+        console.error('❌ Google OAuth error (form)', {
+          code: error?.code,
+          message: error?.message,
+          error
+        })
         setError('Failed to initiate Google login. Please try again.')
         if (typeof window !== 'undefined') {
           alert('Failed to initiate Google login. Please try again.')
@@ -92,10 +97,27 @@ export default function LoginForm({ onSuccess, onSwitchToRegister }) {
       } else {
         // The redirect will happen automatically
         // User will be redirected to Google, then back to our callback
-        console.log('✅ Google login handed off to Supabase (form)', {
-          provider: 'google',
-          path: typeof window !== 'undefined' ? window.location.pathname : 'unknown'
-        })
+        try {
+          const { data: sessionInfo } = await supabase.auth.getSession()
+          const oauthSession = sessionInfo?.session
+          if (oauthSession?.user) {
+            console.log('✅ Google login successful (form)', {
+              email: oauthSession.user.email,
+              sessionExpires: oauthSession.expires_at,
+              provider: 'google'
+            })
+          } else {
+            console.log('ℹ️ Google login handed off to Supabase (form)', {
+              provider: 'google',
+              note: 'No session yet (expect redirect)',
+              path: typeof window !== 'undefined' ? window.location.pathname : 'unknown'
+            })
+          }
+        } catch (sessionError) {
+          console.warn('⚠️ Unable to verify session after Google login handoff (form)', {
+            error: sessionError
+          })
+        }
       }
     } catch (error) {
       console.error('❌ Google login error:', error)

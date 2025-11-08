@@ -11,6 +11,37 @@ import {
 
 const logger = createLogger('oauth-callback')
 
+function isDuplicateKeyError(error) {
+  if (!error) return false
+  const code = error.code || error.error_code || error?.originalError?.code
+  if (code && String(code) === '23505') return true
+  const message = (error.message || error.details || '').toLowerCase()
+  return message.includes('duplicate key') || message.includes('unique constraint')
+}
+
+function isTransactionAbortedError(error) {
+  if (!error) return false
+  const code = error.code || error.error_code || error?.originalError?.code
+  if (code && String(code) === '25P02') return true
+  const message = (error.message || error.details || '').toLowerCase()
+  return message.includes('current transaction is aborted')
+}
+
+function isRlsError(error) {
+  if (!error) return false
+  const message = [
+    error.message,
+    error.details,
+    error.hint,
+    error?.originalError?.message,
+    error?.originalError?.details
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase()
+  return message.includes('row-level security') || message.includes('rls')
+}
+
 function isPasswordHashConstraintError(error) {
   if (!error) return false
   const rawCode =
@@ -344,14 +375,15 @@ export async function GET(request) {
           errorHint: updateError.hint,
           userId: userTarget.id
         })
-        if (
-          typeof updateError.message === 'string' &&
-          updateError.message.toLowerCase().includes('row-level security')
-        ) {
-          logger.warn('Update blocked by row-level security policy', {
-            userId: userTarget.id,
-            email: userTarget.email
-          })
+        if (isRlsError(updateError)) {
+          logger.warn(
+            `RLS policy blocked insert/update: user id=${userTarget.id ?? 'unknown'}, email=${userTarget.email}, role=${userTarget.role}`,
+            {
+              userId: userTarget.id,
+              email: userTarget.email,
+              role: userTarget.role
+            }
+          )
         }
         
         // Provide specific error message based on error type
@@ -403,6 +435,11 @@ export async function GET(request) {
 
       userRecord = updatedUser
       userTarget = updatedUser
+      logger.info('Google OAuth: existing user updated', {
+        id: updatedUser.id,
+        email: userEmail,
+        role: updatedUser.role
+      })
     } else {
       // User doesn't exist - create new user
       logger.info('Creating new user for Google OAuth', { email: userEmail })
@@ -468,15 +505,91 @@ export async function GET(request) {
           errorMessage: finalCreateError.message,
           errorDetails: finalCreateError.details,
           errorCode: finalCreateError.code,
-          email: newUserData.email
+          email: newUserData.email,
+          role: newUserData.role
         })
-        if (
-          typeof finalCreateError.message === 'string' &&
-          finalCreateError.message.toLowerCase().includes('row-level security')
-        ) {
-          logger.warn('Insert blocked by row-level security policy', {
+        if (isRlsError(finalCreateError)) {
+          logger.warn(
+            `RLS policy blocked insert/update: user id=${newUserData.id ?? 'unknown'}, email=${newUserData.email}, role=${newUserData.role}`,
+            {
+              email: newUserData.email,
+              role: newUserData.role,
+              userId: newUserData.id
+            }
+          )
+        }
+      }
+
+      if (!finalCreateError && finalCreatedUser) {
+        logger.info('Google OAuth: user inserted', {
+          id: finalCreatedUser.id,
+          email: finalCreatedUser.email,
+          role: finalCreatedUser.role
+        })
+      }
+
+      if (
+        finalCreateError &&
+        (isDuplicateKeyError(finalCreateError) || isTransactionAbortedError(finalCreateError))
+      ) {
+        logger.warn('Duplicate key on email+role detected, fallback to update.', {
+          email: newUserData.email,
+          role: newUserData.role,
+          error: finalCreateError
+        })
+
+        const duplicateUpdateData = {
+          auth_provider: 'google',
+          email_verified_at: emailVerifiedAt,
+          updated_at: new Date().toISOString()
+        }
+
+        if (userName) {
+          duplicateUpdateData.name = userName
+        }
+        if (defaultAge !== null) {
+          duplicateUpdateData.age = defaultAge
+        }
+
+        const {
+          data: duplicateUpdatedUser,
+          error: duplicateUpdateError
+        } = await adminSupabase
+          .from('users')
+          .update(duplicateUpdateData)
+          .eq('email', newUserData.email)
+          .eq('role', newUserData.role)
+          .select()
+          .single()
+
+        if (duplicateUpdateError) {
+          logger.error('Duplicate fallback update failed', {
+            error: duplicateUpdateError,
+            errorCode: duplicateUpdateError.code,
+            errorMessage: duplicateUpdateError.message,
+            errorDetails: duplicateUpdateError.details,
             email: newUserData.email,
-            userId: newUserData.id
+            role: newUserData.role
+          })
+          if (isRlsError(duplicateUpdateError)) {
+            logger.warn(
+              `RLS policy blocked insert/update: user id=${newUserData.id ?? 'unknown'}, email=${newUserData.email}, role=${newUserData.role}`,
+              {
+                email: newUserData.email,
+                role: newUserData.role,
+                userId: newUserData.id
+              }
+            )
+          }
+          finalCreateError = duplicateUpdateError
+        } else {
+          finalCreatedUser = duplicateUpdatedUser
+          finalCreateError = null
+          userTarget = duplicateUpdatedUser
+          logger.info('Google OAuth: existing user updated', {
+            id: duplicateUpdatedUser.id,
+            email: duplicateUpdatedUser.email,
+            role: duplicateUpdatedUser.role
           })
         }
       }
@@ -518,15 +631,16 @@ export async function GET(request) {
             userId: newUserData.id,
             email: newUserData.email
           })
-          if (
-            typeof fallbackError.message === 'string' &&
-            fallbackError.message.toLowerCase().includes('row-level security')
-          ) {
-            logger.warn('Insert blocked by row-level security policy', {
-              email: newUserData.email,
-              userId: newUserData.id,
-              stage: 'fallback'
-            })
+          if (isRlsError(fallbackError)) {
+            logger.warn(
+              `RLS policy blocked insert/update: user id=${newUserData.id ?? 'unknown'}, email=${newUserData.email}, role=${newUserData.role}`,
+              {
+                email: newUserData.email,
+                role: newUserData.role,
+                stage: 'fallback',
+                userId: newUserData.id
+              }
+            )
           }
           finalCreateError = fallbackError
         } else {

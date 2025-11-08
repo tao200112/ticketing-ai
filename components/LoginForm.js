@@ -1,6 +1,6 @@
 'use client'
 
-// Google OAuth integration – Supabase Auth (2025-11-08)
+// Google OAuth integration – Supabase Auth (2025-11-08) – enhanced logging for redirect debug
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { getSupabaseClient } from '@/lib/supabase-client'
@@ -66,6 +66,8 @@ export default function LoginForm({ onSuccess, onSwitchToRegister }) {
     setError('')
     
     try {
+      console.log('ℹ️ Google login button clicked')
+
       console.log('ℹ️ Google login initiated (form)', {
         path: typeof window !== 'undefined' ? window.location.pathname : 'unknown',
         provider: 'google'
@@ -82,42 +84,44 @@ export default function LoginForm({ onSuccess, onSwitchToRegister }) {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google'
       })
+      console.log('ℹ️ signInWithOAuth result:', { data, error })
 
       if (error) {
-        console.error('❌ Google OAuth error (form)', {
-          code: error?.code,
-          message: error?.message,
-          error
-        })
-        setError('Failed to initiate Google login. Please try again.')
+        console.error('⚠️ Google login error', error)
+        setError(`Google 登录失败：${error.message}`)
         if (typeof window !== 'undefined') {
-          alert('Failed to initiate Google login. Please try again.')
+          alert(`Google 登录失败：${error.message}`)
         }
         setGoogleLoading(false)
-      } else {
-        // The redirect will happen automatically
-        // User will be redirected to Google, then back to our callback
-        try {
-          const { data: sessionInfo } = await supabase.auth.getSession()
-          const oauthSession = sessionInfo?.session
-          if (oauthSession?.user) {
-            console.log('✅ Google login successful (form)', {
-              email: oauthSession.user.email,
-              sessionExpires: oauthSession.expires_at,
-              provider: 'google'
-            })
-          } else {
-            console.log('ℹ️ Google login handed off to Supabase (form)', {
-              provider: 'google',
-              note: 'No session yet (expect redirect)',
-              path: typeof window !== 'undefined' ? window.location.pathname : 'unknown'
-            })
-          }
-        } catch (sessionError) {
-          console.warn('⚠️ Unable to verify session after Google login handoff (form)', {
-            error: sessionError
+        return
+      }
+
+      if (data?.url) {
+        console.log('➡️ Redirecting to provider URL:', data.url)
+      }
+
+      // The redirect will happen automatically
+      // User will be redirected to Google, then back to our callback
+      try {
+        const { data: sessionInfo } = await supabase.auth.getSession()
+        const oauthSession = sessionInfo?.session
+        if (oauthSession?.user) {
+          console.log('✅ Google login successful (form)', {
+            email: oauthSession.user.email,
+            sessionExpires: oauthSession.expires_at,
+            provider: 'google'
+          })
+        } else {
+          console.log('ℹ️ Google login handed off to Supabase (form)', {
+            provider: 'google',
+            note: 'No session yet (expect redirect)',
+            path: typeof window !== 'undefined' ? window.location.pathname : 'unknown'
           })
         }
+      } catch (sessionError) {
+        console.warn('⚠️ Unable to verify session after Google login handoff (form)', {
+          error: sessionError
+        })
       }
     } catch (error) {
       console.error('❌ Google login error:', error)

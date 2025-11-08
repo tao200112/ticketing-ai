@@ -153,6 +153,16 @@ export async function GET(request) {
                      userEmail?.split('@')[0] || 
                      'User'
     const userAvatar = supabaseUser.user_metadata?.avatar_url || null
+    const rawAgeMetadata = supabaseUser.user_metadata?.age
+    let defaultAge = 18
+    if (typeof rawAgeMetadata === 'number' && Number.isFinite(rawAgeMetadata)) {
+      defaultAge = Math.max(16, Math.floor(rawAgeMetadata))
+    } else if (typeof rawAgeMetadata === 'string') {
+      const parsedAge = parseInt(rawAgeMetadata, 10)
+      if (!Number.isNaN(parsedAge) && Number.isFinite(parsedAge)) {
+        defaultAge = Math.max(16, parsedAge)
+      }
+    }
 
     // Check if user already exists in our users table
     // IMPORTANT: First check by Supabase auth user ID (most reliable)
@@ -296,6 +306,12 @@ export async function GET(request) {
       if (!userTarget.name || userTarget.name === userTarget.email?.split('@')[0]) {
         updateData.name = userName
       }
+      if (
+        typeof userTarget.age !== 'number' ||
+        !Number.isFinite(userTarget.age)
+      ) {
+        updateData.age = defaultAge
+      }
       
       // DO NOT update role - keep existing role
       // If user wants to change role, they should use proper registration flow
@@ -395,7 +411,7 @@ export async function GET(request) {
         id: supabaseUser.id, // Use Supabase auth user ID as primary key
         email: userEmail,
         name: userName || 'User', // Ensure name is not empty
-        age: 18, // Default age, user can update later (must be >= 16)
+        age: defaultAge, // Default age, user can update later (must be >= 16)
         auth_provider: 'google',
         email_verified_at: emailVerifiedAt,
         role: targetRole || 'user', // Default to user role

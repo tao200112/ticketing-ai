@@ -73,7 +73,7 @@ export async function POST(request) {
 
     const { data: upsertedUser, error: upsertError } = await supabaseAdmin
       .from('users')
-      .upsert(payload, { onConflict: 'email,role', ignoreDuplicates: false })
+      .upsert(payload, { onConflict: 'email', ignoreDuplicates: false })
       .select()
       .single()
 
@@ -88,7 +88,16 @@ export async function POST(request) {
         })
       }
       return NextResponse.json(
-        { success: false, error: 'UPSERT_FAILED' },
+        {
+          success: false,
+          error: 'UPSERT_FAILED',
+          dbError: {
+            message: upsertError?.message,
+            details: upsertError?.details,
+            hint: upsertError?.hint,
+            code: upsertError?.code,
+          }
+        },
         { status: 500 }
       )
     }

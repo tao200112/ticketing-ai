@@ -1,3 +1,4 @@
+// Google OAuth callback flow fix – dedupe existing users and avoid RLS issues
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { createSupabaseClient } from '@/lib/supabase-api'
@@ -212,7 +213,35 @@ export async function GET(request) {
       }
     }
 
+    let userTarget = existingUser
+
+    if (!userTarget) {
+      const { data: preInsertUsers, error: preInsertError } = await adminSupabase
+        .from('users')
+        .select('*')
+        .eq('email', userEmail)
+        .limit(1)
+
+      if (preInsertError && preInsertError.code !== 'PGRST116') {
+        logger.error('Pre-insert email dedupe query failed', {
+          error: preInsertError,
+          errorCode: preInsertError.code,
+          errorMessage: preInsertError.message,
+          errorDetails: preInsertError.details,
+          email: userEmail
+        })
+      } else if (preInsertUsers && preInsertUsers.length > 0) {
+        userTarget = preInsertUsers[0]
+        logger.info('Existing user found during pre-insert dedupe', {
+          userId: userTarget.id,
+          email: userTarget.email,
+          existingRole: userTarget.role
+        })
+      }
+    }
+
     let userRecord = null
+    const userTargetBeforeUpsert = userTarget
 
     if (userQueryError && userQueryError.code !== 'PGRST116') {
       // PGRST116 means no rows found, which is expected for new users
@@ -247,13 +276,13 @@ export async function GET(request) {
       )
     }
 
-    if (existingUser) {
+    if (userTarget) {
       // User exists - update auth_provider and email_verified_at
       // NOTE: We keep the existing role - don't change role via OAuth
       // Role changes should be done through proper admin/merchant registration channels
       logger.info('Updating existing user for Google OAuth', { 
-        userId: existingUser.id,
-        existingRole: existingUser.role,
+        userId: userTarget.id,
+        existingRole: userTarget.role,
         requestedRole: targetRole
       })
       
@@ -264,7 +293,7 @@ export async function GET(request) {
       }
 
       // Only update name if it's not set or if Google provides a better name
-      if (!existingUser.name || existingUser.name === existingUser.email?.split('@')[0]) {
+      if (!userTarget.name || userTarget.name === userTarget.email?.split('@')[0]) {
         updateData.name = userName
       }
       
@@ -274,7 +303,7 @@ export async function GET(request) {
       const { data: updatedUser, error: updateError } = await adminSupabase
         .from('users')
         .update(updateData)
-        .eq('id', existingUser.id)
+        .eq('id', userTarget.id)
         .select()
         .single()
 
@@ -285,8 +314,17 @@ export async function GET(request) {
           errorMessage: updateError.message,
           errorDetails: updateError.details,
           errorHint: updateError.hint,
-          userId: existingUser.id
+          userId: userTarget.id
         })
+        if (
+          typeof updateError.message === 'string' &&
+          updateError.message.toLowerCase().includes('row-level security')
+        ) {
+          logger.warn('Update blocked by row-level security policy', {
+            userId: userTarget.id,
+            email: userTarget.email
+          })
+        }
         
         // Provide specific error message based on error type
         let errorMessage = 'Database error updating user' // Default fallback
@@ -336,6 +374,7 @@ export async function GET(request) {
       }
 
       userRecord = updatedUser
+      userTarget = updatedUser
     } else {
       // User doesn't exist - create new user
       logger.info('Creating new user for Google OAuth', { email: userEmail })
@@ -350,14 +389,16 @@ export async function GET(request) {
       // But we allow Google OAuth to create merchant users (they can complete registration later)
       // IMPORTANT: Use Supabase auth user ID as the primary key
       // This ensures consistency between auth.users and public.users
+      const emailVerifiedAt = supabaseUser.email_confirmed_at || new Date().toISOString()
+
       const newUserData = {
         id: supabaseUser.id, // Use Supabase auth user ID as primary key
         email: userEmail,
         name: userName || 'User', // Ensure name is not empty
         age: 18, // Default age, user can update later (must be >= 16)
         auth_provider: 'google',
-        email_verified_at: supabaseUser.email_confirmed_at || new Date().toISOString(),
-        role: targetRole, // Use the determined role (user, merchant, or admin)
+        email_verified_at: emailVerifiedAt,
+        role: targetRole || 'user', // Default to user role
         password_hash: null, // Explicitly set to NULL for Google OAuth users (can be set later in settings)
         registration_domain: registrationDomain // Track registration domain (same as email registration)
       }
@@ -392,6 +433,25 @@ export async function GET(request) {
 
       let finalCreateError = createError
       let finalCreatedUser = createdUser
+
+      if (finalCreateError) {
+        logger.error('Primary insert for OAuth user failed', {
+          error: finalCreateError,
+          errorMessage: finalCreateError.message,
+          errorDetails: finalCreateError.details,
+          errorCode: finalCreateError.code,
+          email: newUserData.email
+        })
+        if (
+          typeof finalCreateError.message === 'string' &&
+          finalCreateError.message.toLowerCase().includes('row-level security')
+        ) {
+          logger.warn('Insert blocked by row-level security policy', {
+            email: newUserData.email,
+            userId: newUserData.id
+          })
+        }
+      }
 
       if (finalCreateError && isPasswordHashConstraintError(finalCreateError)) {
         fallbackOriginalError = finalCreateError
@@ -430,6 +490,16 @@ export async function GET(request) {
             userId: newUserData.id,
             email: newUserData.email
           })
+          if (
+            typeof fallbackError.message === 'string' &&
+            fallbackError.message.toLowerCase().includes('row-level security')
+          ) {
+            logger.warn('Insert blocked by row-level security policy', {
+              email: newUserData.email,
+              userId: newUserData.id,
+              stage: 'fallback'
+            })
+          }
           finalCreateError = fallbackError
         } else {
           usedPasswordPlaceholder = true
@@ -630,6 +700,7 @@ export async function GET(request) {
       if (usedPasswordPlaceholder) {
         userRecord.password_hash = GOOGLE_OAUTH_PASSWORD_PLACEHOLDER_HASH
       }
+      userTarget = finalCreatedUser
     }
 
     // Remove sensitive data
@@ -638,6 +709,17 @@ export async function GET(request) {
     delete userRecord.password_hash
 
     // Create session data compatible with our existing system
+    const userLifecycleScenario = userTargetBeforeUpsert
+      ? 'existing_user_updated'
+      : 'new_user_created'
+
+    logger.info('Google OAuth manual verification guidance', {
+      scenario: userLifecycleScenario,
+      email: userRecord.email,
+      instruction_new_user: 'Use a fresh Google email to confirm user creation succeeds.',
+      instruction_existing_user: 'Sign in again with the same Google email to verify the existing record updates without duplication.'
+    })
+
     const sessionData = {
       id: userRecord.id,
       email: userRecord.email,
@@ -654,7 +736,11 @@ export async function GET(request) {
 
     // Redirect to account page with session data in URL hash (will be handled client-side)
     // We'll use a temporary token approach instead
-    const redirectUrl = new URL('/auth/oauth-success', request.url)
+    const redirectBaseUrl =
+      process.env.NEXT_PUBLIC_SITE_URL ||
+      process.env.SITE_URL ||
+      'https://ticketing-ai-six.vercel.app'
+    const redirectUrl = new URL('/auth/oauth-success', redirectBaseUrl)
     redirectUrl.searchParams.set('session', JSON.stringify(sessionData))
 
     return NextResponse.redirect(redirectUrl)

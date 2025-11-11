@@ -20,7 +20,7 @@ function parseHashParams() {
 function VerifyEmailContent() {
   const supabase = useMemo(() => getSupabaseClient(), []);
   const [status, setStatus] = useState(STATUS_LOADING);
-  const [message, setMessage] = useState("姝ｅ湪楠岃瘉鎮ㄧ殑閭...");
+  const [message, setMessage] = useState("Verifying your email...");
   const [userEmail, setUserEmail] = useState("");
   const [userName, setUserName] = useState("");
   const [isResending, setIsResending] = useState(false);
@@ -73,7 +73,7 @@ function VerifyEmailContent() {
             ""
         );
         setMessage(
-          `閭楠岃瘉鎴愬姛锛佸畬鎴愭椂闂达細${new Date(verifiedAt).toLocaleString("zh-CN")}`
+          `Email verified successfully! Verified at: ${new Date(verifiedAt).toLocaleString("en-US")}`
         );
       })
       .catch((error) => {
@@ -95,10 +95,10 @@ function VerifyEmailContent() {
         setMessage(error.message || "Resend failed, please try again later.");
         return;
       }
-      setMessage("宸查噸鏂板彂閫侀獙璇侀偖浠讹紝璇锋鏌ユ偍鐨勬敹浠剁銆?);
+      setMessage("Verification email has been resent. Please check your inbox.");
     } catch (error) {
       console.error("Failed to resend verification email", error);
-      setMessage("缃戠粶閿欒锛岃绋嶅悗閲嶈瘯銆?);
+      setMessage("Network error, please try again later.");
     } finally {
       setIsResending(false);
     }
@@ -107,11 +107,11 @@ function VerifyEmailContent() {
   const renderIcon = () => {
     switch (status) {
       case STATUS_SUCCESS:
-        return "鉁?;
+        return "✅";
       case STATUS_ERROR:
-        return "鈿狅笍";
+        return "❌";
       default:
-        return "鈴?;
+        return "⏳";
     }
   };
 
@@ -130,9 +130,9 @@ function VerifyEmailContent() {
             {renderIcon()} Email Verification
           </h1>
           <p className="text-gray-600">
-            {status === STATUS_LOADING && "姝ｅ湪楠岃瘉鎮ㄧ殑閭..."}
-            {status === STATUS_SUCCESS && "楠岃瘉鎴愬姛锛?}
-            {status === STATUS_ERROR && "楠岃瘉澶辫触"}
+            {status === STATUS_LOADING && "Verifying your email..."}
+            {status === STATUS_SUCCESS && "Verification successful!"}
+            {status === STATUS_ERROR && "Verification failed"}
           </p>
         </div>
       </div>
@@ -146,7 +146,7 @@ function VerifyEmailContent() {
               <div className="space-y-4">
                 <div className="bg-green-50 border border-green-200 rounded-md p-4">
                   <p className="text-sm text-green-800">
-                    <strong>{userName}</strong>锛屾偍鐨勯偖绠?<strong>{userEmail}</strong> 宸叉垚鍔熼獙璇侊紒
+                    <strong>{userName}</strong>, your email <strong>{userEmail}</strong> has been successfully verified!
                   </p>
                 </div>
                 <div className="space-y-2">
@@ -154,13 +154,13 @@ function VerifyEmailContent() {
                     href="/auth/login"
                     className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                   >
-                    绔嬪嵆鐧诲綍
+                    Login Now
                   </Link>
                   <Link
                     href="/"
                     className="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                   >
-                    杩斿洖棣栭〉
+                    Back to Home
                   </Link>
                 </div>
               </div>
@@ -169,11 +169,11 @@ function VerifyEmailContent() {
             {status === STATUS_ERROR && (
               <div className="space-y-4">
                 <div className="bg-red-50 border border-red-200 rounded-md p-4">
-                  <p className="text-sm text-red-800">鍙兘鐨勫師鍥狅細</p>
+                  <p className="text-sm text-red-800">Possible reasons:</p>
                   <ul className="text-sm text-red-700 mt-2 list-disc list-inside text-left">
-                    <li>楠岃瘉閾炬帴宸茶繃鏈?/li>
-                    <li>楠岃瘉閾炬帴宸蹭娇鐢?/li>
-                    <li>楠岃瘉閾炬帴鏃犳晥</li>
+                    <li>Verification link has expired</li>
+                    <li>Verification link has been used</li>
+                    <li>Verification link is invalid</li>
                   </ul>
                 </div>
                 <div className="space-y-2">
@@ -182,13 +182,13 @@ function VerifyEmailContent() {
                     disabled={isResending || !userEmail}
                     className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {isResending ? "鍙戦€佷腑..." : "閲嶆柊鍙戦€侀獙璇侀偖浠?}
+                    {isResending ? "Sending..." : "Resend Verification Email"}
                   </button>
                   <Link
                     href="/auth/login"
                     className="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                   >
-                    杩斿洖鐧诲綍
+                    Back to Login
                   </Link>
                 </div>
               </div>
@@ -199,7 +199,7 @@ function VerifyEmailContent() {
                 <div className="flex justify-center">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600" />
                 </div>
-                <p className="text-sm text-gray-600">璇风◢鍊欙紝鎴戜滑姝ｅ湪楠岃瘉鎮ㄧ殑閭...</p>
+                <p className="text-sm text-gray-600">Please wait, we are verifying your email...</p>
               </div>
             )}
           </div>

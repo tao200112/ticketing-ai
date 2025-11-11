@@ -79,12 +79,12 @@ function ResetPasswordContent() {
     }
 
     if (password !== confirmPassword) {
-      setMessage("涓ゆ杈撳叆鐨勫瘑鐮佷笉涓€鑷淬€?);
+      setMessage("Passwords do not match.");
       return;
     }
 
     if (password.length < 6) {
-      setMessage("瀵嗙爜闀垮害鑷冲皯 6 涓瓧绗︺€?);
+      setMessage("Password must be at least 6 characters long.");
       return;
     }
 
@@ -96,19 +96,19 @@ function ResetPasswordContent() {
 
       if (error) {
         setStatus(STATUS_ERROR);
-        setMessage(error.message || "閲嶇疆澶辫触锛岃绋嶅悗閲嶈瘯銆?);
+        setMessage(error.message || "Reset failed, please try again later.");
         return;
       }
 
       setStatus(STATUS_SUCCESS);
-      setMessage("瀵嗙爜閲嶇疆鎴愬姛锛? 绉掑悗璺宠浆鍒扮櫥褰曢〉銆?);
+      setMessage("Password reset successful! Redirecting to login page in 3 seconds...");
       setTimeout(() => {
         router.push("/auth/login");
       }, 3000);
     } catch (error) {
       console.error("Failed to reset password", error);
       setStatus(STATUS_ERROR);
-      setMessage("缃戠粶閿欒锛岃绋嶅悗閲嶈瘯銆?);
+      setMessage("Network error, please try again later.");
     } finally {
       setIsLoading(false);
     }
@@ -120,7 +120,7 @@ function ResetPasswordContent() {
         <div className="sm:mx-auto sm:w-full sm:max-w-md">
           <div className="text-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto" />
-            <p className="mt-4 text-gray-600">姝ｅ湪楠岃瘉閲嶇疆浠ょ墝...</p>
+            <p className="mt-4 text-gray-600">Validating reset token...</p>
           </div>
         </div>
       </div>
@@ -132,21 +132,21 @@ function ResetPasswordContent() {
       <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
         <div className="sm:mx-auto sm:w-full sm:max-w-md">
           <div className="text-center">
-            <div className="text-6xl mb-4">鈿狅笍</div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">閲嶇疆澶辫触</h1>
+            <div className="text-6xl mb-4">❌</div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Reset Failed</h1>
             <p className="text-red-600 mb-6">{message}</p>
             <div className="space-y-2">
               <Link
                 href="/auth/forgot-password"
                 className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
               >
-                閲嶆柊鐢宠閲嶇疆
+                Request New Reset
               </Link>
               <Link
                 href="/auth/login"
                 className="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
               >
-                杩斿洖鐧诲綍
+                Back to Login
               </Link>
             </div>
           </div>
@@ -160,15 +160,15 @@ function ResetPasswordContent() {
       <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
         <div className="sm:mx-auto sm:w-full sm:max-w-md">
           <div className="text-center">
-            <div className="text-6xl mb-4">鉁?/div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">瀵嗙爜閲嶇疆鎴愬姛</h1>
+            <div className="text-6xl mb-4">✅</div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Password Reset Successful</h1>
             <p className="text-green-600 mb-6">{message}</p>
-            <p className="text-gray-600 mb-6">3 绉掑悗鑷姩璺宠浆鍒扮櫥褰曢〉...</p>
+            <p className="text-gray-600 mb-6">Redirecting to login page in 3 seconds...</p>
             <Link
               href="/auth/login"
               className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
             >
-              绔嬪嵆鐧诲綍
+              Login Now
             </Link>
           </div>
         </div>
@@ -180,8 +180,8 @@ function ResetPasswordContent() {
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">馃敀 閲嶇疆瀵嗙爜</h1>
-          <p className="text-gray-600">璇疯緭鍏ユ偍鐨勬柊瀵嗙爜</p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">🔑 Reset Password</h1>
+          <p className="text-gray-600">Please enter your new password</p>
         </div>
       </div>
 
@@ -190,7 +190,8 @@ function ResetPasswordContent() {
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                鏂板瘑鐮?              </label>
+                New Password
+              </label>
               <div className="mt-1">
                 <input
                   id="password"
@@ -201,14 +202,15 @@ function ResetPasswordContent() {
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
                   className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                  placeholder="璇疯緭鍏ユ柊瀵嗙爜锛堣嚦灏?6 涓瓧绗︼級"
+                  placeholder="Enter new password (at least 6 characters)"
                 />
               </div>
             </div>
 
             <div>
               <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
-                纭鏂板瘑鐮?              </label>
+                Confirm New Password
+              </label>
               <div className="mt-1">
                 <input
                   id="confirmPassword"
@@ -219,7 +221,7 @@ function ResetPasswordContent() {
                   value={confirmPassword}
                   onChange={(event) => setConfirmPassword(event.target.value)}
                   className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                  placeholder="璇峰啀娆¤緭鍏ユ柊瀵嗙爜"
+                  placeholder="Enter new password again"
                 />
               </div>
             </div>
@@ -236,13 +238,13 @@ function ResetPasswordContent() {
                 disabled={isLoading}
                 className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isLoading ? "閲嶇疆涓?.." : "閲嶇疆瀵嗙爜"}
+                {isLoading ? "Resetting..." : "Reset Password"}
               </button>
             </div>
 
             <div className="text-center">
               <Link href="/auth/login" className="text-sm text-indigo-600 hover:text-indigo-500">
-                杩斿洖鐧诲綍
+                Back to Login
               </Link>
             </div>
           </form>
@@ -250,11 +252,11 @@ function ResetPasswordContent() {
 
         <div className="mt-6 text-center">
           <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
-            <h3 className="text-sm font-medium text-yellow-800 mb-2">鈿狅笍 瀹夊叏鎻愮ず</h3>
+            <h3 className="text-sm font-medium text-yellow-800 mb-2">🔒 Security Tips</h3>
             <ul className="text-sm text-yellow-700 text-left space-y-1">
-              <li>璇蜂娇鐢ㄥ己瀵嗙爜锛屽寘鍚瓧姣嶃€佹暟瀛楀拰鐗规畩瀛楃</li>
-              <li>涓嶈浣跨敤涓庡叾浠栫綉绔欑浉鍚岀殑瀵嗙爜</li>
-              <li>瀹氭湡鏇存崲瀵嗙爜浠ヤ繚闅滆处鎴峰畨鍏?/li>
+              <li>Use a strong password with letters, numbers and special characters</li>
+              <li>Don't use the same password as other websites</li>
+              <li>Change your password regularly to keep your account secure</li>
             </ul>
           </div>
         </div>
@@ -271,7 +273,7 @@ export default function ResetPasswordPage() {
           <div className="sm:mx-auto sm:w-full sm:max-w-md">
             <div className="text-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto" />
-              <p className="mt-4 text-gray-600">鍔犺浇涓?..</p>
+              <p className="mt-4 text-gray-600">Loading...</p>
             </div>
           </div>
         </div>

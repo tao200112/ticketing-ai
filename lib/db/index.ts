@@ -1,3 +1,4 @@
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-nocheck
 /**
  * 数据访问层接口
@@ -24,6 +25,7 @@ import { mapStripeSessionToOrder, validateOrderData, validateTicketData } from '
 /**
  * 转换数据库字段为统一模型
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapDbToModel(row: any): any {
   return {
     id: row.id,
@@ -154,6 +156,7 @@ export async function getOrderByStripeSession(
 /**
  * 从 Stripe Session 创建订单
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function createOrderFromStripeSession(session: any): Promise<OrderModel> {
   console.log(`[DB] createOrderFromStripeSession: ${session.id.substring(0, 8)}...`)
   

@@ -38,6 +38,7 @@ export async function GET(request, { params }) {
     }
 
     const supabase = createSupabaseClient()
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { supabaseUrl, supabaseKey } = require('@/lib/supabase-api').getSupabaseConfig()
     
     result.checks.supabaseUrl = supabaseUrl ? 'configured' : 'missing'

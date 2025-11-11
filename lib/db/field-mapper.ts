@@ -26,6 +26,7 @@ export function mapStripeSessionToOrder(session: Stripe.Checkout.Session) {
 /**
  * 验证 Order 数据完整性
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function validateOrderData(data: Record<string, any>): void {
   const required = ['stripe_session_id', 'customer_email', 'total_amount_cents']
   
@@ -39,6 +40,7 @@ export function validateOrderData(data: Record<string, any>): void {
 /**
  * 验证 Ticket 数据完整性
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function validateTicketData(data: Record<string, any>): void {
   const required = ['order_id', 'event_id', 'holder_email', 'qr_payload']
   

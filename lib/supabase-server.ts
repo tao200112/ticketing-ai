@@ -29,6 +29,7 @@ export async function getSupabaseServer() {
         get: (name: string) => {
           return cookieStore.get(name)?.value
         },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         set: (name: string, value: string, options: any) => {
           try {
             cookieStore.set({ name, value, ...options })
@@ -36,6 +37,7 @@ export async function getSupabaseServer() {
             // 在某些场景下（如 middleware）可能无法设置 cookie
           }
         },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         remove: (name: string, options: any) => {
           try {
             cookieStore.set({ name, value: '', ...options })

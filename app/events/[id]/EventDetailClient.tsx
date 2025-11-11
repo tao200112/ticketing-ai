@@ -121,9 +121,10 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
       }
 
       window.location.href = result.url;
-    } catch (error: any) {
+    } catch (error) {
       console.error("Failed to create checkout session", error);
-      setPaymentError(error?.message || "Failed to start checkout. Please try again.");
+      const errorMessage = error instanceof Error ? error.message : "Failed to start checkout. Please try again.";
+      setPaymentError(errorMessage);
     } finally {
       setPaymentLoading(false);
     }

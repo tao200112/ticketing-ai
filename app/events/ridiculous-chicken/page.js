@@ -36,13 +36,13 @@ const EVENT = {
 
 export default function RidiculousChickenEvent() {
   const { user: authUser } = useAuth();
-  const [selectedTicketId, setSelectedTicketId] = useState<string>(TICKETS[0].id);
-  const [quantity, setQuantity] = useState<number>(1);
-  const [customerName, setCustomerName] = useState<string>("");
-  const [customerEmail, setCustomerEmail] = useState<string>("");
-  const [customerAge, setCustomerAge] = useState<string>("");
-  const [error, setError] = useState<string>("");
-  const [loading, setLoading] = useState<boolean>(false);
+  const [selectedTicketId, setSelectedTicketId] = useState(TICKETS[0].id);
+  const [quantity, setQuantity] = useState(1);
+  const [customerName, setCustomerName] = useState("");
+  const [customerEmail, setCustomerEmail] = useState("");
+  const [customerAge, setCustomerAge] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (!authUser) {
@@ -123,7 +123,7 @@ export default function RidiculousChickenEvent() {
       }
 
       window.location.href = result.url;
-    } catch (purchaseError: any) {
+    } catch (purchaseError) {
       console.error("Failed to create checkout session", purchaseError);
       setError(purchaseError?.message || "Unable to process your order. Please try again.");
     } finally {

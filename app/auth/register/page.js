@@ -137,7 +137,7 @@ export default function RegisterPage() {
         maxWidth: '448px'
       }}>
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-          <h1 style({
+          <h1 style={{
             fontSize: '1.875rem',
             fontWeight: 'bold',
             color: 'white',

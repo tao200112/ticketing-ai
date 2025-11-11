@@ -12,11 +12,11 @@ function buildUnauthorizedResponse() {
   return NextResponse.json({ ok: false, message: 'Authentication required' }, { status: 401 })
 }
 
-function buildConfigError(message: string) {
+function buildConfigError(message) {
   return NextResponse.json({ ok: false, message }, { status: 500 })
 }
 
-function ownsOrder(order: any, userId: string, userEmail?: string | null) {
+function ownsOrder(order, userId, userEmail) {
   if (!order) return false
   if (order.user_id && order.user_id === userId) return true
   if (order.customer_email && userEmail && order.customer_email === userEmail) return true
@@ -38,7 +38,7 @@ function ownsOrder(order: any, userId: string, userEmail?: string | null) {
   return false
 }
 
-async function ensureOrderOwnedByUser(order: any, userId: string) {
+async function ensureOrderOwnedByUser(order, userId) {
   if (!order) return order
   if (order.user_id === userId) return order
 
@@ -60,7 +60,7 @@ async function ensureOrderOwnedByUser(order: any, userId: string) {
   return data
 }
 
-async function createOrderFromStripe(sessionId: string, userId: string, userEmail?: string | null) {
+async function createOrderFromStripe(sessionId, userId, userEmail) {
   if (!stripe) {
     throw new Error('Stripe not configured')
   }
@@ -106,7 +106,7 @@ async function createOrderFromStripe(sessionId: string, userId: string, userEmai
   }
 
   // Snapshot helpers
-  let eventSnapshot: any = null
+  let eventSnapshot = null
   if (eventId) {
     const { data: eventData } = await admin
       .from('events')
@@ -127,7 +127,7 @@ async function createOrderFromStripe(sessionId: string, userId: string, userEmai
     }
   }
 
-  let priceSnapshot: any = null
+  let priceSnapshot = null
   if (priceId) {
     const { data: priceData } = await admin
       .from('prices')
@@ -180,7 +180,7 @@ async function createOrderFromStripe(sessionId: string, userId: string, userEmai
   return order
 }
 
-function buildTicketQr(ticket: any, event: any) {
+function buildTicketQr(ticket, event) {
   const qrData = {
     ticket_id: ticket.id,
     short_id: ticket.short_id,
@@ -199,7 +199,7 @@ function buildTicketQr(ticket: any, event: any) {
   }
 }
 
-export async function GET(request: Request) {
+export async function GET(request) {
   try {
     const user = await getServerUser()
     if (!user) {
@@ -290,7 +290,7 @@ export async function GET(request: Request) {
       tickets: ticketsWithQR,
       event,
     })
-  } catch (error: any) {
+  } catch (error) {
     console.error('orders/by-session error', error)
     const message = error?.message || 'Internal Server Error'
     const status = error?.status || 500

@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useAuth } from '@/lib/auth-context'
 
 export default function RegisterForm({ onSuccess, onSwitchToLogin }) {
   const [formData, setFormData] = useState({
@@ -14,85 +15,97 @@ export default function RegisterForm({ onSuccess, onSwitchToLogin }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const router = useRouter()
+  const { registerWithPassword } = useAuth()
 
-  const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    })
+  const handleChange = (event) => {
+    setFormData((prev) => ({ ...prev, [event.target.name]: event.target.value }))
     setError('')
   }
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
+  const validateForm = () => {
+    if (!formData.email || !formData.password || !formData.name) {
+      setError('Please fill in all required fields (email, password, name).')
+      return false
+    }
+
+    if (formData.password !== formData.confirmPassword) {
+      setError('Passwords do not match.')
+      return false
+    }
+
+    if (formData.password.length < 8) {
+      setError('Password must be at least 8 characters long.')
+      return false
+    }
+
+    if (formData.age) {
+      const ageNumber = parseInt(formData.age, 10)
+      if (Number.isNaN(ageNumber) || ageNumber < 16) {
+        setError('Age must be 16 or older.')
+        return false
+      }
+    }
+
+    return true
+  }
+
+  const handleSubmit = async (event) => {
+    event.preventDefault()
+
+    if (!validateForm()) {
+      return
+    }
+
     setLoading(true)
     setError('')
 
-    // Client-side validation
-    if (!formData.email || !formData.password || !formData.name) {
-      setError('Please fill in all required fields (email, password, name)')
-      setLoading(false)
-      return
-    }
-
-    // Validate password match
-    if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match')
-      setLoading(false)
-      return
-    }
-
-    // Validate age
-    const age = parseInt(formData.age)
-    if (formData.age && (isNaN(age) || age < 16)) {
-      setError('Age must be 16 or older')
-      setLoading(false)
-      return
-    }
-
     try {
-      const response = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: formData.name,
-          email: formData.email,
-          age: age || null,
-          password: formData.password
-        }),
+      const metadata = {
+        full_name: formData.name,
+        name: formData.name,
+        age: formData.age ? parseInt(formData.age, 10) : undefined,
+      }
+
+      const origin = typeof window !== 'undefined' ? window.location.origin.replace(/\/$/, '') : ''
+      const emailRedirectTo = origin ? `${origin}/auth/verify-email` : undefined
+
+      const data = await registerWithPassword(formData.email, formData.password, {
+        data: metadata,
+        emailRedirectTo,
       })
 
-      const result = await response.json()
+      const sessionUser = data.user || data.session?.user || null
+      if (sessionUser) {
+        onSuccess?.(sessionUser)
+        router.replace('/account')
+        return
+      }
 
-      // Handle response
-      if (response.ok && result.success) {
-        // Save user session
-        if (result.data) {
-          localStorage.setItem('userSession', JSON.stringify(result.data))
-          onSuccess && onSuccess(result.data)
-          router.push('/account')
-        }
-      } else {
-        // Display specific error message
-        // Prioritize backend error message
-        const errorMessage = result.message || result.error || 'Registration failed, please try again'
-        setError(errorMessage)
-        
-        // Log detailed error in console (development only)
-        if (process.env.NODE_ENV === 'development') {
-          console.error('Registration error:', {
-            status: response.status,
-            error: result.error,
-            message: result.message,
-            details: result.details
-          })
+      // 如果启用了邮箱验证，Supabase 可能不会立即返回 session
+      if (!sessionUser) {
+        setError('Registration successful! Please check your email to confirm your account.')
+      }
+    } catch (authError) {
+      console.error('Registration error:', authError)
+      // 提供更详细的错误信息
+      let errorMessage = 'Registration failed, please try again.'
+      
+      if (authError?.message) {
+        errorMessage = authError.message
+      } else if (authError?.code) {
+        switch (authError.code) {
+          case 'user_already_registered':
+            errorMessage = 'This email is already registered. Please sign in instead.'
+            break
+          case 'email_not confirmed':
+            errorMessage = 'Please check your email to confirm your account.'
+            break
+          default:
+            errorMessage = `Registration failed: ${authError.code}`
         }
       }
-    } catch (error) {
-      console.error('Registration error:', error)
-      setError('Network error, please check your connection and try again')
+      
+      setError(errorMessage)
     } finally {
       setLoading(false)
     }
@@ -135,12 +148,7 @@ export default function RegisterForm({ onSuccess, onSwitchToLogin }) {
 
       <form onSubmit={handleSubmit}>
         <div style={{ marginBottom: '1rem' }}>
-          <label style={{
-            display: 'block',
-            color: '#e2e8f0',
-            marginBottom: '0.5rem',
-            fontSize: '0.875rem'
-          }}>
+          <label style={{ display: 'block', color: '#e2e8f0', marginBottom: '0.5rem', fontSize: '0.875rem' }}>
             Name *
           </label>
           <input
@@ -163,12 +171,7 @@ export default function RegisterForm({ onSuccess, onSwitchToLogin }) {
         </div>
 
         <div style={{ marginBottom: '1rem' }}>
-          <label style={{
-            display: 'block',
-            color: '#e2e8f0',
-            marginBottom: '0.5rem',
-            fontSize: '0.875rem'
-          }}>
+          <label style={{ display: 'block', color: '#e2e8f0', marginBottom: '0.5rem', fontSize: '0.875rem' }}>
             Email *
           </label>
           <input
@@ -191,12 +194,7 @@ export default function RegisterForm({ onSuccess, onSwitchToLogin }) {
         </div>
 
         <div style={{ marginBottom: '1rem' }}>
-          <label style={{
-            display: 'block',
-            color: '#e2e8f0',
-            marginBottom: '0.5rem',
-            fontSize: '0.875rem'
-          }}>
+          <label style={{ display: 'block', color: '#e2e8f0', marginBottom: '0.5rem', fontSize: '0.875rem' }}>
             Age
           </label>
           <input
@@ -219,12 +217,7 @@ export default function RegisterForm({ onSuccess, onSwitchToLogin }) {
         </div>
 
         <div style={{ marginBottom: '1rem' }}>
-          <label style={{
-            display: 'block',
-            color: '#e2e8f0',
-            marginBottom: '0.5rem',
-            fontSize: '0.875rem'
-          }}>
+          <label style={{ display: 'block', color: '#e2e8f0', marginBottom: '0.5rem', fontSize: '0.875rem' }}>
             Password * (at least 8 characters)
           </label>
           <input
@@ -248,12 +241,7 @@ export default function RegisterForm({ onSuccess, onSwitchToLogin }) {
         </div>
 
         <div style={{ marginBottom: '1.5rem' }}>
-          <label style={{
-            display: 'block',
-            color: '#e2e8f0',
-            marginBottom: '0.5rem',
-            fontSize: '0.875rem'
-          }}>
+          <label style={{ display: 'block', color: '#e2e8f0', marginBottom: '0.5rem', fontSize: '0.875rem' }}>
             Confirm Password *
           </label>
           <input
@@ -295,12 +283,7 @@ export default function RegisterForm({ onSuccess, onSwitchToLogin }) {
         </button>
       </form>
 
-      <div style={{
-        marginTop: '1rem',
-        textAlign: 'center',
-        color: '#94a3b8',
-        fontSize: '0.875rem'
-      }}>
+      <div style={{ marginTop: '1rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.875rem' }}>
         Already have an account?{' '}
         <button
           onClick={onSwitchToLogin}

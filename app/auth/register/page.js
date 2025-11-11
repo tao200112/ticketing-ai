@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-// import { hasSupabase } from '../../../lib/safeEnv' // 已移除，使用新的 API 客户端
+import { useAuth } from '../../../lib/auth-context'
 
 export default function RegisterPage() {
   const router = useRouter()
+  const { registerWithPassword } = useAuth()
   const [formData, setFormData] = useState({
     email: '',
     name: '',
@@ -16,12 +17,6 @@ export default function RegisterPage() {
   const [errors, setErrors] = useState({})
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
-  const [isSupabaseAvailable, setIsSupabaseAvailable] = useState(true) // 假设 API 可用
-
-  useEffect(() => {
-    // 检查 API 是否可用
-    setIsSupabaseAvailable(true)
-  }, [])
 
   const handleInputChange = (e) => {
     const { name, value } = e.target
@@ -30,7 +25,6 @@ export default function RegisterPage() {
       [name]: value
     }))
     
-    // Clear error for corresponding field
     if (errors[name]) {
       setErrors(prev => ({
         ...prev,
@@ -56,18 +50,16 @@ export default function RegisterPage() {
     
     if (!formData.age) {
       newErrors.age = 'Please enter age'
-    } else if (isNaN(formData.age) || parseInt(formData.age) < 16) {
+    } else if (isNaN(formData.age) || parseInt(formData.age, 10) < 16) {
       newErrors.age = 'Age must be 16 or older'
     }
     
-    // Password validation - at least 8 characters
     if (!formData.password) {
       newErrors.password = 'Please enter password'
     } else if (formData.password.length < 8) {
       newErrors.password = 'Password must be at least 8 characters'
     }
     
-    // Confirm password validation
     if (!formData.confirmPassword) {
       newErrors.confirmPassword = 'Please confirm password'
     } else if (formData.password !== formData.confirmPassword) {
@@ -89,63 +81,42 @@ export default function RegisterPage() {
     setMessage('')
     
     try {
-      const response = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: formData.email,
-          name: formData.name,
-          age: parseInt(formData.age),
-          password: formData.password
-        })
-      })
-      
-      const result = await response.json()
-      
-      if (response.ok && result.success) {
-        setMessage('Registration successful! Please check your email and click the verification link to complete registration.')
-        
-        // 保存用户会话（简化实现）
-        localStorage.setItem('userSession', JSON.stringify(result.data))
-        
-        // 发送邮箱验证邮件
-        try {
-          const emailResponse = await fetch('/api/auth/send-verification', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              email: formData.email
-            })
-          })
-          
-          if (emailResponse.ok) {
-            setMessage('Registration successful! Verification email has been sent, please check your inbox and click the verification link to complete registration.')
-          } else {
-            setMessage('Registration successful! But verification email sending failed, please try again later.')
-          }
-        } catch (emailError) {
-          console.error('Email verification error:', emailError)
-          setMessage('Registration successful! But verification email sending failed, please try again later.')
-        }
-        
-        // Navigate to account page after a brief delay
-        setTimeout(() => {
-          router.push('/account')
-        }, 3000)
-      } else {
-        setMessage(result.message || 'Registration failed, please try again')
+      const metadata = {
+        full_name: formData.name,
+        name: formData.name,
+        age: parseInt(formData.age, 10)
       }
+
+      const siteOrigin =
+        typeof window !== 'undefined'
+          ? window.location.origin
+          : process.env.NEXT_PUBLIC_SITE_URL || ''
+
+      const emailRedirectTo = siteOrigin
+        ? `${siteOrigin.replace(/\/$/, '')}/auth/oauth-success`
+        : undefined
+
+      const data = await registerWithPassword(formData.email, formData.password, {
+        data: metadata,
+        emailRedirectTo,
+      })
+
+      if (data.session) {
+        setMessage('Registration successful! Redirecting...')
+        router.replace('/account')
+        return
+      }
+
+      setMessage('Registration successful! Please check your email to confirm your account.')
     } catch (error) {
       console.error('Registration error:', error)
-      setMessage('Network error, please check connection and try again')
+      setMessage(error?.message || 'Registration failed, please try again')
     } finally {
       setLoading(false)
     }
   }
+
+  const isSuccessMessage = message && message.toLowerCase().includes('success')
 
   return (
     <div style={{
@@ -166,14 +137,14 @@ export default function RegisterPage() {
         maxWidth: '448px'
       }}>
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-          <h1 style={{
+          <h1 style({
             fontSize: '1.875rem',
             fontWeight: 'bold',
             color: 'white',
             marginBottom: '8px'
           }}>Join PartyTix</h1>
           <p style={{ color: '#94a3b8', fontSize: '0.875rem' }}>
-            {isSupabaseAvailable ? 'Create your account to get started' : 'Local registration mode'}
+            Create your account to get started
           </p>
         </div>
 
@@ -384,29 +355,14 @@ export default function RegisterPage() {
             <div style={{
               marginTop: '16px',
               padding: '12px',
-              backgroundColor: message.includes('成功') || message.includes('successful') ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-              border: `1px solid ${message.includes('成功') || message.includes('successful') ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
+              backgroundColor: isSuccessMessage ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+              border: `1px solid ${isSuccessMessage ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
               borderRadius: '8px',
-              color: message.includes('成功') || message.includes('successful') ? '#22c55e' : '#ef4444',
+              color: isSuccessMessage ? '#22c55e' : '#ef4444',
               fontSize: '0.875rem',
               textAlign: 'center'
             }}>
               {message}
-            </div>
-          )}
-
-          {!isSupabaseAvailable && (
-            <div style={{
-              marginTop: '16px',
-              padding: '12px',
-              backgroundColor: 'rgba(251, 191, 36, 0.1)',
-              border: '1px solid rgba(251, 191, 36, 0.3)',
-              borderRadius: '8px',
-              color: '#fbbf24',
-              fontSize: '0.75rem',
-              textAlign: 'center'
-            }}>
-              ⚠️ Supabase not configured, data will be saved locally
             </div>
           )}
         </form>

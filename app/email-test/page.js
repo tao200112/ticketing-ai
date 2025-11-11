@@ -1,32 +1,17 @@
-export default function EmailTestPage() {
+'use client'
+
+export default function DeprecatedAuthDebugPage() {
   return (
-    <div style={{ padding: '20px', textAlign: 'center' }}>
-      <h1>📧 Email Test Page</h1>
-      <p>This page is working!</p>
-      <p>If you can see this, the routing is working correctly.</p>
-      
-      <div style={{ marginTop: '20px' }}>
-        <h2>Test Email Sending</h2>
-        <form action="/api/auth/send-verification" method="POST" style={{ marginTop: '10px' }}>
-          <input 
-            type="email" 
-            name="email" 
-            placeholder="Enter email address" 
-            required 
-            style={{ padding: '8px', marginRight: '10px', width: '200px' }}
-          />
-          <button type="submit" style={{ padding: '8px 16px' }}>
-            Send Test Email
-          </button>
-        </form>
-      </div>
-      
-      <div style={{ marginTop: '20px' }}>
-        <h3>Test Links:</h3>
-        <p><a href="/auth/verify-email">Verify Email Page</a></p>
-        <p><a href="/auth/forgot-password">Forgot Password Page</a></p>
-        <p><a href="/auth/reset-password">Reset Password Page</a></p>
-      </div>
+    <div style={{ padding: '2rem', maxWidth: '720px', margin: '0 auto', lineHeight: 1.6 }}>
+      <h1 style={{ fontSize: '1.5rem', fontWeight: 600, marginBottom: '1rem' }}>Authentication Debug Page Deprecated</h1>
+      <p style={{ marginBottom: '0.75rem' }}>
+        The legacy authentication debug utilities have been removed. Supabase Auth is now the single source of truth
+        for login, registration, email verification, and password recovery flows.
+      </p>
+      <p style={{ marginBottom: '0.75rem' }}>
+        Please use the Supabase dashboard or the new client-side helpers in <code>lib/auth-context</code> and
+        <code>lib/auth-server</code> for any required testing.
+      </p>
     </div>
-  );
+  )
 }

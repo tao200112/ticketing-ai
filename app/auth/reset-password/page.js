@@ -1,114 +1,152 @@
-'use client';
+"use client";
 
-import { useState, useEffect, Suspense } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
-import Link from 'next/link';
+import { useEffect, useMemo, useState, Suspense } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { getSupabaseClient } from "@/lib/supabase-client";
+
+const STATUS_LOADING = "loading";
+const STATUS_READY = "ready";
+const STATUS_SUCCESS = "success";
+const STATUS_ERROR = "error";
+
+function parseHashParams() {
+  if (typeof window === "undefined") {
+    return new URLSearchParams();
+  }
+
+  const hash = window.location.hash?.replace(/^#/, "");
+  return new URLSearchParams(hash);
+}
 
 function ResetPasswordContent() {
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [status, setStatus] = useState('loading');
-  const [message, setMessage] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  
-  const searchParams = useSearchParams();
+  const supabase = useMemo(() => getSupabaseClient(), []);
   const router = useRouter();
-  const token = searchParams.get('token');
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [status, setStatus] = useState(STATUS_LOADING);
+  const [message, setMessage] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    if (!token) {
-      setStatus('error');
-      setMessage('缺少重置令牌');
-    } else {
-      setStatus('ready');
+    if (!supabase) {
+      setStatus(STATUS_ERROR);
+      setMessage("Authentication service is not configured.");
+      return;
     }
-  }, [token]);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const params = parseHashParams();
+    const accessToken = params.get("access_token");
+    const refreshToken = params.get("refresh_token");
+    const type = params.get("type");
+
+    if (!accessToken || !refreshToken || type !== "recovery") {
+      setStatus(STATUS_ERROR);
+      setMessage("Reset link is invalid or has expired.");
+      return;
+    }
+
+    supabase.auth
+      .setSession({ access_token: accessToken, refresh_token: refreshToken })
+      .then(({ error }) => {
+        if (error) {
+          setStatus(STATUS_ERROR);
+          setMessage(error.message || "Unable to validate reset link.");
+          return;
+        }
+
+        setStatus(STATUS_READY);
+        setMessage("");
+      })
+      .catch((error) => {
+        console.error("Failed to set recovery session", error);
+        setStatus(STATUS_ERROR);
+        setMessage("Unable to validate reset link.");
+      });
+  }, [supabase]);
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+
+    if (!supabase) {
+      setStatus(STATUS_ERROR);
+      setMessage("Authentication service is not configured.");
+      return;
+    }
+
     if (password !== confirmPassword) {
-      setMessage('两次输入的密码不一致');
+      setMessage("涓ゆ杈撳叆鐨勫瘑鐮佷笉涓€鑷淬€?);
       return;
     }
 
     if (password.length < 6) {
-      setMessage('密码长度至少6个字符');
+      setMessage("瀵嗙爜闀垮害鑷冲皯 6 涓瓧绗︺€?);
       return;
     }
 
     setIsLoading(true);
-    setMessage('');
+    setMessage("");
 
     try {
-      const response = await fetch('/api/auth/reset-password', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          token, 
-          newPassword: password 
-        }),
-      });
+      const { error } = await supabase.auth.updateUser({ password });
 
-      const data = await response.json();
-
-      if (data.success) {
-        setStatus('success');
-        setMessage(data.message);
-        // 3秒后跳转到登录页面
-        setTimeout(() => {
-          router.push('/auth/login');
-        }, 3000);
-      } else {
-        setStatus('error');
-        setMessage(data.message || '重置失败，请稍后重试');
+      if (error) {
+        setStatus(STATUS_ERROR);
+        setMessage(error.message || "閲嶇疆澶辫触锛岃绋嶅悗閲嶈瘯銆?);
+        return;
       }
+
+      setStatus(STATUS_SUCCESS);
+      setMessage("瀵嗙爜閲嶇疆鎴愬姛锛? 绉掑悗璺宠浆鍒扮櫥褰曢〉銆?);
+      setTimeout(() => {
+        router.push("/auth/login");
+      }, 3000);
     } catch (error) {
-      console.error('重置密码失败:', error);
-      setStatus('error');
-      setMessage('网络错误，请稍后重试');
+      console.error("Failed to reset password", error);
+      setStatus(STATUS_ERROR);
+      setMessage("缃戠粶閿欒锛岃绋嶅悗閲嶈瘯銆?);
     } finally {
       setIsLoading(false);
     }
   };
 
-  if (status === 'loading') {
+  if (status === STATUS_LOADING) {
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
         <div className="sm:mx-auto sm:w-full sm:max-w-md">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600">正在验证重置令牌...</p>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto" />
+            <p className="mt-4 text-gray-600">姝ｅ湪楠岃瘉閲嶇疆浠ょ墝...</p>
           </div>
         </div>
       </div>
     );
   }
 
-  if (status === 'error') {
+  if (status === STATUS_ERROR) {
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
         <div className="sm:mx-auto sm:w-full sm:max-w-md">
           <div className="text-center">
-            <div className="text-6xl mb-4">❌</div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
-              重置失败
-            </h1>
+            <div className="text-6xl mb-4">鈿狅笍</div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">閲嶇疆澶辫触</h1>
             <p className="text-red-600 mb-6">{message}</p>
             <div className="space-y-2">
               <Link
                 href="/auth/forgot-password"
                 className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
               >
-                重新申请重置
+                閲嶆柊鐢宠閲嶇疆
               </Link>
               <Link
                 href="/auth/login"
                 className="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
               >
-                返回登录
+                杩斿洖鐧诲綍
               </Link>
             </div>
           </div>
@@ -117,24 +155,20 @@ function ResetPasswordContent() {
     );
   }
 
-  if (status === 'success') {
+  if (status === STATUS_SUCCESS) {
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
         <div className="sm:mx-auto sm:w-full sm:max-w-md">
           <div className="text-center">
-            <div className="text-6xl mb-4">✅</div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
-              密码重置成功！
-            </h1>
+            <div className="text-6xl mb-4">鉁?/div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">瀵嗙爜閲嶇疆鎴愬姛</h1>
             <p className="text-green-600 mb-6">{message}</p>
-            <p className="text-gray-600 mb-6">
-              3秒后自动跳转到登录页面...
-            </p>
+            <p className="text-gray-600 mb-6">3 绉掑悗鑷姩璺宠浆鍒扮櫥褰曢〉...</p>
             <Link
               href="/auth/login"
               className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
             >
-              立即登录
+              绔嬪嵆鐧诲綍
             </Link>
           </div>
         </div>
@@ -146,12 +180,8 @@ function ResetPasswordContent() {
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            🔒 重置密码
-          </h1>
-          <p className="text-gray-600">
-            请输入您的新密码
-          </p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">馃敀 閲嶇疆瀵嗙爜</h1>
+          <p className="text-gray-600">璇疯緭鍏ユ偍鐨勬柊瀵嗙爜</p>
         </div>
       </div>
 
@@ -160,8 +190,7 @@ function ResetPasswordContent() {
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                新密码
-              </label>
+                鏂板瘑鐮?              </label>
               <div className="mt-1">
                 <input
                   id="password"
@@ -170,17 +199,16 @@ function ResetPasswordContent() {
                   autoComplete="new-password"
                   required
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(event) => setPassword(event.target.value)}
                   className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                  placeholder="请输入新密码（至少6个字符）"
+                  placeholder="璇疯緭鍏ユ柊瀵嗙爜锛堣嚦灏?6 涓瓧绗︼級"
                 />
               </div>
             </div>
 
             <div>
               <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
-                确认新密码
-              </label>
+                纭鏂板瘑鐮?              </label>
               <div className="mt-1">
                 <input
                   id="confirmPassword"
@@ -189,24 +217,16 @@ function ResetPasswordContent() {
                   autoComplete="new-password"
                   required
                   value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  onChange={(event) => setConfirmPassword(event.target.value)}
                   className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                  placeholder="请再次输入新密码"
+                  placeholder="璇峰啀娆¤緭鍏ユ柊瀵嗙爜"
                 />
               </div>
             </div>
 
-            {message && (
-              <div className={`p-4 rounded-md ${
-                status === 'error' 
-                  ? 'bg-red-50 border border-red-200' 
-                  : 'bg-green-50 border border-green-200'
-              }`}>
-                <p className={`text-sm ${
-                  status === 'error' ? 'text-red-800' : 'text-green-800'
-                }`}>
-                  {message}
-                </p>
+            {message && status !== STATUS_SUCCESS && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
+                <p className="text-sm text-yellow-800">{message}</p>
               </div>
             )}
 
@@ -216,16 +236,13 @@ function ResetPasswordContent() {
                 disabled={isLoading}
                 className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isLoading ? '重置中...' : '重置密码'}
+                {isLoading ? "閲嶇疆涓?.." : "閲嶇疆瀵嗙爜"}
               </button>
             </div>
 
             <div className="text-center">
-              <Link
-                href="/auth/login"
-                className="text-sm text-indigo-600 hover:text-indigo-500"
-              >
-                返回登录
+              <Link href="/auth/login" className="text-sm text-indigo-600 hover:text-indigo-500">
+                杩斿洖鐧诲綍
               </Link>
             </div>
           </form>
@@ -233,13 +250,11 @@ function ResetPasswordContent() {
 
         <div className="mt-6 text-center">
           <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
-            <h3 className="text-sm font-medium text-yellow-800 mb-2">
-              ⚠️ 安全提示
-            </h3>
+            <h3 className="text-sm font-medium text-yellow-800 mb-2">鈿狅笍 瀹夊叏鎻愮ず</h3>
             <ul className="text-sm text-yellow-700 text-left space-y-1">
-              <li>• 请使用强密码，包含字母、数字和特殊字符</li>
-              <li>• 不要使用与其他网站相同的密码</li>
-              <li>• 定期更换密码以保障账户安全</li>
+              <li>璇蜂娇鐢ㄥ己瀵嗙爜锛屽寘鍚瓧姣嶃€佹暟瀛楀拰鐗规畩瀛楃</li>
+              <li>涓嶈浣跨敤涓庡叾浠栫綉绔欑浉鍚岀殑瀵嗙爜</li>
+              <li>瀹氭湡鏇存崲瀵嗙爜浠ヤ繚闅滆处鎴峰畨鍏?/li>
             </ul>
           </div>
         </div>
@@ -250,16 +265,18 @@ function ResetPasswordContent() {
 
 export default function ResetPasswordPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-        <div className="sm:mx-auto sm:w-full sm:max-w-md">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600">加载中...</p>
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+          <div className="sm:mx-auto sm:w-full sm:max-w-md">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto" />
+              <p className="mt-4 text-gray-600">鍔犺浇涓?..</p>
+            </div>
           </div>
         </div>
-      </div>
-    }>
+      }
+    >
       <ResetPasswordContent />
     </Suspense>
   );

@@ -1,123 +1,207 @@
 'use client'
 
 import Link from 'next/link'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
+import { useAuth } from '@/lib/auth-context'
 
 export default function NavbarPartyTix() {
+  const router = useRouter()
+  const { user, logout } = useAuth()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
+  const [isSigningOut, setIsSigningOut] = useState(false)
 
   useEffect(() => {
     const checkScreenSize = () => {
       setIsMobile(window.innerWidth < 768)
     }
-    
+
     checkScreenSize()
     window.addEventListener('resize', checkScreenSize)
-    
+
     return () => window.removeEventListener('resize', checkScreenSize)
   }, [])
 
-  return (
-    <nav style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      zIndex: 50,
-      backdropFilter: 'blur(12px)',
-      backgroundColor: 'rgba(0, 0, 0, 0.4)',
-      borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-      padding: '16px 0'
-    }}>
-      <div style={{
-        maxWidth: '1200px',
-        margin: '0 auto',
-        padding: '0 24px',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center'
-      }}>
-        <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{
-            width: '32px',
-            height: '32px',
+  const closeMobileMenu = useCallback(() => {
+    setIsMobileMenuOpen(false)
+  }, [])
+
+  const handleLogout = useCallback(async () => {
+    try {
+      setIsSigningOut(true)
+      await logout()
+      closeMobileMenu()
+      router.push('/auth/login')
+    } catch (error) {
+      console.error('Logout failed:', error)
+    } finally {
+      setIsSigningOut(false)
+    }
+  }, [logout, closeMobileMenu, router])
+
+  const renderAuthLinks = (variant = 'desktop') => {
+    const baseStyle = {
+      color: 'white',
+      textDecoration: 'none',
+      transition: 'color 0.3s ease'
+    }
+
+    if (user) {
+      return (
+        <>
+          <Link
+            href="/account"
+            style={{
+              ...baseStyle,
+              background: 'linear-gradient(135deg, #7C3AED 0%, #22D3EE 100%)',
+              padding: variant === 'desktop' ? '8px 16px' : '12px 16px',
+              borderRadius: '8px',
+              fontWeight: '500'
+            }}
+            onClick={variant === 'mobile' ? closeMobileMenu : undefined}
+          >
+            Account
+          </Link>
+          <button
+            onClick={handleLogout}
+            disabled={isSigningOut}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'white',
+              fontSize: variant === 'desktop' ? '1rem' : '16px',
+              cursor: isSigningOut ? 'wait' : 'pointer',
+              padding: variant === 'desktop' ? '0' : '8px 0'
+            }}
+          >
+            {isSigningOut ? 'Signing out...' : 'Logout'}
+          </button>
+        </>
+      )
+    }
+
+    return (
+      <>
+        <Link
+          href="/auth/login"
+          style={baseStyle}
+          onClick={variant === 'mobile' ? closeMobileMenu : undefined}
+        >
+          Login
+        </Link>
+        <Link
+          href="/auth/register"
+          style={{
+            ...baseStyle,
             background: 'linear-gradient(135deg, #7C3AED 0%, #22D3EE 100%)',
+            padding: variant === 'desktop' ? '8px 16px' : '12px 16px',
             borderRadius: '8px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'white',
-            fontWeight: 'bold',
-            fontSize: '18px',
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
-          }}>
+            fontWeight: '500'
+          }}
+          onClick={variant === 'mobile' ? closeMobileMenu : undefined}
+        >
+          Sign Up
+        </Link>
+      </>
+    )
+  }
+
+  return (
+    <nav
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 50,
+        backdropFilter: 'blur(12px)',
+        backgroundColor: 'rgba(0, 0, 0, 0.4)',
+        borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+        padding: '16px 0'
+      }}
+    >
+      <div
+        style={{
+          maxWidth: '1200px',
+          margin: '0 auto',
+          padding: '0 24px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}
+      >
+        <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div
+            style={{
+              width: '32px',
+              height: '32px',
+              background: 'linear-gradient(135deg, #7C3AED 0%, #22D3EE 100%)',
+              borderRadius: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'white',
+              fontWeight: 'bold',
+              fontSize: '18px',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
+            }}
+          >
             P
           </div>
-          <span style={{
-            fontSize: '24px',
-            fontWeight: 'bold',
-            color: 'white'
-          }}>
+          <span
+            style={{
+              fontSize: '24px',
+              fontWeight: 'bold',
+              color: 'white'
+            }}
+          >
             PartyTix
           </span>
         </Link>
-        
-        {/* Desktop Navigation */}
+
         {!isMobile && (
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '24px'
-          }}>
-            <Link 
-              href="/events" 
-              style={{ 
-                color: 'white', 
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '24px'
+            }}
+          >
+            <Link
+              href="/events"
+              style={{
+                color: 'white',
                 textDecoration: 'none',
                 transition: 'color 0.3s ease'
               }}
             >
               Events
             </Link>
-            <Link 
-              href="/activity" 
-              style={{ 
-                color: 'white', 
+            <Link
+              href="/activity"
+              style={{
+                color: 'white',
                 textDecoration: 'none',
                 transition: 'color 0.3s ease'
               }}
             >
               Activity
             </Link>
-            <Link 
-              href="/contact" 
-              style={{ 
-                color: 'white', 
+            <Link
+              href="/contact"
+              style={{
+                color: 'white',
                 textDecoration: 'none',
                 transition: 'color 0.3s ease'
               }}
             >
               Contact Us
             </Link>
-            <Link 
-              href="/account" 
-              style={{ 
-                color: 'white', 
-                textDecoration: 'none',
-                transition: 'color 0.3s ease',
-                background: 'linear-gradient(135deg, #7C3AED 0%, #22D3EE 100%)',
-                padding: '8px 16px',
-                borderRadius: '8px',
-                fontWeight: '500'
-              }}
-            >
-              Account
-            </Link>
+            {renderAuthLinks('desktop')}
           </div>
         )}
 
-        {/* Mobile Menu Button */}
         {isMobile && (
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -130,69 +214,67 @@ export default function NavbarPartyTix() {
               padding: '8px'
             }}
           >
-            {isMobileMenuOpen ? '✕' : '☰'}
+            {isMobileMenuOpen ? 'Close' : 'Menu'}
           </button>
         )}
       </div>
 
-      {/* Mobile Navigation Menu */}
       {isMobile && isMobileMenuOpen && (
-        <div style={{
-          position: 'absolute',
-          top: '100%',
-          left: 0,
-          right: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.9)',
-          backdropFilter: 'blur(12px)',
-          borderTop: '1px solid rgba(255, 255, 255, 0.1)',
-          padding: '20px 24px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '16px'
-        }}>
-          <Link 
-            href="/events" 
-            style={{ 
-              color: 'white', 
+        <div
+          style={{
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            right: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.9)',
+            backdropFilter: 'blur(12px)',
+            borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+            padding: '20px 24px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px'
+          }}
+        >
+          <Link
+            href="/events"
+            style={{
+              color: 'white',
               textDecoration: 'none',
               fontSize: '16px',
               padding: '8px 0',
               transition: 'color 0.3s ease'
             }}
-            onClick={() => setIsMobileMenuOpen(false)}
+            onClick={closeMobileMenu}
           >
             Events
           </Link>
-          <Link 
-            href="/activity" 
-            style={{ 
-              color: 'white', 
+          <Link
+            href="/activity"
+            style={{
+              color: 'white',
               textDecoration: 'none',
               fontSize: '16px',
               padding: '8px 0',
               transition: 'color 0.3s ease'
             }}
-            onClick={() => setIsMobileMenuOpen(false)}
+            onClick={closeMobileMenu}
           >
             Activity
           </Link>
-          <Link 
-            href="/account" 
-            style={{ 
-              color: 'white', 
+          <Link
+            href="/contact"
+            style={{
+              color: 'white',
               textDecoration: 'none',
               fontSize: '16px',
-              padding: '12px 16px',
-              transition: 'color 0.3s ease',
-              background: 'linear-gradient(135deg, #7C3AED 0%, #22D3EE 100%)',
-              borderRadius: '8px',
-              fontWeight: '500',
-              textAlign: 'center'
+              padding: '8px 0',
+              transition: 'color 0.3s ease'
             }}
-            onClick={() => setIsMobileMenuOpen(false)}
+            onClick={closeMobileMenu}
           >
-            Account
+            Contact Us
           </Link>
+          {renderAuthLinks('mobile')}
         </div>
       )}
     </nav>

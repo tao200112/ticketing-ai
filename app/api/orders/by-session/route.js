@@ -1,295 +1,299 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
 import Stripe from 'stripe'
+import { getServerUser } from '@/lib/auth-server'
+import { supabaseAdmin } from '@/lib/supabase-admin'
 import { generateShortTicketId } from '@/lib/ticket-utils'
 
-// 安全地初始化Stripe
-const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: '2023-10-16',
-}) : null
+const stripe = process.env.STRIPE_SECRET_KEY
+  ? new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2023-10-16' })
+  : null
 
-export async function GET(request) {
+function buildUnauthorizedResponse() {
+  return NextResponse.json({ ok: false, message: 'Authentication required' }, { status: 401 })
+}
+
+function buildConfigError(message: string) {
+  return NextResponse.json({ ok: false, message }, { status: 500 })
+}
+
+function ownsOrder(order: any, userId: string, userEmail?: string | null) {
+  if (!order) return false
+  if (order.user_id && order.user_id === userId) return true
+  if (order.customer_email && userEmail && order.customer_email === userEmail) return true
+
+  if (order.metadata) {
+    try {
+      const metadata = typeof order.metadata === 'string' ? JSON.parse(order.metadata) : order.metadata
+      if (metadata?.user_id && metadata.user_id === userId) {
+        return true
+      }
+      if (metadata?.customer_email && userEmail && metadata.customer_email === userEmail) {
+        return true
+      }
+    } catch (error) {
+      console.warn('Failed to parse order metadata', error)
+    }
+  }
+
+  return false
+}
+
+async function ensureOrderOwnedByUser(order: any, userId: string) {
+  if (!order) return order
+  if (order.user_id === userId) return order
+
+  const admin = supabaseAdmin
+  if (!admin) return order
+
+  const { data, error } = await admin
+    .from('orders')
+    .update({ user_id: userId })
+    .eq('id', order.id)
+    .select()
+    .single()
+
+  if (error) {
+    console.warn('Failed to set order owner', error)
+    return order
+  }
+
+  return data
+}
+
+async function createOrderFromStripe(sessionId: string, userId: string, userEmail?: string | null) {
+  if (!stripe) {
+    throw new Error('Stripe not configured')
+  }
+
+  const admin = supabaseAdmin
+  if (!admin) {
+    throw new Error('Supabase admin client not configured')
+  }
+
+  const session = await stripe.checkout.sessions.retrieve(sessionId)
+
+  if (session.payment_status !== 'paid') {
+    throw new Error('Payment not completed')
+  }
+
+  const customerEmail = session.customer_email || userEmail || null
+  const metadata = session.metadata || {}
+  const eventId = metadata.event_id || null
+  const priceId = metadata.price_id || null
+  const priceName = metadata.price_name || 'general'
+  const quantity = parseInt(metadata.quantity || '1', 10) || 1
+
+  const { data: order, error: orderError } = await admin
+    .from('orders')
+    .insert({
+      stripe_session_id: session.id,
+      user_id: userId,
+      customer_email: customerEmail,
+      total_amount_cents: session.amount_total,
+      currency: session.currency?.toUpperCase() || 'USD',
+      status: 'paid',
+      metadata: {
+        ...metadata,
+        user_id: userId,
+        customer_email: customerEmail,
+      },
+    })
+    .select()
+    .single()
+
+  if (orderError || !order) {
+    throw new Error('Failed to create order record')
+  }
+
+  // Snapshot helpers
+  let eventSnapshot: any = null
+  if (eventId) {
+    const { data: eventData } = await admin
+      .from('events')
+      .select('title, description, venue_name, address, start_at, end_at, poster_url')
+      .eq('id', eventId)
+      .single()
+
+    if (eventData) {
+      eventSnapshot = {
+        title: eventData.title,
+        description: eventData.description,
+        venue_name: eventData.venue_name,
+        address: eventData.address,
+        start_at: eventData.start_at,
+        end_at: eventData.end_at,
+        poster_url: eventData.poster_url,
+      }
+    }
+  }
+
+  let priceSnapshot: any = null
+  if (priceId) {
+    const { data: priceData } = await admin
+      .from('prices')
+      .select('name, amount_cents, currency, ticket_kind')
+      .eq('id', priceId)
+      .single()
+
+    if (priceData) {
+      priceSnapshot = {
+        name: priceData.name,
+        amount_cents: priceData.amount_cents,
+        currency: priceData.currency || 'USD',
+        ticket_kind: priceData.ticket_kind,
+      }
+    }
+  }
+
+  const ticketRows = []
+  for (let i = 0; i < quantity; i += 1) {
+    ticketRows.push({
+      order_id: order.id,
+      event_id: eventId,
+      tier: priceName,
+      ticket_kind: priceSnapshot?.ticket_kind || null,
+      holder_email: customerEmail,
+      status: 'unused',
+      used: false,
+      short_id: generateShortTicketId(),
+      user_id: userId,
+      event_title_snapshot: eventSnapshot?.title || null,
+      event_description_snapshot: eventSnapshot?.description || null,
+      event_venue_snapshot: eventSnapshot?.venue_name || null,
+      event_address_snapshot: eventSnapshot?.address || null,
+      event_start_at_snapshot: eventSnapshot?.start_at || null,
+      event_end_at_snapshot: eventSnapshot?.end_at || null,
+      event_poster_url_snapshot: eventSnapshot?.poster_url || null,
+      price_name_snapshot: priceSnapshot?.name || priceName,
+      price_amount_cents_snapshot: priceSnapshot?.amount_cents || null,
+      price_currency_snapshot: priceSnapshot?.currency || 'USD',
+    })
+  }
+
+  if (ticketRows.length > 0) {
+    const { error: ticketError } = await admin.from('tickets').insert(ticketRows)
+    if (ticketError) {
+      console.warn('Failed to create ticket rows', ticketError)
+    }
+  }
+
+  return order
+}
+
+function buildTicketQr(ticket: any, event: any) {
+  const qrData = {
+    ticket_id: ticket.id,
+    short_id: ticket.short_id,
+    event_id: ticket.event_id,
+    tier: ticket.tier,
+    holder_email: ticket.holder_email,
+    event_title: event?.title || 'Event',
+    event_date: event?.start_at || '',
+    valid_from: ticket.created_at,
+    status: ticket.status,
+  }
+
+  return {
+    ...ticket,
+    qrPayload: JSON.stringify(qrData),
+  }
+}
+
+export async function GET(request: Request) {
   try {
-    // 检查Stripe是否已初始化
+    const user = await getServerUser()
+    if (!user) {
+      return buildUnauthorizedResponse()
+    }
+
     if (!stripe) {
-      return NextResponse.json({ 
-        ok: false, 
-        message: 'Stripe not configured' 
-      }, { status: 500 })
+      return buildConfigError('Stripe not configured')
     }
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-    if (!supabaseUrl || !supabaseKey) {
-      return NextResponse.json({ 
-        ok: false, 
-        message: 'Supabase not configured' 
-      }, { status: 500 })
+    const admin = supabaseAdmin
+    if (!admin) {
+      return buildConfigError('Supabase Service Role not configured')
     }
 
-    const supabase = createClient(supabaseUrl, supabaseKey)
-
-    // 获取 session_id
     const { searchParams } = new URL(request.url)
     const sessionId = searchParams.get('session_id')
 
     if (!sessionId) {
-      return NextResponse.json({ 
-        ok: false, 
-        message: 'Missing session_id parameter' 
-      }, { status: 400 })
+      return NextResponse.json({ ok: false, message: 'Missing session_id parameter' }, { status: 400 })
     }
 
-    console.log('🔍 查找订单:', sessionId)
-
-    // 获取订单信息
-    let { data: order, error: orderError } = await supabase
+    let { data: order, error: orderError } = await admin
       .from('orders')
       .select('*')
       .eq('stripe_session_id', sessionId)
-      .single()
+      .maybeSingle()
 
-    // 如果订单不存在，尝试从 Stripe 创建
-    if (orderError || !order) {
-      console.error('❌ 订单未找到，尝试从 Stripe 获取并创建:', orderError)
-      
-      try {
-        const session = await stripe.checkout.sessions.retrieve(sessionId)
-        
-        if (session.payment_status !== 'paid') {
-          return NextResponse.json({ 
-            ok: false, 
-            message: 'Payment not completed' 
-          }, { status: 400 })
-        }
-        
-        console.log('✅ 从 Stripe 获取 session:', session.id)
-        
-        // 创建订单
-        const orderData = {
-          stripe_session_id: session.id,
-          customer_email: session.customer_email,
-          total_amount_cents: session.amount_total,
-          currency: session.currency.toUpperCase(),
-          status: 'paid',
-          tier: session.metadata?.price_name || 'general'
-        }
-        
-        const { data: newOrder, error: createOrderError } = await supabase
-          .from('orders')
-          .insert(orderData)
-          .select()
-          .single()
-        
-        if (createOrderError || !newOrder) {
-          console.error('❌ 创建订单失败:', createOrderError)
-          return NextResponse.json({ 
-            ok: false, 
-            message: 'Failed to create order' 
-          }, { status: 500 })
-        }
-        
-        console.log('✅ 订单创建成功:', newOrder.id)
-        order = newOrder
-        
-        // 创建票据
-        const quantity = parseInt(session.metadata?.quantity || '1')
-        
-        // 获取或创建默认活动ID
-        let eventId = session.metadata?.event_id
-        
-        // 如果event_id不是有效的UUID，使用默认活动
-        if (!eventId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(eventId)) {
-          console.log('⚠️ 使用默认活动ID，因为event_id无效:', eventId)
-          // 获取第一个活动作为默认
-          const { data: defaultEvent } = await supabase
-            .from('events')
-            .select('id')
-            .limit(1)
-            .single()
-          
-          eventId = defaultEvent?.id || '45091d37-7252-43c7-93c8-a7033d28af31'
-        }
-        
-        // Get event snapshot
-        let eventSnapshot = null
-        if (eventId) {
-          const { data: eventData, error: eventDataError } = await supabase
-            .from('events')
-            .select('title, description, venue_name, address, start_at, end_at, poster_url')
-            .eq('id', eventId)
-            .single()
-          
-          if (!eventDataError && eventData) {
-            eventSnapshot = {
-              title: eventData.title,
-              description: eventData.description,
-              venue_name: eventData.venue_name,
-              address: eventData.address,
-              start_at: eventData.start_at,
-              end_at: eventData.end_at,
-              poster_url: eventData.poster_url
-            }
-          }
-        }
-        
-        // Get price snapshot
-        let priceSnapshot = null
-        const priceId = session.metadata?.price_id
-        if (priceId) {
-          const { data: priceData, error: priceError } = await supabase
-            .from('prices')
-            .select('name, amount_cents, currency, ticket_kind')
-            .eq('id', priceId)
-            .single()
-          
-          if (!priceError && priceData) {
-            priceSnapshot = {
-              name: priceData.name,
-              amount_cents: priceData.amount_cents,
-              currency: priceData.currency || 'USD',
-              ticket_kind: priceData.ticket_kind
-            }
-          }
-        }
-        
-        // Import ticket helpers
-        const { isComboTicket, getComboTicketKinds, getTicketKindFromPriceName } = await import('@/lib/ticket-helpers')
-        
-        // Get ticket_kind from price snapshot
-        let ticketKindFromPrice = priceSnapshot?.ticket_kind || null
-        
-        const priceName = session.metadata?.price_name || 'general'
-        const isCombo = isComboTicket(priceName, ticketKindFromPrice)
-        const comboKinds = isCombo ? getComboTicketKinds(priceName, ticketKindFromPrice) : [ticketKindFromPrice || getTicketKindFromPriceName(priceName) || null]
-        
-        for (let i = 0; i < quantity; i++) {
-          const ticketKinds = isCombo ? comboKinds : [comboKinds[0]]
-          
-          for (const ticketKind of ticketKinds) {
-            const shortId = generateShortTicketId()
-            
-            const { data: ticket, error: ticketError } = await supabase
-              .from('tickets')
-              .insert({
-                order_id: newOrder.id,
-                event_id: eventId,
-                tier: session.metadata?.price_name || 'general',
-                ticket_kind: ticketKind || null,
-                holder_email: session.customer_email,
-                status: 'unused',
-                used: false,
-                short_id: shortId,
-                // Event snapshot fields
-                event_title_snapshot: eventSnapshot?.title || null,
-                event_description_snapshot: eventSnapshot?.description || null,
-                event_venue_snapshot: eventSnapshot?.venue_name || null,
-                event_address_snapshot: eventSnapshot?.address || null,
-                event_start_at_snapshot: eventSnapshot?.start_at || null,
-                event_end_at_snapshot: eventSnapshot?.end_at || null,
-                event_poster_url_snapshot: eventSnapshot?.poster_url || null,
-                // Price snapshot fields
-                price_name_snapshot: priceSnapshot?.name || session.metadata?.price_name || null,
-                price_amount_cents_snapshot: priceSnapshot?.amount_cents || null,
-                price_currency_snapshot: priceSnapshot?.currency || 'USD'
-              })
-              .select()
-              .single()
-            
-            if (!ticketError && ticket) {
-              console.log('✅ 票据创建成功:', ticket.id, 'ticket_kind:', ticketKind)
-            } else {
-              console.error('❌ 创建票据失败:', ticketError)
-            }
-          }
-        }
-      } catch (stripeError) {
-        console.error('❌ Stripe 错误:', stripeError)
-        return NextResponse.json({ 
-          ok: false, 
-          message: 'Failed to process payment' 
-        }, { status: 500 })
-      }
+    if (orderError && orderError.code !== 'PGRST116') {
+      throw orderError
     }
-    
+
+    if (order && !ownsOrder(order, user.id, user.email)) {
+      return NextResponse.json({ ok: false, message: 'Order not found' }, { status: 404 })
+    }
+
     if (!order) {
-      return NextResponse.json({ 
-        ok: false, 
-        message: 'Order not found' 
-      }, { status: 404 })
+      order = await createOrderFromStripe(sessionId, user.id, user.email)
+    } else {
+      order = await ensureOrderOwnedByUser(order, user.id)
     }
 
-    console.log('✅ 找到订单:', order.id)
-
-    // 获取票据信息
-    const { data: tickets, error: ticketsError } = await supabase
+    const { data: tickets = [], error: ticketsError } = await admin
       .from('tickets')
       .select('*')
       .eq('order_id', order.id)
 
     if (ticketsError) {
-      console.error('❌ 获取票据失败:', ticketsError)
-      return NextResponse.json({ 
-        ok: false, 
-        message: 'Failed to fetch tickets' 
-      }, { status: 500 })
+      throw ticketsError
     }
 
-    // 确保tickets是数组
-    const ticketsArray = Array.isArray(tickets) ? tickets : []
-    console.log('✅ 找到票据:', ticketsArray.length)
-
-    // 获取活动信息（从票据中获取 event_id）
-    const eventId = ticketsArray[0]?.event_id
+    const eventId = tickets[0]?.event_id
     let event = null
-    
+
     if (eventId) {
-      const { data: eventData, error: eventError } = await supabase
+      const { data: eventData, error: eventError } = await admin
         .from('events')
         .select('*')
         .eq('id', eventId)
         .single()
 
-      if (eventError) {
-        console.error('❌ 获取活动信息失败:', eventError)
-      } else {
+      if (!eventError) {
         event = eventData
       }
     }
 
-    // 为每个票据生成 qr_payload
-    const ticketsWithQR = ticketsArray.map(ticket => {
-      const qrData = {
-        ticket_id: ticket.id,
-        short_id: ticket.short_id,
-        event_id: ticket.event_id,
-        tier: ticket.tier,
-        holder_email: ticket.holder_email,
-        event_title: event?.title || 'Event',
-        event_date: event?.start_at || '',
-        valid_from: ticket.created_at,
-        status: ticket.status
-      }
-
-      return {
-        ...ticket,
-        qrPayload: JSON.stringify(qrData)
-      }
+    const ownedTickets = tickets.filter((ticket) => {
+      if (ticket.user_id && ticket.user_id === user.id) return true
+      if (ticket.holder_email && user.email && ticket.holder_email === user.email) return true
+      return false
     })
+
+    // ensure ticket ownership is set for future queries
+    const ticketsToClaim = ownedTickets.filter((ticket) => !ticket.user_id)
+    if (ticketsToClaim.length > 0) {
+      const ticketIds = ticketsToClaim.map((ticket) => ticket.id)
+      await admin
+        .from('tickets')
+        .update({ user_id: user.id })
+        .in('id', ticketIds)
+    }
+
+    const ticketsWithQR = ownedTickets.map((ticket) => buildTicketQr(ticket, event))
 
     return NextResponse.json({
       ok: true,
       order,
       tickets: ticketsWithQR,
-      event
+      event,
     })
-
-  } catch (error) {
-    console.error('❌ API 错误:', error)
-    return NextResponse.json({ 
-      ok: false, 
-      message: error.message 
-    }, { status: 500 })
+  } catch (error: any) {
+    console.error('orders/by-session error', error)
+    const message = error?.message || 'Internal Server Error'
+    const status = error?.status || 500
+    return NextResponse.json({ ok: false, message }, { status })
   }
 }

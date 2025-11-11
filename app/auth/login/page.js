@@ -1,15 +1,14 @@
 'use client'
 
-// Google OAuth integration – Supabase Auth (2025-11-08) – enhanced logging for redirect debug
+// Google OAuth integration - Supabase Auth (2025-11-08) - enhanced logging for redirect debug
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '../../../lib/auth-context'
-import { getSupabaseClient } from '@/lib/supabase-client'
 
 function LoginPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { login, isAuthenticated, loading: authLoading } = useAuth()
+  const { user, loginWithPassword, loginWithGoogle, loading: authLoading } = useAuth()
   const [formData, setFormData] = useState({
     email: '',
     password: ''
@@ -30,11 +29,11 @@ function LoginPageContent() {
   // If already logged in, redirect to account page
   useEffect(() => {
     if (authLoading) return // Wait for auth check to complete
-    
-    if (isAuthenticated && isAuthenticated()) {
+
+    if (user) {
       router.push('/account')
     }
-  }, [isAuthenticated, authLoading, router])
+  }, [user, authLoading, router])
 
   const handleInputChange = (e) => {
     const { name, value } = e.target
@@ -43,7 +42,6 @@ function LoginPageContent() {
       [name]: value
     }))
     
-    // Clear error for corresponding field
     if (errors[name]) {
       setErrors(prev => ({
         ...prev,
@@ -80,53 +78,13 @@ function LoginPageContent() {
     setMessage('')
     
     try {
-      console.log('🔍 Attempting login for:', formData.email)
-      
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email: formData.email, password: formData.password }),
-      })
-
-      const result = await response.json()
-
-      if (response.ok && result.success) {
-        console.log('✅ Login successful', result)
-        
-        // Get user data from result (support both result.data and result.user)
-        const userData = result.data || result.user
-        if (!userData) {
-          console.error('❌ Login successful but no user data returned')
-          setMessage('Login successful but user data not found. Please try again.')
-          setLoading(false)
-          return
-        }
-        
-        // Save user session immediately
-        try {
-          localStorage.setItem('userSession', JSON.stringify(userData))
-          console.log('✅ User session saved to localStorage')
-        } catch (storageError) {
-          console.error('❌ Failed to save session:', storageError)
-          setMessage('Failed to save session. Please try again.')
-          setLoading(false)
-          return
-        }
-        
-        setMessage('Login successful! Redirecting...')
-        
-        // Use replace instead of push to avoid back button issues
-        // Remove setTimeout for immediate redirect
-        router.replace('/account')
-      } else {
-        console.error('❌ Login failed:', result.error || result)
-        setMessage(result.message || 'Login failed, please check email and password')
-      }
+      console.log('[Auth] Attempting Supabase login for:', formData.email)
+      await loginWithPassword(formData.email, formData.password)
+      setMessage('Login successful! Redirecting...')
+      router.replace('/account')
     } catch (error) {
-      console.error('❌ Login error:', error)
-      setMessage('Network error, please check connection and try again')
+      console.error('[Auth] Login error:', error)
+      setMessage(error?.message || 'Login failed, please check email and password')
     } finally {
       setLoading(false)
     }
@@ -148,75 +106,18 @@ function LoginPageContent() {
         ? `${siteOrigin.replace(/\/$/, '')}/auth/oauth-success`
         : undefined
 
-      console.log('[OAuth] Google login initiated (page)', {
-        path: typeof window !== 'undefined' ? window.location.pathname : 'unknown',
-        provider: 'google',
-        redirectTo
-      })
+      console.log('[OAuth] Initiating Supabase OAuth', { redirectTo })
 
-      const supabase = getSupabaseClient()
-      if (!supabase) {
-        setMessage('Supabase client not available. Please check configuration.')
-        setGoogleLoading(false)
-        return
-      }
-
-      if (!redirectTo) {
-        console.warn('[OAuth] redirectTo is undefined – Supabase may fall back to default callback')
-      }
-
-      // Initiate Google OAuth sign-in
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo
-        }
-      })
-      console.log('[OAuth] signInWithOAuth result (page)', { data, error, redirectTo })
-
-      if (error) {
-        console.error('[OAuth] Google OAuth error (page):', error)
-        setMessage(`Google 登录失败：${error.message || 'unknown_error'}`)
-        if (typeof window !== 'undefined') {
-          alert(`Google 登录失败：${error.message || 'Unknown error'}`)
-        }
-        setGoogleLoading(false)
-        return
-      }
-
-      if (data?.url) {
-        console.log('[OAuth] Redirecting to', data.url)
-      }
-
-      // The redirect will happen automatically
-      // User will be redirected to Google, then back to our callback
-      try {
-        const { data: sessionInfo } = await supabase.auth.getSession()
-        const oauthSession = sessionInfo?.session
-        if (oauthSession?.user) {
-          console.log('[OAuth] Google login successful (page)', {
-            email: oauthSession.user.email,
-            sessionExpires: oauthSession.expires_at,
-            provider: 'google'
-          })
-        } else {
-          console.log('[OAuth] Google login handed off to Supabase (page)', {
-            provider: 'google',
-            note: 'No session yet (expect redirect)',
-            path: typeof window !== 'undefined' ? window.location.pathname : 'unknown'
-          })
-        }
-      } catch (sessionError) {
-        console.warn('[OAuth] Unable to verify session after Google login handoff (page)', {
-          error: sessionError
-        })
-      }
+      await loginWithGoogle({ redirectTo })
     } catch (error) {
-      console.error('[OAuth] Unexpected Google login error (page):', error)
-      setMessage('Network error during Google login. Please try again.')
+      console.error('[OAuth] Google login error (page):', error)
+      setMessage(error?.message ? `Google login failed: ${error.message}` : 'Network error during Google login. Please try again.')
+    } finally {
       setGoogleLoading(false)
     }
   }
+
+  const isSuccessMessage = message && message.toLowerCase().includes('success')
 
   return (
     <div style={{
@@ -436,10 +337,10 @@ function LoginPageContent() {
             <div style={{
               marginTop: '16px',
               padding: '12px',
-              backgroundColor: message.includes('successful') ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-              border: `1px solid ${message.includes('successful') ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
+              backgroundColor: isSuccessMessage ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+              border: `1px solid ${isSuccessMessage ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
               borderRadius: '8px',
-              color: message.includes('successful') ? '#22c55e' : '#ef4444',
+              color: isSuccessMessage ? '#22c55e' : '#ef4444',
               fontSize: '0.875rem',
               textAlign: 'center'
             }}>

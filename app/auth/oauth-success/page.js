@@ -6,30 +6,86 @@ import { useAuth } from '@/lib/auth-context'
 
 function OAuthSuccessContent() {
   const router = useRouter()
-  const { loading, isAuthenticated, user } = useAuth()
-  const [statusMessage, setStatusMessage] = useState('Completing login...')
+  const { loading, user, session } = useAuth()
+  const [statusMessage, setStatusMessage] = useState('Processing login...')
 
   useEffect(() => {
     console.log('[OAuth] oauth-success page mounted')
-  }, [])
-
-  useEffect(() => {
-    if (loading) return
-
-    if (isAuthenticated()) {
+    
+    if (!loading && user) {
+      const role = user.user_metadata?.role
       const destination =
-        user?.role === 'merchant'
+        role === 'merchant'
           ? '/merchant'
-          : user?.role === 'admin'
+          : role === 'admin'
           ? '/account/merchant/admin'
           : '/account'
 
       setStatusMessage('Login successful, redirecting...')
       router.replace(destination)
-    } else {
-      setStatusMessage('Waiting for Supabase session...')
+      return
     }
-  }, [loading, isAuthenticated, user, router])
+
+    // 如果还在加载，等待一下
+    if (loading) {
+      setStatusMessage('Loading...')
+      return
+    }
+
+    // 如果没有用户，等待一段时间让 Supabase 处理 OAuth 回调
+    if (!user && !loading) {
+      const checkInterval = setInterval(async () => {
+        try {
+          const { getSupabaseClient } = await import('@/lib/supabase-client')
+          const supabase = getSupabaseClient()
+          
+          const { data: { session: currentSession }, error } = await supabase.auth.getSession()
+          
+          if (error) {
+            console.error('[OAuth] Session error:', error)
+            clearInterval(checkInterval)
+            setStatusMessage('Login failed. Please try again.')
+            setTimeout(() => {
+              router.push('/auth/login')
+            }, 2000)
+            return
+          }
+
+          if (currentSession?.user) {
+            clearInterval(checkInterval)
+            const role = currentSession.user.user_metadata?.role
+            const destination =
+              role === 'merchant'
+                ? '/merchant'
+                : role === 'admin'
+                ? '/account/merchant/admin'
+                : '/account'
+
+            setStatusMessage('Login successful, redirecting...')
+            router.replace(destination)
+          }
+        } catch (error) {
+          console.error('[OAuth] Error checking session:', error)
+        }
+      }, 500)
+
+      // 设置超时，如果 15 秒后还没有 session，重定向到登录页面
+      const timeout = setTimeout(() => {
+        clearInterval(checkInterval)
+        if (!user) {
+          setStatusMessage('Login timeout. Please try again.')
+          setTimeout(() => {
+            router.push('/auth/login')
+          }, 2000)
+        }
+      }, 15000)
+
+      return () => {
+        clearInterval(checkInterval)
+        clearTimeout(timeout)
+      }
+    }
+  }, [loading, user, session, router])
 
   return (
     <div style={{
@@ -117,4 +173,3 @@ export default function OAuthSuccessPage() {
     </Suspense>
   )
 }
-

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
 export default function AdminLogin() {
@@ -8,9 +8,25 @@ export default function AdminLogin() {
   const [error, setError] = useState('');
   const router = useRouter();
 
+  // 检查是否已经登录，如果已登录直接跳转到dashboard
+  useEffect(() => {
+    const adminToken = localStorage.getItem('adminToken');
+    if (adminToken === 'admin-logged-in') {
+      router.push('/admin/dashboard');
+    }
+  }, [router]);
+
   const handleSubmit = (e) => {
     e.preventDefault();
     if (password === '1461') {
+      // 设置管理员token，避免二次登录
+      localStorage.setItem('adminToken', 'admin-logged-in');
+      localStorage.setItem('adminUser', JSON.stringify({
+        id: 'admin-hardcoded',
+        email: 'admin@partytix.com',
+        role: 'admin',
+        name: 'Admin'
+      }));
       router.push('/admin/dashboard');
     } else {
       setError('Invalid password. Please try again.');

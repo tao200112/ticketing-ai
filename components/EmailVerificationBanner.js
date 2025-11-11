@@ -1,15 +1,15 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import Link from 'next/link';
+import { useMemo, useState, useEffect } from 'react';
+import { getSupabaseClient } from '@/lib/supabase-client';
 
 export default function EmailVerificationBanner({ user }) {
   const [isVisible, setIsVisible] = useState(false);
   const [isResending, setIsResending] = useState(false);
   const [message, setMessage] = useState('');
+  const supabase = useMemo(() => getSupabaseClient(), []);
 
   useEffect(() => {
-    // 检查用户邮箱是否已验证
     if (user && !user.emailVerified) {
       setIsVisible(true);
     }
@@ -17,28 +17,29 @@ export default function EmailVerificationBanner({ user }) {
 
   const handleResendVerification = async () => {
     if (!user?.email) return;
-    
+
     setIsResending(true);
     setMessage('');
-    
+
     try {
-      const response = await fetch('/api/auth/send-verification', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email: user.email }),
+      if (!supabase) {
+        setMessage('Authentication service is not available. Please try again later.');
+        return;
+      }
+
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: user.email,
       });
 
-      const data = await response.json();
-
-      if (data.success) {
-        setMessage('Verification email has been resent, please check your inbox');
-      } else {
-        setMessage(data.message || 'Failed to send, please try again later');
+      if (error) {
+        setMessage(error.message || 'Failed to send, please try again later');
+        return;
       }
+
+      setMessage('Verification email has been resent, please check your inbox');
     } catch (error) {
-      console.error('重新发送验证邮件失败:', error);
+      console.error('Resend verification email failed:', error);
       setMessage('Network error, please try again later');
     } finally {
       setIsResending(false);
@@ -62,9 +63,7 @@ export default function EmailVerificationBanner({ user }) {
           </svg>
         </div>
         <div className="ml-3 flex-1">
-          <h3 className="text-sm font-medium text-yellow-800">
-            Email Verification Required
-          </h3>
+          <h3 className="text-sm font-medium text-yellow-800">Email Verification Required</h3>
           <div className="mt-2 text-sm text-yellow-700">
             <p>
               To ensure your account security, please verify your email address <strong>{user.email}</strong>.

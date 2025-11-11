@@ -15,7 +15,7 @@ export default function AdminContactMessages() {
     // Check admin login
     const adminToken = localStorage.getItem('adminToken')
     if (!adminToken) {
-      router.push('/admin/login')
+      router.push('/admin')
       return
     }
 

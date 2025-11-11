@@ -60,7 +60,7 @@ export default function AdminDashboard() {
     const adminUserData = localStorage.getItem('adminUser')
     
     if (!adminToken || !adminUserData) {
-      router.push('/admin/login')
+      router.push('/admin')
       return
     }
 
@@ -71,7 +71,7 @@ export default function AdminDashboard() {
       console.error('Failed to parse admin user data:', error)
       localStorage.removeItem('adminToken')
       localStorage.removeItem('adminUser')
-      router.push('/admin/login')
+      router.push('/admin')
     }
   }, [router])
 
@@ -206,7 +206,7 @@ export default function AdminDashboard() {
   const handleLogout = () => {
     localStorage.removeItem('adminToken')
     localStorage.removeItem('adminUser')
-    router.push('/admin/login')
+    router.push('/admin')
   }
 
   const generateInviteCode = async () => {

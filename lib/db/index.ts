@@ -319,6 +319,7 @@ function generateQRPayload(data: {
   expAt: string
   orderId: string
 }): string {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const crypto = require('crypto')
   const salt = process.env.QR_SALT || 'default-salt'
   

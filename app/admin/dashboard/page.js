@@ -1631,13 +1631,19 @@ export default function AdminDashboard() {
             >
               ×
             </button>
-            <EventCreationForm
-              onSubmit={handleEventSubmit}
-              onCancel={() => setShowEventModal(false)}
-              initialData={editingEvent}
-              isEditing={!!editingEvent}
-              merchantId={editingEvent?.merchant_id || (merchants.length > 0 ? merchants[0].id : 'admin-created')}
-            />
+            {typeof EventCreationForm !== 'undefined' ? (
+              <EventCreationForm
+                onSubmit={handleEventSubmit}
+                onCancel={() => setShowEventModal(false)}
+                initialData={editingEvent}
+                isEditing={!!editingEvent}
+                merchantId={editingEvent?.merchant_id || (merchants.length > 0 ? merchants[0].id : 'admin-created')}
+              />
+            ) : (
+              <div style={{ padding: '20px', color: 'white', background: 'rgba(15, 23, 42, 0.95)', borderRadius: '16px' }}>
+                <p>Loading form...</p>
+              </div>
+            )}
           </div>
         </div>
       )}

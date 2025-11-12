@@ -226,7 +226,7 @@ export async function PUT(request, { params }) {
     const resolvedParams = await params
     const id = resolvedParams?.id || resolvedParams?.id
     const body = await request.json()
-    const { title, description, startTime, endTime, location, poster_url, status, prices } = body
+    const { title, description, startTime, endTime, location, poster_url, merchant_id, status, prices } = body
 
     if (!isSupabaseConfigured()) {
       throw ErrorHandler.configurationError(
@@ -238,18 +238,21 @@ export async function PUT(request, { params }) {
     const supabase = createSupabaseClient()
 
     // 更新活动基本信息
+    const updateData = {
+      title,
+      description,
+      start_at: startTime,
+      end_at: endTime,
+      address: location,
+      venue_name: location,
+      poster_url: poster_url || null,
+      ...(merchant_id !== undefined && { merchant_id: merchant_id || null }),
+      ...(status && { status })
+    }
+
     const { data: event, error } = await supabase
       .from('events')
-      .update({
-        title,
-        description,
-        start_at: startTime,
-        end_at: endTime,
-        address: location,
-        venue_name: location,
-        poster_url: poster_url || null,
-        ...(status && { status })
-      })
+      .update(updateData)
       .eq('id', id)
       .select()
       .single()

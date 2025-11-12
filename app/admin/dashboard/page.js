@@ -1011,9 +1011,10 @@ export default function AdminDashboard() {
                             }}
                             title="Move up"
                           >
-                            �?
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M18 15l-6-6-6 6"/>
+                            </svg>
                           </button>
-                          <button
                             onClick={async () => {
                               try {
                                 const response = await fetch(`/api/admin/events/${event.id}/reorder`, {
@@ -1045,9 +1046,10 @@ export default function AdminDashboard() {
                             }}
                             title="Move down"
                           >
-                            �?
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M6 9l6 6 6-6"/>
+                            </svg>
                           </button>
-                        </div>
                         <button
                           onClick={() => window.open(`/events/${event.id}`, '_blank')}
                           style={{
@@ -1483,9 +1485,10 @@ export default function AdminDashboard() {
                             }}
                             title="Move up"
                           >
-                            �?
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M18 15l-6-6-6 6"/>
+                            </svg>
                           </button>
-                          <button
                             onClick={async () => {
                               try {
                                 const response = await fetch(`/api/admin/activities/${activity.id}/reorder`, {
@@ -1517,9 +1520,10 @@ export default function AdminDashboard() {
                             }}
                             title="Move down"
                           >
-                            �?
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M6 9l6 6 6-6"/>
+                            </svg>
                           </button>
-                        </div>
                         <button
                           onClick={() => {
                             setEditingActivity(activity)

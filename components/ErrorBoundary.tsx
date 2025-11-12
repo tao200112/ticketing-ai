@@ -137,7 +137,6 @@ export class ErrorBoundary extends Component<Props, State> {
  * 简化的错误边界 Hook（用于函数组件）
  */
 export function useErrorHandler() {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (error: Error, errorInfo?: any) => {
     console.error('组件错误:', error, errorInfo)
     // 这里可以添加错误上报逻辑

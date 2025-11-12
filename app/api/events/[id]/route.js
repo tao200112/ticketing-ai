@@ -130,7 +130,6 @@ export async function GET(request, { params }) {
         // 尝试使用 service role key 重新查询
         const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
         if (serviceKey) {
-          // eslint-disable-next-line @typescript-eslint/no-require-imports
           const { createClient } = require('@supabase/supabase-js')
           const adminSupabase = createClient(
             process.env.NEXT_PUBLIC_SUPABASE_URL,

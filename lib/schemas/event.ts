@@ -74,7 +74,6 @@ export function validateEventDetail(data: unknown): EventDetail | null {
 /**
  * 安全获取事件字段（带默认值）
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function getSafeEventField(event: Event | null, field: keyof Event, defaultValue: any = '') {
   if (!event) return defaultValue
   return event[field] ?? defaultValue
@@ -83,7 +82,6 @@ export function getSafeEventField(event: Event | null, field: keyof Event, defau
 /**
  * 安全获取价格字段（带默认值）
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function getSafePriceField(price: Price | null, field: keyof Price, defaultValue: any = 0) {
   if (!price) return defaultValue
   return price[field] ?? defaultValue

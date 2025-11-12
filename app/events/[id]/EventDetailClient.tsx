@@ -1,327 +1,1161 @@
-"use client";
+'use client'
 
-import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-import { useAuth } from "@/lib/auth-context";
-import { requires21Plus } from "@/lib/ticket-helpers";
-import type { EventDetail, Price } from "../../../lib/schemas/event";
+import { useState, useEffect, useMemo } from 'react'
+import Link from 'next/link'
+import { EventDetail, Price } from '../../../lib/schemas/event'
+import { EventDetailErrorBoundary } from '../../../components/ErrorBoundary'
+import { getTicketCategory, requires21Plus, isComboTicket } from '../../../lib/ticket-helpers'
 
 interface EventDetailClientProps {
-  event: EventDetail;
+  event: EventDetail
 }
 
-const MIN_TICKETS = 1;
-const MAX_TICKETS = 10;
-
-function formatDate(value: string | Date | undefined) {
-  if (!value) {
-    return "";
-  }
-
-  try {
-    return new Date(value).toLocaleString();
-  } catch (error) {
-    console.warn("Failed to format date", error);
-    return String(value);
-  }
-}
-
+/**
+ * 🎫 事件详情客户端组件
+ * 处理用户交互和客户端状态管理
+ */
 export default function EventDetailClient({ event }: EventDetailClientProps) {
-  const { user: authUser } = useAuth();
-  const [quantity, setQuantity] = useState<number>(1);
-  const [selectedPriceId, setSelectedPriceId] = useState<string>(event.prices[0]?.id ?? "");
-  const [customerName, setCustomerName] = useState<string>("");
-  const [customerEmail, setCustomerEmail] = useState<string>("");
-  const [customerAge, setCustomerAge] = useState<string>("");
-  const [paymentError, setPaymentError] = useState<string>("");
-  const [paymentLoading, setPaymentLoading] = useState<boolean>(false);
+  const [quantity, setQuantity] = useState(1)
+  const [selectedPriceIndex, setSelectedPriceIndex] = useState(0)
+  const [customerEmail, setCustomerEmail] = useState('')
+  const [customerName, setCustomerName] = useState('')
+  const [customerAge, setCustomerAge] = useState('')
+  const [paymentLoading, setPaymentLoading] = useState(false)
+  const [paymentError, setPaymentError] = useState('')
 
+  // 安全获取用户数据 - 确保只在客户端执行
   useEffect(() => {
-    if (!authUser) {
-      setCustomerName("");
-      setCustomerEmail("");
-      setCustomerAge("");
-      return;
+    // 检查是否在客户端环境
+    if (typeof window === 'undefined') return
+    
+    try {
+      const userSession = localStorage.getItem('userSession')
+      if (userSession) {
+        const user = JSON.parse(userSession)
+        if (user?.id) {
+          setCustomerEmail(user.email ?? '')
+          setCustomerName(user.name ?? '')
+          // 自动填写年龄，如果用户信息中有年龄字段
+          if (user.age) {
+            setCustomerAge(String(user.age))
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load user data:', error)
     }
+  }, [])
 
-    const metadata = authUser.user_metadata ?? {};
-    const name = metadata.full_name ?? metadata.name ?? metadata.display_name ?? authUser.email ?? "";
-    const email = authUser.email ?? "";
-    const age = metadata.age ?? metadata.birth_year ?? "";
+  // 安全获取选中的价格
+  const selectedPrice: Price | null = event?.prices?.[selectedPriceIndex] ?? null
+  const totalPrice = selectedPrice ? (selectedPrice.amount * quantity) / 100 : 0
 
-    setCustomerName(name);
-    setCustomerEmail(email);
-    setCustomerAge(age ? String(age) : "");
-  }, [authUser]);
-
-  const selectedPrice: Price | undefined = useMemo(
-    () => event.prices.find((price) => price.id === selectedPriceId),
-    [event.prices, selectedPriceId]
-  );
-
-  const totalPrice = useMemo(() => {
-    if (!selectedPrice) {
-      return 0;
+  // 按分类组织价格列表
+  const groupedPrices = useMemo(() => {
+    if (!event?.prices) return {}
+    
+    const groups: Record<string, Array<{ price: Price; index: number }>> = {
+      entry: [],
+      queue: [],
+      drink: [],
+      combo: [],
+      other: []
     }
+    
+    event.prices.forEach((price, index) => {
+      const ticketKind = price.ticket_kind || null
+      const category = getTicketCategory(ticketKind)
+      groups[category].push({ price, index })
+    })
+    
+    return groups
+  }, [event?.prices])
 
-    return (selectedPrice.amount * quantity) / 100;
-  }, [selectedPrice, quantity]);
+  // 检查选中的票是否需要21+限制
+  const selectedRequires21Plus = useMemo(() => {
+    if (!selectedPrice) return false
+    return requires21Plus(selectedPrice.ticket_kind || null)
+  }, [selectedPrice])
 
-  const handlePurchase = async () => {
-    setPaymentError("");
-
-    if (!selectedPrice) {
-      setPaymentError("Please select a ticket type.");
-      return;
+  const handleBuyTickets = async () => {
+    // 验证用户登录状态 - 确保只在客户端执行
+    if (typeof window === 'undefined') {
+      setPaymentError('Page is loading, please try again later')
+      return
     }
-
-    if (!customerName.trim() || !customerEmail.trim()) {
-      setPaymentError("Please provide your name and email.");
-      return;
-    }
-
-    const ageNumber = Number(customerAge);
-    if (Number.isNaN(ageNumber) || ageNumber < 1 || ageNumber > 120) {
-      setPaymentError("Please enter a valid age between 1 and 120.");
-      return;
-    }
-
-    if (requires21Plus(selectedPrice.ticket_kind ?? null) && ageNumber < 21) {
-      setPaymentError("This ticket requires you to be at least 21 years old.");
-      return;
-    }
-
-    if (selectedPrice.inventory !== null && selectedPrice.inventory !== undefined && quantity > selectedPrice.inventory) {
-      setPaymentError("Not enough inventory remaining for this ticket type.");
-      return;
-    }
-
-    setPaymentLoading(true);
 
     try {
-      const response = await fetch("/api/checkout_sessions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          event_id: event.id,
-          price_id: selectedPrice.id,
-          quantity,
-          customer_email: customerEmail.trim(),
-          customer_name: customerName.trim(),
-          customer_age: ageNumber
-        })
-      });
-
-      const result = await response.json();
-
-      if (!response.ok || !result?.url) {
-        throw new Error(result?.message || "Failed to create checkout session.");
+      const userSession = localStorage.getItem('userSession')
+      if (!userSession) {
+        setPaymentError('Please login first to purchase tickets')
+        return
       }
 
-      window.location.href = result.url;
+      const user = JSON.parse(userSession)
+      if (!user?.id) {
+        setPaymentError('Please login first to purchase tickets')
+        return
+      }
     } catch (error) {
-      console.error("Failed to create checkout session", error);
-      const errorMessage = error instanceof Error ? error.message : "Failed to start checkout. Please try again.";
-      setPaymentError(errorMessage);
-    } finally {
-      setPaymentLoading(false);
+      console.error('Failed to verify user login status:', error)
+      setPaymentError('Please login first to purchase tickets')
+      return
     }
-  };
 
-  const canPurchase = Boolean(selectedPrice) && !paymentLoading;
+    // 验证表单数据
+    if (!customerEmail || !customerName) {
+      setPaymentError('Please fill in email and name')
+      return
+    }
+    
+    if (!customerAge || parseInt(customerAge) < 1 || parseInt(customerAge) > 120) {
+      setPaymentError('Please enter a valid age (1-120)')
+      return
+    }
+
+    // 检查21+年龄限制
+    const customerAgeNum = parseInt(customerAge)
+    if (selectedRequires21Plus && customerAgeNum < 21) {
+      setPaymentError('This ticket type requires you to be 21 years or older')
+      return
+    }
+
+    if (!selectedPrice) {
+      setPaymentError('Please select a ticket type')
+      return
+    }
+
+    // 只在有库存限制时检查库存（inventory为null表示无限）
+    if (selectedPrice.inventory !== null && selectedPrice.inventory !== undefined && selectedPrice.inventory < quantity) {
+      setPaymentError('Insufficient ticket inventory')
+      return
+    }
+
+    setPaymentLoading(true)
+    setPaymentError('')
+
+    try {
+      // 获取用户信息 - 确保只在客户端执行
+      let user = null
+      if (typeof window !== 'undefined') {
+        try {
+          const userSession = localStorage.getItem('userSession')
+          user = userSession ? JSON.parse(userSession) : null
+        } catch (error) {
+          console.error('Failed to get user information:', error)
+        }
+      }
+
+      // 创建 Stripe 结账会话
+      const response = await fetch('/api/checkout_sessions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          eventId: event.id,
+          ticketType: selectedPrice.label,
+          quantity: quantity,
+          customerEmail: customerEmail,
+          customerName: customerName,
+          customerAge: parseInt(customerAge),
+          userId: user?.id,
+          userToken: user?.token ?? 'local-token',
+          eventData: event
+        }),
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        // 保存购买信息到 localStorage - 确保只在客户端执行
+        if (typeof window !== 'undefined') {
+          try {
+            const purchaseInfo = {
+              eventId: event.id,
+              eventTitle: event.title,
+              ticketType: selectedPrice.label,
+              quantity: quantity,
+              totalAmount: selectedPrice.amount * quantity,
+              customerEmail: customerEmail,
+              customerName: customerName,
+              customerAge: parseInt(customerAge)
+            }
+            localStorage.setItem('recentPurchase', JSON.stringify(purchaseInfo))
+          } catch (error) {
+            console.error('Failed to save purchase information:', error)
+          }
+        }
+        
+        // 跳转到 Stripe 结账页面 - 确保只在客户端执行
+        if (typeof window !== 'undefined') {
+          window.location.href = data.url
+        }
+      } else {
+        setPaymentError(`Payment setup failed: ${data.error}`)
+      }
+    } catch (error) {
+      console.error('Payment error:', error)
+      setPaymentError('Payment setup failed, please try again')
+    } finally {
+      setPaymentLoading(false)
+    }
+  }
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "linear-gradient(135deg, #0f172a 0%, #7c3aed 50%, #0f172a 100%)",
-        paddingBottom: "64px"
-      }}
-    >
-      <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "40px 24px 0" }}>
-        <Link href="/events" style={{ color: "rgba(226,232,240,0.7)", display: "inline-flex", gap: "8px" }}>
-          鈫?Back to events
-        </Link>
+    <EventDetailErrorBoundary>
+      <div style={{
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #0f172a 0%, #7c3aed 50%, #0f172a 100%)',
+        padding: '32px'
+      }}>
+        <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
+          {/* 返回按钮 */}
+          <div style={{ marginBottom: '24px' }}>
+            <Link href="/events" style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              color: '#22D3EE',
+              textDecoration: 'none',
+              fontSize: '0.875rem',
+              fontWeight: '500'
+            }}>
+              ← Back to Events
+            </Link>
+          </div>
 
-        <div
-          style={{
-            marginTop: "24px",
-            background: "rgba(15, 23, 42, 0.75)",
-            borderRadius: "24px",
-            border: "1px solid rgba(255,255,255,0.08)",
-            boxShadow: "0 20px 45px rgba(15, 23, 42, 0.55)",
-            overflow: "hidden"
-          }}
-        >
-          <div style={{ padding: "32px" }}>
-            <header style={{ marginBottom: "32px" }}>
-              <p style={{ color: "rgba(165, 180, 252, 0.85)", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-                Featured event
-              </p>
-              <h1 style={{ color: "#fff", fontSize: "36px", margin: "12px 0" }}>{event.title}</h1>
-              {event.description && (
-                <p style={{ color: "rgba(226,232,240,0.78)", maxWidth: "760px" }}>{event.description}</p>
-              )}
-            </header>
+          {/* 活动详情 */}
+          <div style={{
+            background: 'rgba(15, 23, 42, 0.6)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            borderRadius: '16px',
+            padding: '32px',
+            marginBottom: '24px'
+          }}>
+            <h1 style={{
+              fontSize: '2.5rem',
+              fontWeight: 'bold',
+              color: 'white',
+              marginBottom: '16px'
+            }}>
+              {event?.title ?? 'Event Title'}
+            </h1>
 
-            <section
-              style={{
-                display: "grid",
-                gap: "32px",
-                gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-                marginBottom: "40px"
-              }}
-            >
-              <div>
-                <h2 style={{ color: "#fff", fontSize: "18px", marginBottom: "12px" }}>Event details</h2>
-                <ul style={{ color: "rgba(226,232,240,0.78)", listStyle: "none", padding: 0, lineHeight: 1.6 }}>
-                  <li><strong>Starts:</strong> {formatDate(event.start_time)}</li>
-                  {event.end_time && <li><strong>Ends:</strong> {formatDate(event.end_time)}</li>}
-                  {event.venue && <li><strong>Venue:</strong> {event.venue}</li>}
-                  {event.location && <li><strong>Location:</strong> {event.location}</li>}
-                </ul>
-              </div>
+            <p style={{
+              color: '#cbd5e1',
+              fontSize: '1.1rem',
+              lineHeight: '1.6',
+              marginBottom: '24px'
+            }}>
+              {event?.description ?? 'No description available'}
+            </p>
 
-              <div>
-                <h2 style={{ color: "#fff", fontSize: "18px", marginBottom: "12px" }}>Purchase</h2>
-                <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                  <label style={{ color: "rgba(226,232,240,0.78)", fontSize: "14px" }}>Ticket type</label>
-                  <select
-                    value={selectedPriceId}
-                    onChange={(event) => setSelectedPriceId(event.target.value)}
-                    style={{
-                      padding: "12px",
-                      borderRadius: "12px",
-                      border: "1px solid rgba(255,255,255,0.12)",
-                      background: "rgba(15,23,42,0.6)",
-                      color: "#fff"
-                    }}
-                  >
-                    {event.prices.map((price) => (
-                      <option key={price.id} value={price.id}>
-                        {price.label} 鈥?${(price.amount / 100).toFixed(2)} {price.currency || "USD"}
-                      </option>
-                    ))}
-                  </select>
-
-                  <label style={{ color: "rgba(226,232,240,0.78)", fontSize: "14px" }}>Quantity</label>
-                  <input
-                    type="number"
-                    min={MIN_TICKETS}
-                    max={MAX_TICKETS}
-                    value={quantity}
-                    onChange={(event) => setQuantity(Math.min(MAX_TICKETS, Math.max(MIN_TICKETS, Number(event.target.value))))}
-                    style={{
-                      padding: "12px",
-                      borderRadius: "12px",
-                      border: "1px solid rgba(255,255,255,0.12)",
-                      background: "rgba(15,23,42,0.6)",
-                      color: "#fff"
-                    }}
-                  />
-
-                  <label style={{ color: "rgba(226,232,240,0.78)", fontSize: "14px" }}>Name</label>
-                  <input
-                    type="text"
-                    value={customerName}
-                    onChange={(event) => setCustomerName(event.target.value)}
-                    placeholder="Your full name"
-                    style={{
-                      padding: "12px",
-                      borderRadius: "12px",
-                      border: "1px solid rgba(255,255,255,0.12)",
-                      background: "rgba(15,23,42,0.6)",
-                      color: "#fff"
-                    }}
-                  />
-
-                  <label style={{ color: "rgba(226,232,240,0.78)", fontSize: "14px" }}>Email</label>
-                  <input
-                    type="email"
-                    value={customerEmail}
-                    onChange={(event) => setCustomerEmail(event.target.value)}
-                    placeholder="example@email.com"
-                    style={{
-                      padding: "12px",
-                      borderRadius: "12px",
-                      border: "1px solid rgba(255,255,255,0.12)",
-                      background: "rgba(15,23,42,0.6)",
-                      color: "#fff"
-                    }}
-                  />
-
-                  <label style={{ color: "rgba(226,232,240,0.78)", fontSize: "14px" }}>Age</label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={120}
-                    value={customerAge}
-                    onChange={(event) => setCustomerAge(event.target.value)}
-                    placeholder="Age"
-                    style={{
-                      padding: "12px",
-                      borderRadius: "12px",
-                      border: "1px solid rgba(255,255,255,0.12)",
-                      background: "rgba(15,23,42,0.6)",
-                      color: "#fff"
-                    }}
-                  />
-
-                  <div style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    marginTop: "8px"
-                  }}>
-                    <span style={{ color: "rgba(226,232,240,0.78)" }}>Total</span>
-                    <strong style={{ color: "#fff", fontSize: "20px" }}>
-                      ${totalPrice.toFixed(2)} {selectedPrice?.currency || "USD"}
-                    </strong>
+            {/* 活动信息 */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+              gap: '16px',
+              marginBottom: '24px'
+            }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                padding: '12px',
+                backgroundColor: 'rgba(55, 65, 81, 0.3)',
+                borderRadius: '8px'
+              }}>
+                <div style={{ fontSize: '1.5rem' }}>📅</div>
+                <div>
+                  <div style={{ color: '#94a3b8', fontSize: '0.875rem' }}>Start Time</div>
+                  <div style={{ color: 'white', fontWeight: '500' }}>
+                    {event?.start_time ? new Date(event.start_time).toLocaleString('en-US', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    }) : 'TBD'}
                   </div>
-
-                  {paymentError && (
-                    <div
-                      style={{
-                        background: "rgba(248,113,113,0.12)",
-                        border: "1px solid rgba(248,113,113,0.3)",
-                        borderRadius: "12px",
-                        padding: "12px",
-                        color: "#fecaca"
-                      }}
-                    >
-                      {paymentError}
-                    </div>
-                  )}
-
-                  <button
-                    type="button"
-                    onClick={handlePurchase}
-                    disabled={!canPurchase}
-                    style={{
-                      marginTop: "8px",
-                      padding: "14px 20px",
-                      borderRadius: "14px",
-                      border: "none",
-                      background: canPurchase
-                        ? "linear-gradient(135deg, #7c3aed 0%, #22d3ee 100%)"
-                        : "rgba(148, 163, 184, 0.25)",
-                      color: "white",
-                      fontWeight: 600,
-                      fontSize: "16px",
-                      cursor: canPurchase ? "pointer" : "not-allowed",
-                      transition: "opacity 0.2s ease"
-                    }}
-                  >
-                    {paymentLoading ? "Processing..." : "Proceed to checkout"}
-                  </button>
                 </div>
               </div>
-            </section>
+
+              {event?.end_time && (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  padding: '12px',
+                  backgroundColor: 'rgba(55, 65, 81, 0.3)',
+                  borderRadius: '8px'
+                }}>
+                  <div style={{ fontSize: '1.5rem' }}>🕐</div>
+                  <div>
+                    <div style={{ color: '#94a3b8', fontSize: '0.875rem' }}>End Time</div>
+                    <div style={{ color: 'white', fontWeight: '500' }}>
+                      {new Date(event.end_time).toLocaleString('en-US', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                padding: '12px',
+                backgroundColor: 'rgba(55, 65, 81, 0.3)',
+                borderRadius: '8px'
+              }}>
+                <div style={{ fontSize: '1.5rem' }}>📍</div>
+                <div>
+                  <div style={{ color: '#94a3b8', fontSize: '0.875rem' }}>Venue</div>
+                  <div style={{ color: 'white', fontWeight: '500' }}>
+                    {event?.venue ?? event?.location ?? 'TBD'}
+                  </div>
+                </div>
+              </div>
+
+              {event?.max_attendees && (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  padding: '12px',
+                  backgroundColor: 'rgba(55, 65, 81, 0.3)',
+                  borderRadius: '8px'
+                }}>
+                  <div style={{ fontSize: '1.5rem' }}>👥</div>
+                  <div>
+                    <div style={{ color: '#94a3b8', fontSize: '0.875rem' }}>Max Attendees</div>
+                    <div style={{ color: 'white', fontWeight: '500' }}>
+                      {event.max_attendees} people
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
+
+          {/* 购票区域 */}
+          {event?.prices && event.prices.length > 0 ? (
+            <div style={{
+              background: 'rgba(15, 23, 42, 0.6)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              borderRadius: '16px',
+              padding: '32px'
+            }}>
+              <h2 style={{
+                fontSize: '1.5rem',
+                fontWeight: 'bold',
+                color: 'white',
+                marginBottom: '24px'
+              }}>
+                Purchase Tickets
+              </h2>
+
+              {/* 票种选择 - 按分类显示 */}
+              <div style={{ marginBottom: '24px' }}>
+                {/* 常规入场票 (18-20, 21+) */}
+                {groupedPrices.entry.length > 0 && (
+                  <div style={{ marginBottom: '32px' }}>
+                    <h3 style={{
+                      fontSize: '1.125rem',
+                      fontWeight: '600',
+                      color: 'white',
+                      marginBottom: '16px',
+                      paddingBottom: '8px',
+                      borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
+                    }}>
+                      Entry Tickets
+                    </h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {groupedPrices.entry.map(({ price, index }) => (
+                        <div key={price.id} style={{
+                          padding: '16px',
+                          backgroundColor: selectedPriceIndex === index ? 'rgba(124, 58, 237, 0.2)' : 'rgba(55, 65, 81, 0.3)',
+                          border: selectedPriceIndex === index ? '2px solid #7c3aed' : '1px solid rgba(255, 255, 255, 0.1)',
+                          borderRadius: '12px',
+                          cursor: 'pointer',
+                          transition: 'all 0.3s ease'
+                        }}
+                        onClick={() => setSelectedPriceIndex(index)}>
+                          <div style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center'
+                          }}>
+                            <div style={{ flex: 1 }}>
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '12px',
+                                marginBottom: '4px'
+                              }}>
+                                <h4 style={{
+                                  fontSize: '1rem',
+                                  fontWeight: 'bold',
+                                  color: 'white',
+                                  margin: 0
+                                }}>
+                                  {price.label}
+                                </h4>
+                                {price.ticket_kind === 'entry_21_plus' && (
+                                  <span style={{
+                                    fontSize: '0.75rem',
+                                    padding: '2px 8px',
+                                    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+                                    color: '#fca5a5',
+                                    borderRadius: '4px',
+                                    fontWeight: '500'
+                                  }}>
+                                    21+
+                                  </span>
+                                )}
+                                {price.ticket_kind === 'entry_18_20' && (
+                                  <span style={{
+                                    fontSize: '0.75rem',
+                                    padding: '2px 8px',
+                                    backgroundColor: 'rgba(34, 211, 238, 0.2)',
+                                    color: '#67e8f9',
+                                    borderRadius: '4px',
+                                    fontWeight: '500'
+                                  }}>
+                                    18-20
+                                  </span>
+                                )}
+                              </div>
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px'
+                              }}>
+                                <span style={{
+                                  fontSize: '1.125rem',
+                                  fontWeight: 'bold',
+                                  color: '#22c55e'
+                                }}>
+                                  ${(price.amount / 100).toFixed(2)}
+                                </span>
+                                {price.inventory !== null && price.inventory !== undefined && (
+                                  <span style={{
+                                    fontSize: '0.875rem',
+                                    color: '#94a3b8'
+                                  }}>
+                                    Stock: {price.inventory > 0 ? '●' : '○'}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div style={{
+                              width: '20px',
+                              height: '20px',
+                              borderRadius: '50%',
+                              border: selectedPriceIndex === index ? '2px solid #7c3aed' : '2px solid #6b7280',
+                              backgroundColor: selectedPriceIndex === index ? '#7c3aed' : 'transparent',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0
+                            }}>
+                              {selectedPriceIndex === index && (
+                                <div style={{
+                                  width: '8px',
+                                  height: '8px',
+                                  borderRadius: '50%',
+                                  backgroundColor: 'white'
+                                }}></div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 插队票 */}
+                {groupedPrices.queue.length > 0 && (
+                  <div style={{ marginBottom: '32px' }}>
+                    <h3 style={{
+                      fontSize: '1.125rem',
+                      fontWeight: '600',
+                      color: 'white',
+                      marginBottom: '16px',
+                      paddingBottom: '8px',
+                      borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
+                    }}>
+                      Queue Pass
+                    </h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {groupedPrices.queue.map(({ price, index }) => (
+                        <div key={price.id} style={{
+                          padding: '16px',
+                          backgroundColor: selectedPriceIndex === index ? 'rgba(124, 58, 237, 0.2)' : 'rgba(55, 65, 81, 0.3)',
+                          border: selectedPriceIndex === index ? '2px solid #7c3aed' : '1px solid rgba(255, 255, 255, 0.1)',
+                          borderRadius: '12px',
+                          cursor: 'pointer',
+                          transition: 'all 0.3s ease'
+                        }}
+                        onClick={() => setSelectedPriceIndex(index)}>
+                          <div style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center'
+                          }}>
+                            <div style={{ flex: 1 }}>
+                              <h4 style={{
+                                fontSize: '1rem',
+                                fontWeight: 'bold',
+                                color: 'white',
+                                marginBottom: '4px'
+                              }}>
+                                {price.label}
+                              </h4>
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px'
+                              }}>
+                                <span style={{
+                                  fontSize: '1.125rem',
+                                  fontWeight: 'bold',
+                                  color: '#22c55e'
+                                }}>
+                                  ${(price.amount / 100).toFixed(2)}
+                                </span>
+                                {price.inventory !== null && price.inventory !== undefined && (
+                                  <span style={{
+                                    fontSize: '0.875rem',
+                                    color: '#94a3b8'
+                                  }}>
+                                    Stock: {price.inventory > 0 ? '●' : '○'}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div style={{
+                              width: '20px',
+                              height: '20px',
+                              borderRadius: '50%',
+                              border: selectedPriceIndex === index ? '2px solid #7c3aed' : '2px solid #6b7280',
+                              backgroundColor: selectedPriceIndex === index ? '#7c3aed' : 'transparent',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0
+                            }}>
+                              {selectedPriceIndex === index && (
+                                <div style={{
+                                  width: '8px',
+                                  height: '8px',
+                                  borderRadius: '50%',
+                                  backgroundColor: 'white'
+                                }}></div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 酒水票 */}
+                {groupedPrices.drink.length > 0 && (
+                  <div style={{ marginBottom: '32px' }}>
+                    <h3 style={{
+                      fontSize: '1.125rem',
+                      fontWeight: '600',
+                      color: 'white',
+                      marginBottom: '16px',
+                      paddingBottom: '8px',
+                      borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
+                    }}>
+                      Drink Tickets
+                    </h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {groupedPrices.drink.map(({ price, index }) => (
+                        <div key={price.id} style={{
+                          padding: '16px',
+                          backgroundColor: selectedPriceIndex === index ? 'rgba(124, 58, 237, 0.2)' : 'rgba(55, 65, 81, 0.3)',
+                          border: selectedPriceIndex === index ? '2px solid #7c3aed' : '1px solid rgba(255, 255, 255, 0.1)',
+                          borderRadius: '12px',
+                          cursor: 'pointer',
+                          transition: 'all 0.3s ease'
+                        }}
+                        onClick={() => setSelectedPriceIndex(index)}>
+                          <div style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center'
+                          }}>
+                            <div style={{ flex: 1 }}>
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '12px',
+                                marginBottom: '4px'
+                              }}>
+                                <h4 style={{
+                                  fontSize: '1rem',
+                                  fontWeight: 'bold',
+                                  color: 'white',
+                                  margin: 0
+                                }}>
+                                  {price.label}
+                                </h4>
+                                <span style={{
+                                  fontSize: '0.75rem',
+                                  padding: '2px 8px',
+                                  backgroundColor: 'rgba(239, 68, 68, 0.2)',
+                                  color: '#fca5a5',
+                                  borderRadius: '4px',
+                                  fontWeight: '500'
+                                }}>
+                                  21+
+                                </span>
+                              </div>
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px'
+                              }}>
+                                <span style={{
+                                  fontSize: '1.125rem',
+                                  fontWeight: 'bold',
+                                  color: '#22c55e'
+                                }}>
+                                  ${(price.amount / 100).toFixed(2)}
+                                </span>
+                                {price.inventory !== null && price.inventory !== undefined && (
+                                  <span style={{
+                                    fontSize: '0.875rem',
+                                    color: '#94a3b8'
+                                  }}>
+                                    Stock: {price.inventory > 0 ? '●' : '○'}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div style={{
+                              width: '20px',
+                              height: '20px',
+                              borderRadius: '50%',
+                              border: selectedPriceIndex === index ? '2px solid #7c3aed' : '2px solid #6b7280',
+                              backgroundColor: selectedPriceIndex === index ? '#7c3aed' : 'transparent',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0
+                            }}>
+                              {selectedPriceIndex === index && (
+                                <div style={{
+                                  width: '8px',
+                                  height: '8px',
+                                  borderRadius: '50%',
+                                  backgroundColor: 'white'
+                                }}></div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Combo票 */}
+                {groupedPrices.combo.length > 0 && (
+                  <div style={{ marginBottom: '32px' }}>
+                    <h3 style={{
+                      fontSize: '1.125rem',
+                      fontWeight: '600',
+                      color: 'white',
+                      marginBottom: '16px',
+                      paddingBottom: '8px',
+                      borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
+                    }}>
+                      Combo Package
+                    </h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {groupedPrices.combo.map(({ price, index }) => (
+                        <div key={price.id} style={{
+                          padding: '16px',
+                          backgroundColor: selectedPriceIndex === index ? 'rgba(124, 58, 237, 0.2)' : 'rgba(55, 65, 81, 0.3)',
+                          border: selectedPriceIndex === index ? '2px solid #7c3aed' : '1px solid rgba(255, 255, 255, 0.1)',
+                          borderRadius: '12px',
+                          cursor: 'pointer',
+                          transition: 'all 0.3s ease',
+                          position: 'relative'
+                        }}
+                        onClick={() => setSelectedPriceIndex(index)}>
+                          <div style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center'
+                          }}>
+                            <div style={{ flex: 1 }}>
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '12px',
+                                marginBottom: '4px'
+                              }}>
+                                <h4 style={{
+                                  fontSize: '1rem',
+                                  fontWeight: 'bold',
+                                  color: 'white',
+                                  margin: 0
+                                }}>
+                                  {price.label}
+                                </h4>
+                                <span style={{
+                                  fontSize: '0.75rem',
+                                  padding: '2px 8px',
+                                  backgroundColor: 'rgba(239, 68, 68, 0.2)',
+                                  color: '#fca5a5',
+                                  borderRadius: '4px',
+                                  fontWeight: '500'
+                                }}>
+                                  21+ Only
+                                </span>
+                              </div>
+                              <div style={{
+                                fontSize: '0.875rem',
+                                color: '#94a3b8',
+                                marginBottom: '8px'
+                              }}>
+                                Includes: Entry Ticket + Drink Ticket
+                              </div>
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px'
+                              }}>
+                                <span style={{
+                                  fontSize: '1.125rem',
+                                  fontWeight: 'bold',
+                                  color: '#22c55e'
+                                }}>
+                                  ${(price.amount / 100).toFixed(2)}
+                                </span>
+                                {price.inventory !== null && price.inventory !== undefined && (
+                                  <span style={{
+                                    fontSize: '0.875rem',
+                                    color: '#94a3b8'
+                                  }}>
+                                    Stock: {price.inventory > 0 ? '●' : '○'}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div style={{
+                              width: '20px',
+                              height: '20px',
+                              borderRadius: '50%',
+                              border: selectedPriceIndex === index ? '2px solid #7c3aed' : '2px solid #6b7280',
+                              backgroundColor: selectedPriceIndex === index ? '#7c3aed' : 'transparent',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0
+                            }}>
+                              {selectedPriceIndex === index && (
+                                <div style={{
+                                  width: '8px',
+                                  height: '8px',
+                                  borderRadius: '50%',
+                                  backgroundColor: 'white'
+                                }}></div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 其他类型 */}
+                {groupedPrices.other.length > 0 && (
+                  <div style={{ marginBottom: '32px' }}>
+                    <h3 style={{
+                      fontSize: '1.125rem',
+                      fontWeight: '600',
+                      color: 'white',
+                      marginBottom: '16px',
+                      paddingBottom: '8px',
+                      borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
+                    }}>
+                      Other
+                    </h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {groupedPrices.other.map(({ price, index }) => (
+                        <div key={price.id} style={{
+                          padding: '16px',
+                          backgroundColor: selectedPriceIndex === index ? 'rgba(124, 58, 237, 0.2)' : 'rgba(55, 65, 81, 0.3)',
+                          border: selectedPriceIndex === index ? '2px solid #7c3aed' : '1px solid rgba(255, 255, 255, 0.1)',
+                          borderRadius: '12px',
+                          cursor: 'pointer',
+                          transition: 'all 0.3s ease'
+                        }}
+                        onClick={() => setSelectedPriceIndex(index)}>
+                          <div style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center'
+                          }}>
+                            <div style={{ flex: 1 }}>
+                              <h4 style={{
+                                fontSize: '1rem',
+                                fontWeight: 'bold',
+                                color: 'white',
+                                marginBottom: '4px'
+                              }}>
+                                {price.label}
+                              </h4>
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px'
+                              }}>
+                                <span style={{
+                                  fontSize: '1.125rem',
+                                  fontWeight: 'bold',
+                                  color: '#22c55e'
+                                }}>
+                                  ${(price.amount / 100).toFixed(2)}
+                                </span>
+                                {price.inventory !== null && price.inventory !== undefined && (
+                                  <span style={{
+                                    fontSize: '0.875rem',
+                                    color: '#94a3b8'
+                                  }}>
+                                    Stock: {price.inventory > 0 ? '●' : '○'}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div style={{
+                              width: '20px',
+                              height: '20px',
+                              borderRadius: '50%',
+                              border: selectedPriceIndex === index ? '2px solid #7c3aed' : '2px solid #6b7280',
+                              backgroundColor: selectedPriceIndex === index ? '#7c3aed' : 'transparent',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0
+                            }}>
+                              {selectedPriceIndex === index && (
+                                <div style={{
+                                  width: '8px',
+                                  height: '8px',
+                                  borderRadius: '50%',
+                                  backgroundColor: 'white'
+                                }}></div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* 客户信息 */}
+              <div style={{ marginBottom: '24px' }}>
+                <h3 style={{
+                  color: 'white',
+                  fontSize: '1.125rem',
+                  fontWeight: '600',
+                  marginBottom: '16px'
+                }}>
+                  Customer Information
+                </h3>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      color: 'white',
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      marginBottom: '8px'
+                    }}>
+                      Name *
+                    </label>
+                    <input
+                      type="text"
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                      placeholder="Enter your name"
+                      style={{
+                        width: '100%',
+                        padding: '12px 16px',
+                        backgroundColor: 'rgba(55, 65, 81, 0.5)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        borderRadius: '8px',
+                        color: 'white',
+                        fontSize: '1rem',
+                        outline: 'none'
+                      }}
+                    />
+                  </div>
+                  
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      color: 'white',
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      marginBottom: '8px'
+                    }}>
+                      Email *
+                    </label>
+                    <input
+                      type="email"
+                      value={customerEmail}
+                      readOnly
+                      placeholder="Account email (auto-filled)"
+                      style={{
+                        width: '100%',
+                        padding: '12px 16px',
+                        backgroundColor: 'rgba(55, 65, 81, 0.3)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        borderRadius: '8px',
+                        color: customerEmail ? 'white' : '#94a3b8',
+                        fontSize: '1rem',
+                        outline: 'none',
+                        cursor: 'not-allowed'
+                      }}
+                    />
+                  </div>
+                </div>
+                
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{
+                    display: 'block',
+                    color: 'white',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    marginBottom: '8px'
+                  }}>
+                    Age *
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="120"
+                    value={customerAge}
+                    onChange={(e) => setCustomerAge(e.target.value)}
+                    placeholder="Enter your age"
+                    style={{
+                      width: '100%',
+                      padding: '12px 16px',
+                      backgroundColor: 'rgba(55, 65, 81, 0.5)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '8px',
+                      color: 'white',
+                      fontSize: '1rem',
+                      outline: 'none'
+                    }}
+                  />
+                </div>
+                
+                {/* 重要提示信息 */}
+                <div style={{
+                  backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                  border: '2px solid #ef4444',
+                  borderRadius: '8px',
+                  padding: '16px',
+                  marginTop: '16px'
+                }}>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '12px'
+                  }}>
+                    <div style={{
+                      color: '#ef4444',
+                      fontSize: '1.25rem',
+                      marginTop: '2px',
+                      fontWeight: 'bold'
+                    }}>
+                      ⚠️
+                    </div>
+                    <div style={{
+                      color: '#fca5a5',
+                      fontSize: '0.9375rem',
+                      lineHeight: '1.6',
+                      fontWeight: '500'
+                    }}>
+                                              <div style={{ 
+                          color: '#fecaca', 
+                          fontWeight: 'bold', 
+                          marginBottom: '8px',
+                          fontSize: '1rem'
+                        }}>
+                          Important Notice: ID Verification Required for Entry
+                        </div>
+                        <div style={{ marginBottom: '4px' }}>
+                          • You must present a valid ID for verification at entry
+                        </div>
+                        <div style={{ marginBottom: '4px' }}>
+                          • The <strong style={{ color: '#fecaca' }}>name and age</strong> you provide when purchasing must <strong style={{ color: '#fecaca' }}>exactly match</strong> your ID document
+                        </div>
+                        <div style={{ 
+                          color: '#fee2e2', 
+                          fontWeight: 'bold',
+                          marginTop: '8px',
+                          fontSize: '0.9375rem'
+                        }}>
+                          ⚠️ If information does not match, the ticket will be voided with no refund
+                        </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 数量选择 */}
+              <div style={{ marginBottom: '24px' }}>
+                <label style={{
+                  display: 'block',
+                  color: 'white',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  marginBottom: '8px'
+                }}>
+                  Quantity
+                </label>
+                <select
+                  value={quantity}
+                  onChange={(e) => setQuantity(parseInt(e.target.value))}
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    backgroundColor: 'rgba(55, 65, 81, 0.5)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: '8px',
+                    color: 'white',
+                    fontSize: '1rem',
+                    outline: 'none'
+                  }}
+                >
+                  {[1, 2, 3, 4, 5].map(num => (
+                    <option key={num} value={num}>{num} ticket(s)</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 总价 */}
+              <div style={{
+                backgroundColor: 'rgba(55, 65, 81, 0.3)',
+                borderRadius: '8px',
+                padding: '16px',
+                marginBottom: '24px'
+              }}>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '8px'
+                }}>
+                  <span style={{ color: '#94a3b8' }}>Total</span>
+                  <span style={{
+                    fontSize: '1.5rem',
+                    fontWeight: 'bold',
+                    color: '#22c55e'
+                  }}>
+                    ${totalPrice.toFixed(2)}
+                  </span>
+                </div>
+                <div style={{
+                  color: 'rgba(239, 68, 68, 0.9)',
+                  fontSize: '0.875rem',
+                  textAlign: 'center',
+                  paddingTop: '8px',
+                  borderTop: '1px solid rgba(255, 255, 255, 0.1)'
+                }}>
+                  ⚠️ Tickets are non-refundable once purchased
+                </div>
+              </div>
+
+              {/* 错误信息 */}
+              {paymentError && (
+                <div style={{
+                  backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                  border: '1px solid #ef4444',
+                  borderRadius: '8px',
+                  padding: '12px',
+                  marginBottom: '16px',
+                  color: '#ef4444',
+                  fontSize: '0.875rem'
+                }}>
+                  {paymentError}
+                </div>
+              )}
+
+              {/* 购票按钮 */}
+              <button
+                onClick={handleBuyTickets}
+                disabled={paymentLoading}
+                style={{
+                  width: '100%',
+                  padding: '16px',
+                  background: paymentLoading ? '#6b7280' : 'linear-gradient(135deg, #7C3AED 0%, #22D3EE 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '12px',
+                  fontSize: '1.125rem',
+                  fontWeight: 'bold',
+                  cursor: paymentLoading ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.3s ease'
+                }}
+                onMouseEnter={(e) => {
+                  if (!paymentLoading) {
+                    e.currentTarget.style.transform = 'scale(1.02)'
+                    e.currentTarget.style.boxShadow = '0 10px 25px rgba(124, 58, 237, 0.3)'
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!paymentLoading) {
+                    e.currentTarget.style.transform = 'scale(1)'
+                    e.currentTarget.style.boxShadow = 'none'
+                  }
+                }}
+              >
+                {paymentLoading ? 'Processing...' : 'Purchase Now'}
+              </button>
+            </div>
+          ) : (
+            <div style={{
+              background: 'rgba(15, 23, 42, 0.6)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              borderRadius: '16px',
+              padding: '32px',
+              textAlign: 'center'
+            }}>
+              <div style={{ fontSize: '3rem', marginBottom: '16px' }}>🎫</div>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: 'white', marginBottom: '8px' }}>
+                No Tickets Available
+              </h3>
+              <p style={{ color: '#94a3b8' }}>
+                No tickets are available for this event at the moment.
+              </p>
+            </div>
+          )}
         </div>
       </div>
-    </div>
-  );
+    </EventDetailErrorBoundary>
+  )
 }

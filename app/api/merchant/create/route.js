@@ -80,13 +80,12 @@ export async function POST(request) {
           throw ErrorHandler.validationError('INVALID_EMAIL')
         }
 
-      // 检查邮箱是否已存在（只检查merchant角色）
+      // 检查邮箱是否已存在（检查所有角色，因为 email 是唯一的）
       // 使用 maybeSingle() 来处理可能不存在的情况，避免 406 错误
       const { data: existingUser, error: existingUserError } = await supabase
         .from('users')
-        .select('id')
+        .select('id, role')
         .eq('email', email)
-        .eq('role', 'merchant')
         .maybeSingle()
 
       // 如果查询出错（非"不存在"的错误），抛出错误
@@ -95,9 +94,17 @@ export async function POST(request) {
       }
 
       if (existingUser) {
+        // 如果用户已存在且是 merchant 角色，抛出错误
+        if (existingUser.role === 'merchant') {
+          throw ErrorHandler.conflictError(
+            'EMAIL_EXISTS',
+            'Email already registered as merchant'
+          )
+        }
+        // 如果用户已存在但不是 merchant 角色，也抛出错误（邮箱唯一性）
         throw ErrorHandler.conflictError(
           'EMAIL_EXISTS',
-          'Email already registered as merchant'
+          'Email already exists. Please use a different email address.'
         )
       }
 
@@ -106,23 +113,66 @@ export async function POST(request) {
         throw ErrorHandler.validationError('PASSWORD_TOO_SHORT')
       }
 
+      // 验证年龄（数据库约束要求 age >= 16）
+      const ageInt = parseInt(age)
+      if (isNaN(ageInt) || ageInt < 16) {
+        throw ErrorHandler.validationError(
+          'INVALID_AGE',
+          'Age must be at least 16'
+        )
+      }
+
       // 加密密码
       const hashedPassword = await bcrypt.hash(password, 12)
 
       // 创建商家用户
+      // 注意：确保所有必需字段都有值，并且符合数据库约束
       const { data: newUser, error: userError } = await supabase
         .from('users')
         .insert([{
-          email,
-          name,
-          age: parseInt(age),
+          email: email.trim().toLowerCase(), // 规范化邮箱
+          name: name.trim(),
+          age: ageInt,
           password_hash: hashedPassword,
-          role: 'merchant'
+          role: 'merchant',
+          is_active: true // 显式设置，确保默认值
         }])
         .select()
         .single()
 
       if (userError) {
+        // 记录详细的错误信息以便调试
+        logger.error('User creation failed', {
+          error: userError,
+          email: email,
+          age: ageInt,
+          role: 'merchant',
+          hasPassword: !!hashedPassword
+        })
+        
+        // 检查是否是约束违反错误
+        if (userError.code === '23505') { // 唯一约束违反
+          throw ErrorHandler.conflictError(
+            'EMAIL_EXISTS',
+            'Email already exists. Please use a different email address.'
+          )
+        }
+        
+        if (userError.code === '23514') { // 检查约束违反
+          if (userError.message?.includes('age')) {
+            throw ErrorHandler.validationError(
+              'INVALID_AGE',
+              'Age must be at least 16'
+            )
+          }
+          if (userError.message?.includes('role')) {
+            throw ErrorHandler.validationError(
+              'INVALID_ROLE',
+              'Invalid role specified'
+            )
+          }
+        }
+        
         throw ErrorHandler.fromSupabaseError(userError, 'USER_CREATION_FAILED')
       }
 

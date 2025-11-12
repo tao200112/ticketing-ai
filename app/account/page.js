@@ -41,39 +41,50 @@ export default function AccountPage() {
   const [verificationMessage, setVerificationMessage] = useState('') // Verification message
 
   useEffect(() => {
-    // Check if user session exists
-    const userSession = localStorage.getItem('userSession')
-    
-    if (!userSession) {
-      console.log('No user session found')
-      setLoading(false)
-      setShowLogin(true)
-      return
-    }
-
-    // Initialize Supabase client
+    // Initialize Supabase client and check session
     if (supabaseUrl && supabaseKey) {
-      try {
-        console.log('Parsing user session:', userSession)
-        const sessionData = JSON.parse(userSession)
-        console.log('Parsed session data:', sessionData)
-        
-        const client = createClient(supabaseUrl, supabaseKey)
-        setSupabase(client)
-        
-        // Use user ID from session to load data
-        if (sessionData && sessionData.id) {
-          loadUserData(client, sessionData.id)
-        } else {
-          console.error('❌ No user ID in session data')
+      const client = createClient(supabaseUrl, supabaseKey)
+      setSupabase(client)
+      
+      // Get session from Supabase (this also sets cookies for server-side access)
+      client.auth.getSession().then(({ data: { session }, error }) => {
+        if (error) {
+          console.error('❌ Failed to get session:', error)
           setLoading(false)
-          router.push('/auth/login')
+          setShowLogin(true)
+          return
         }
-      } catch (error) {
-        console.error('❌ Failed to parse session:', error, 'Session data:', userSession)
+        
+        if (!session || !session.user) {
+          console.log('No active session found')
+          setLoading(false)
+          setShowLogin(true)
+          return
+        }
+        
+        console.log('✅ Active session found:', session.user.id)
+        
+        // Store session in localStorage for backward compatibility
+        try {
+          const sessionData = {
+            id: session.user.id,
+            email: session.user.email,
+            name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.user_metadata?.display_name || session.user.email,
+            role: session.user.user_metadata?.role || 'user',
+            age: session.user.user_metadata?.age || null,
+          }
+          localStorage.setItem('userSession', JSON.stringify(sessionData))
+        } catch (storageError) {
+          console.warn('⚠️ Failed to store session in localStorage:', storageError)
+        }
+        
+        // Load user data
+        loadUserData(client, session.user.id)
+      }).catch((error) => {
+        console.error('❌ Error getting session:', error)
         setLoading(false)
-        router.push('/auth/login')
-      }
+        setShowLogin(true)
+      })
     } else {
       console.error('❌ Supabase not configured')
       setLoading(false)
@@ -116,14 +127,98 @@ export default function AccountPage() {
 
   const loadUserData = async (client, userId) => {
     try {
-      // Get user information
-      const { data: userData, error: userError } = await client
+      // Get user information from users table
+      let { data: userData, error: userError } = await client
         .from('users')
         .select('*')
         .eq('id', userId)
         .single()
 
-      if (userError) {
+      // If user not found in users table, try to sync from auth via API
+      if (userError && userError.code === 'PGRST116') {
+        console.log('⚠️ User not found in users table, attempting to sync from auth...')
+        
+        try {
+          // Call sync API to create/update user record
+          const syncResponse = await fetch('/api/users/sync', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          })
+
+          if (!syncResponse.ok) {
+            const errorData = await syncResponse.json()
+            console.error('❌ Failed to sync user:', errorData)
+            
+            // If sync fails due to auth, redirect to login
+            if (syncResponse.status === 401) {
+              setLoading(false)
+              router.push('/auth/login')
+              return
+            }
+            
+            // For other errors, try to continue with auth user data
+            const { data: { user: authUser }, error: authError } = await client.auth.getUser()
+            if (!authError && authUser) {
+              const metadata = authUser.user_metadata || {}
+              userData = {
+                id: authUser.id,
+                email: authUser.email,
+                name: metadata.full_name || metadata.name || metadata.display_name || authUser.email || 'User',
+                role: metadata.role || 'user',
+                age: metadata.age || null,
+                auth_provider: authUser.app_metadata?.provider || 'email',
+                email_verified_at: authUser.email_confirmed_at || authUser.confirmed_at || null
+              }
+              console.log('⚠️ Using auth user data as fallback after sync failure')
+            } else {
+              setLoading(false)
+              router.push('/auth/login')
+              return
+            }
+          } else {
+            const syncData = await syncResponse.json()
+            if (syncData.ok && syncData.user) {
+              userData = syncData.user
+              console.log('✅ Successfully synced user record from auth')
+            } else {
+              console.error('❌ Sync API returned error:', syncData)
+              setLoading(false)
+              router.push('/auth/login')
+              return
+            }
+          }
+        } catch (syncError) {
+          console.error('❌ Error syncing user:', syncError)
+          // Try to continue with auth user data as fallback
+          try {
+            const { data: { user: authUser }, error: authError } = await client.auth.getUser()
+            if (!authError && authUser) {
+              const metadata = authUser.user_metadata || {}
+              userData = {
+                id: authUser.id,
+                email: authUser.email,
+                name: metadata.full_name || metadata.name || metadata.display_name || authUser.email || 'User',
+                role: metadata.role || 'user',
+                age: metadata.age || null,
+                auth_provider: authUser.app_metadata?.provider || 'email',
+                email_verified_at: authUser.email_confirmed_at || authUser.confirmed_at || null
+              }
+              console.log('⚠️ Using auth user data as fallback after sync error')
+            } else {
+              setLoading(false)
+              router.push('/auth/login')
+              return
+            }
+          } catch (authFallbackError) {
+            console.error('❌ Failed to get auth user as fallback:', authFallbackError)
+            setLoading(false)
+            router.push('/auth/login')
+            return
+          }
+        }
+      } else if (userError) {
         console.error('❌ Failed to get user information:', userError)
         setLoading(false)
         router.push('/auth/login')

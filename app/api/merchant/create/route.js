@@ -31,26 +31,26 @@ export async function POST(request) {
     const supabase = createSupabaseClient()
 
     // 验证邀请码（必须是活跃且未使用的）
+    // 使用 maybeSingle() 避免 406 错误
     const { data: inviteCodeData, error: inviteError } = await supabase
       .from('admin_invite_codes')
       .select('*')
-      .eq('code', inviteCode)
-      .eq('is_active', true)
-      .is('used_by', null) // 确保邀请码未被使用
-      .single()
+      .eq('code', inviteCode.trim().toUpperCase())
+      .maybeSingle()
 
-    if (inviteError || !inviteCodeData) {
-      throw ErrorHandler.validationError(
-        'INVALID_INVITE_CODE',
-        'Invalid invite code'
+    if (inviteError && inviteError.code !== 'PGRST116') {
+      logger.error('Error checking invite code', { error: inviteError, code: inviteCode })
+      throw ErrorHandler.databaseError(
+        inviteError,
+        'INVITE_CODE_CHECK_FAILED',
+        'Failed to verify invite code'
       )
     }
 
-    // 检查邀请码是否过期
-    if (new Date(inviteCodeData.expires_at) < new Date()) {
+    if (!inviteCodeData) {
       throw ErrorHandler.validationError(
-        'INVITE_CODE_EXPIRED',
-        'Invite code has expired'
+        'INVALID_INVITE_CODE',
+        '邀请码无效，请检查是否正确'
       )
     }
 
@@ -58,7 +58,23 @@ export async function POST(request) {
     if (inviteCodeData.used_by) {
       throw ErrorHandler.validationError(
         'INVITE_CODE_ALREADY_USED',
-        'Invite code has already been used'
+        '邀请码已被使用，请联系管理员获取新的邀请码'
+      )
+    }
+
+    // 检查邀请码是否过期
+    if (new Date(inviteCodeData.expires_at) < new Date()) {
+      throw ErrorHandler.validationError(
+        'INVITE_CODE_EXPIRED',
+        '邀请码已过期，请联系管理员获取新的邀请码'
+      )
+    }
+
+    // 检查邀请码是否活跃
+    if (!inviteCodeData.is_active) {
+      throw ErrorHandler.validationError(
+        'INVITE_CODE_INACTIVE',
+        '邀请码已失效，请联系管理员获取新的邀请码'
       )
     }
 
@@ -77,7 +93,10 @@ export async function POST(request) {
         // 验证邮箱格式
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
         if (!emailRegex.test(email)) {
-          throw ErrorHandler.validationError('INVALID_EMAIL')
+          throw ErrorHandler.validationError(
+            'INVALID_EMAIL',
+            '邮箱格式不正确，请检查后重试'
+          )
         }
 
       // 检查邮箱是否已存在（检查所有角色，因为 email 是 UNIQUE 的）
@@ -98,19 +117,22 @@ export async function POST(request) {
         if (existingUser.role === 'merchant') {
           throw ErrorHandler.conflictError(
             'EMAIL_EXISTS',
-            'Email already registered as merchant'
+            '该邮箱已被注册为商家账户，请使用其他邮箱或直接登录'
           )
         }
         // 如果用户已存在但不是 merchant 角色，也抛出错误（邮箱唯一性）
         throw ErrorHandler.conflictError(
           'EMAIL_EXISTS',
-          'Email already exists. Please use a different email address.'
+          '该邮箱已被注册，请使用其他邮箱或直接登录'
         )
       }
 
       // 验证密码长度
       if (password.length < 8) {
-        throw ErrorHandler.validationError('PASSWORD_TOO_SHORT')
+        throw ErrorHandler.validationError(
+          'PASSWORD_TOO_SHORT',
+          '密码长度至少为 8 个字符'
+        )
       }
 
       // 验证年龄（数据库约束要求 age >= 16）
@@ -118,7 +140,7 @@ export async function POST(request) {
       if (isNaN(ageInt) || ageInt < 16) {
         throw ErrorHandler.validationError(
           'INVALID_AGE',
-          'Age must be at least 16'
+          '年龄必须至少为 16 岁'
         )
       }
 
@@ -153,7 +175,7 @@ export async function POST(request) {
         if (userError.code === '23505') { // 唯一约束违反
           throw ErrorHandler.conflictError(
             'EMAIL_EXISTS',
-            'Email already exists. Please use a different email address.'
+            '该邮箱已被注册，请使用其他邮箱或直接登录'
           )
         }
         
@@ -161,13 +183,13 @@ export async function POST(request) {
           if (userError.message?.includes('age')) {
             throw ErrorHandler.validationError(
               'INVALID_AGE',
-              'Age must be at least 16'
+              '年龄必须至少为 16 岁'
             )
           }
           if (userError.message?.includes('role')) {
             throw ErrorHandler.validationError(
               'INVALID_ROLE',
-              'Invalid role specified'
+              '无效的角色设置'
             )
           }
         }
@@ -203,7 +225,7 @@ export async function POST(request) {
     if (existingMerchant) {
       throw ErrorHandler.conflictError(
         'MERCHANT_EXISTS',
-        'User already has a merchant account'
+        '您已经拥有商家账户，请直接登录'
       )
     }
 

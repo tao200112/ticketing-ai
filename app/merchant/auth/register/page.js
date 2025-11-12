@@ -101,7 +101,7 @@ export default function MerchantRegisterPage() {
 
       const data = await response.json()
 
-      if (data.ok) {
+      if (data.ok || data.success) {
         // 注册成功，保存登录信息并跳转到商家页面
         if (data.user && data.merchant) {
           const merchantUser = {
@@ -117,14 +117,52 @@ export default function MerchantRegisterPage() {
           router.push('/merchant/auth/login?success=registered')
         }
       } else {
-        if (data.reason === 'invalid_invite') {
-          setErrors({ inviteCode: 'Invalid or expired invite code' })
-        } else if (data.reason === 'merchant_exists') {
-          setErrors({ general: 'You already have a merchant account' })
-        } else if (data.reason === 'EMAIL_EXISTS') {
-          setErrors({ email: 'Email already exists' })
-        } else {
-          setErrors({ general: data.reason || 'Failed to create merchant account' })
+        // 处理错误响应
+        const errorCode = data.error || data.code
+        const errorMessage = data.message || data.reason || '注册失败，请重试'
+        
+        console.error('Registration error:', { errorCode, errorMessage, data })
+        
+        // 根据错误代码设置相应的错误消息
+        switch (errorCode) {
+          case 'INVALID_INVITE_CODE':
+            setErrors({ inviteCode: errorMessage || '邀请码无效，请检查是否正确' })
+            break
+          case 'INVITE_CODE_ALREADY_USED':
+            setErrors({ inviteCode: errorMessage || '邀请码已被使用，请联系管理员获取新的邀请码' })
+            break
+          case 'INVITE_CODE_EXPIRED':
+            setErrors({ inviteCode: errorMessage || '邀请码已过期，请联系管理员获取新的邀请码' })
+            break
+          case 'INVITE_CODE_INACTIVE':
+            setErrors({ inviteCode: errorMessage || '邀请码已失效，请联系管理员获取新的邀请码' })
+            break
+          case 'EMAIL_EXISTS':
+            setErrors({ email: errorMessage || '该邮箱已被注册，请使用其他邮箱或直接登录' })
+            break
+          case 'MERCHANT_EXISTS':
+            setErrors({ general: errorMessage || '您已经拥有商家账户，请直接登录' })
+            break
+          case 'MISSING_FIELDS':
+            setErrors({ general: errorMessage || '请填写所有必填字段' })
+            break
+          case 'INVALID_EMAIL':
+            setErrors({ email: errorMessage || '邮箱格式不正确' })
+            break
+          case 'PASSWORD_TOO_SHORT':
+            setErrors({ password: errorMessage || '密码长度至少为 8 个字符' })
+            break
+          case 'INVALID_AGE':
+            setErrors({ age: errorMessage || '年龄必须至少为 16 岁' })
+            break
+          case 'USER_CREATION_FAILED':
+            setErrors({ general: errorMessage || '创建用户失败，请检查输入信息' })
+            break
+          case 'MERCHANT_CREATION_FAILED':
+            setErrors({ general: errorMessage || '创建商家账户失败，请重试' })
+            break
+          default:
+            setErrors({ general: errorMessage || '注册失败，请重试' })
         }
       }
     } catch (error) {

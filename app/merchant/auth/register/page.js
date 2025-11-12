@@ -103,34 +103,33 @@ export default function MerchantRegisterPage() {
 
       if (data.ok || data.success) {
         // 注册成功，保存登录信息并跳转到商家页面
-        if (data.merchant) {
-          // 如果有用户信息，保存完整的用户和商家信息
-          if (data.user) {
-            const merchantUser = {
-              id: data.user.id,
-              email: data.user.email,
-              name: data.user.name,
-              merchant: data.merchant,
-              merchant_id: data.merchant.id
-            }
-            localStorage.setItem('merchantUser', JSON.stringify(merchantUser))
-            console.log('✅ 商家注册成功，已保存用户和商家信息，跳转到商家页面')
-            router.push('/merchant')
-          } else {
-            // 如果只有商家信息（独立商家），也保存并跳转
-            const merchantUser = {
-              email: data.merchant.contact_email,
-              merchant: data.merchant,
-              merchant_id: data.merchant.id
-            }
-            localStorage.setItem('merchantUser', JSON.stringify(merchantUser))
-            console.log('✅ 商家注册成功（独立商家），跳转到登录页面')
-            router.push('/merchant/auth/login?success=registered')
+        // 商家注册必须同时有用户和商家信息
+        if (data.merchant && data.user) {
+          const merchantUser = {
+            id: data.user.id,
+            email: data.user.email,
+            name: data.user.name,
+            merchant: data.merchant,
+            merchant_id: data.merchant.id
           }
+          localStorage.setItem('merchantUser', JSON.stringify(merchantUser))
+          localStorage.setItem('merchantToken', 'merchant-logged-in')
+          console.log('✅ 商家注册成功，已保存用户和商家信息，跳转到商家页面', merchantUser)
+          
+          // 使用 setTimeout 确保 localStorage 已保存
+          setTimeout(() => {
+            router.push('/merchant')
+          }, 100)
         } else {
-          // 如果注册成功但没有商家信息，跳转到登录页面
-          console.log('⚠️ 注册成功但缺少商家信息，跳转到登录页面')
-          router.push('/merchant/auth/login?success=registered')
+          // 如果缺少用户或商家信息，显示错误
+          console.error('❌ 注册响应不完整:', { hasUser: !!data.user, hasMerchant: !!data.merchant })
+          setErrors({ 
+            general: '注册成功但信息不完整，请联系管理员或尝试登录' 
+          })
+          // 仍然跳转到登录页面
+          setTimeout(() => {
+            router.push('/merchant/auth/login?success=registered')
+          }, 2000)
         }
       } else {
         // 处理错误响应
@@ -176,6 +175,12 @@ export default function MerchantRegisterPage() {
             break
           case 'MERCHANT_CREATION_FAILED':
             setErrors({ general: errorMessage || '创建商家账户失败，请重试' })
+            break
+          case 'USER_CREATION_FAILED':
+            setErrors({ general: errorMessage || '创建用户账户失败，请检查输入信息后重试' })
+            break
+          case 'USER_REQUIRED':
+            setErrors({ general: errorMessage || '商家注册必须创建用户账户，请检查输入信息' })
             break
           default:
             setErrors({ general: errorMessage || '注册失败，请重试' })

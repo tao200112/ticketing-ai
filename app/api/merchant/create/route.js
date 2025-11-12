@@ -165,18 +165,36 @@ export async function POST(request) {
           logger.error('User creation failed', {
             error: userError,
             email: email.trim().toLowerCase(),
-            age: ageInt
+            age: ageInt,
+            errorCode: userError.code,
+            errorMessage: userError.message
           })
           
           // 检查是否是约束违反错误
-          if (userError.code === '23505') { // 唯一约束违反
-            throw ErrorHandler.conflictError(
-              'EMAIL_EXISTS',
-              '该邮箱已在用户系统中注册，将使用现有账户关联商家'
-            )
-          }
-          
-          if (userError.code === '23514') { // 检查约束违反
+          if (userError.code === '23505') { // 唯一约束违反 - 邮箱已存在
+            // 尝试查找现有用户并关联
+            const { data: existingUserByEmail, error: findError } = await supabase
+              .from('users')
+              .select('id, role, email, name')
+              .eq('email', email.trim().toLowerCase())
+              .maybeSingle()
+            
+            if (findError && findError.code !== 'PGRST116') {
+              throw ErrorHandler.fromSupabaseError(findError, 'USER_LOOKUP_FAILED')
+            }
+            
+            if (existingUserByEmail) {
+              // 使用现有用户
+              userRecord = existingUserByEmail
+              finalUserId = existingUserByEmail.id
+              logger.info('使用现有用户关联商家', { userId: finalUserId })
+            } else {
+              throw ErrorHandler.conflictError(
+                'EMAIL_EXISTS',
+                '该邮箱已被注册，请使用其他邮箱或直接登录'
+              )
+            }
+          } else if (userError.code === '23514') { // 检查约束违反
             if (userError.message?.includes('age')) {
               throw ErrorHandler.validationError(
                 'INVALID_AGE',
@@ -189,13 +207,18 @@ export async function POST(request) {
                 '无效的角色设置'
               )
             }
+            // 其他约束违反，抛出错误
+            throw ErrorHandler.fromSupabaseError(userError, 'USER_CREATION_FAILED')
+          } else {
+            // 其他错误，必须抛出，不能继续创建 merchant
+            // 因为商家登录需要 users 表中的记录
+            logger.error('用户创建失败，无法继续创建商家', { error: userError })
+            throw ErrorHandler.fromSupabaseError(userError, 'USER_CREATION_FAILED')
           }
-          
-          // 如果创建用户失败，仍然可以创建 merchant（独立表）
-          logger.warn('User creation failed, but will continue with merchant creation', { error: userError })
         } else {
           userRecord = newUser
           finalUserId = newUser.id
+          logger.info('商家用户创建成功', { userId: finalUserId, email: newUser.email })
         }
       }
     } else if (userId) {
@@ -262,18 +285,21 @@ export async function POST(request) {
     }
 
     // 创建商家记录
-    // merchants 表现在可以独立存在，owner_user_id 是可选的
+    // 注意：商家注册必须关联用户，因为登录需要 users 表中的记录
+    if (!finalUserId) {
+      throw ErrorHandler.validationError(
+        'USER_REQUIRED',
+        '商家注册必须创建用户账户，请检查输入信息'
+      )
+    }
+
     const merchantData = {
+      owner_user_id: finalUserId, // 必须关联用户
       name: businessName.trim(),
       contact_email: normalizedEmail || email?.trim().toLowerCase() || null,
       contact_phone: phone ? phone.trim() : null,
       verified: false,
       status: 'active'
-    }
-
-    // 如果有关联的用户，添加 owner_user_id（可选）
-    if (finalUserId) {
-      merchantData.owner_user_id = finalUserId
     }
 
     const { data: newMerchant, error: merchantError } = await supabase

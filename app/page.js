@@ -5,11 +5,11 @@ import React, { useState, useEffect } from "react"
 import NavbarPartyTix from "../components/NavbarPartyTix"
 import EventCard from "../components/EventCard"
 import { SkeletonGrid } from "../components/SkeletonCard"
-// import { hasSupabase } from "../lib/safeEnv" // 已移除，使用新的 API 客户端
+// import { hasSupabase } from "../lib/safeEnv" // Removed, using new API client
 import { useEvents } from "../lib/hooks/use-api"
 
 export default function Home() {
-  // 使用新的 API 钩子
+  // Use new API hook
   const { data: apiEvents, loading: apiLoading, error: apiError } = useEvents()
   const [localEvents, setLocalEvents] = useState([])
   const [activities, setActivities] = useState([])
@@ -29,11 +29,11 @@ export default function Home() {
       }
     }
     
-    // 添加页面可见性变化监听，当页面重新可见时刷新数据
+    // Add page visibility change listener to refresh data when page becomes visible
     const handleVisibilityChange = () => {
       if (!document.hidden) {
-        console.log('🔄 页面重新可见，刷新活动数据')
-        // 触发useEvents重新获取数据
+        console.log('🔄 Page visible again, refreshing event data')
+        // Trigger useEvents to refetch data
         if (window.refreshEvents) {
           window.refreshEvents()
         }
@@ -65,50 +65,50 @@ export default function Home() {
     }
   }
 
-  // 不再使用 localStorage，所有活动从 Supabase API 获取
+  // No longer using localStorage, all events fetched from Supabase API
   const loadLocalEvents = () => {
     setLocalEvents([])
   }
 
-  // 合并 API 数据和本地数据
+  // Merge API data and local data
   const events = React.useMemo(() => {
-    console.log('🔍 开始合并活动数据:', { apiEvents, apiLoading, apiError })
+    console.log('🔍 Starting to merge event data:', { apiEvents, apiLoading, apiError })
     
-    // 使用 API 返回的活动数据和默认活动
+    // Use API returned event data and default events
     let allEvents = []
     
-    // 添加 API 活动
+    // Add API events
     if (apiEvents && Array.isArray(apiEvents) && apiEvents.length > 0) {
-      console.log('✅ 添加 API 活动:', apiEvents.length)
+      console.log('✅ Adding API events:', apiEvents.length)
       allEvents = [...apiEvents]
     } else {
-      console.log('⚠️ API 活动为空或无效:', apiEvents)
+      console.log('⚠️ API events empty or invalid:', apiEvents)
     }
     
     
-    // 过滤掉测试活动
+    // Filter out test events
     const filteredEvents = allEvents.filter(event => {
       const title = event.title || event.name || ''
       return title.length > 1 && title !== '11' && title !== 'bb' && title !== 'aa'
     })
     
-    console.log(`📊 活动统计 - API: ${apiEvents?.length || 0}, 最终: ${filteredEvents.length}`)
+    console.log(`📊 Event statistics - API: ${apiEvents?.length || 0}, Final: ${filteredEvents.length}`)
     
-    // 只返回前3个（按sort_order排序，已在API中排序）
+    // Return only first 3 (sorted by sort_order, already sorted in API)
     return filteredEvents.slice(0, 3)
-  }, [apiEvents, apiLoading, apiError]) // 添加更多依赖项确保数据更新
+  }, [apiEvents, apiLoading, apiError]) // Add more dependencies to ensure data updates
 
-  // 获取前3个activities
+  // Get first 3 activities
   const featuredActivities = React.useMemo(() => {
     return activities.slice(0, 3)
   }, [activities])
 
-  // 更新加载状态 - 改进loading逻辑
+  // Update loading state - improved loading logic
   useEffect(() => {
     if (apiLoading) {
       setLoading(true)
     } else {
-      // 延迟一点时间确保数据完全加载
+      // Delay a bit to ensure data is fully loaded
       const timer = setTimeout(() => {
         setLoading(false)
       }, 100)

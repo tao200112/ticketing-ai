@@ -8,7 +8,7 @@ export default function AdminLogin() {
   const [error, setError] = useState('');
   const router = useRouter();
 
-  // 检查是否已经登录，如果已登录直接跳转到dashboard
+  // Check if already logged in, redirect to dashboard if logged in
   useEffect(() => {
     const adminToken = localStorage.getItem('adminToken');
     if (adminToken === 'admin-logged-in') {
@@ -19,7 +19,7 @@ export default function AdminLogin() {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (password === '1461') {
-      // 设置管理员token，避免二次登录
+      // Set admin token to avoid re-login
       localStorage.setItem('adminToken', 'admin-logged-in');
       localStorage.setItem('adminUser', JSON.stringify({
         id: 'admin-hardcoded',

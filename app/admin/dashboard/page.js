@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
@@ -36,6 +36,8 @@ export default function AdminDashboard() {
   const [uploadingImage, setUploadingImage] = useState(false)
   const [imagePreview, setImagePreview] = useState(null)
   const [showEventModal, setShowEventModal] = useState(false)
+  const [showTemplateModal, setShowTemplateModal] = useState(false)
+  const [templateSearch, setTemplateSearch] = useState('')
   const [editingEvent, setEditingEvent] = useState(null)
   const [merchantSearch, setMerchantSearch] = useState('')
   const [eventSearch, setEventSearch] = useState('')
@@ -240,24 +242,21 @@ export default function AdminDashboard() {
       
       const method = editingEvent ? 'PUT' : 'POST'
       
-      // 转换字段名以匹配API期望
+      // Transform field names to match API expectations
+      // EventCreationForm component returns format close to API expectations
       const apiData = {
         title: eventData.title,
         description: eventData.description,
-        startTime: eventData.startDate ? `${eventData.startDate}T${eventData.startTime || '00:00'}:00.000Z` : eventData.startTime,
-        endTime: eventData.endDate ? `${eventData.endDate}T${eventData.endTime || '23:59'}:59.999Z` : eventData.endTime,
+        startTime: eventData.startTime,
+        endTime: eventData.endTime,
         location: eventData.location,
-        maxAttendees: eventData.maxAttendees,
-        merchant_id: eventData.merchantId,
-        prices: eventData.ticketTypes?.map(ticket => ({
-          name: ticket.name,
-          amount_cents: parseInt(ticket.amount_cents),
-          inventory: parseInt(ticket.inventory),
-          limit_per_user: parseInt(ticket.limit_per_user) || 4
-        })) || []
+        poster_url: eventData.poster_url,
+        merchant_id: eventData.merchant_id,
+        prices: eventData.prices || [],
+        status: eventData.status || 'published'
       }
       
-      console.log('🔍 发送事件数据:', apiData)
+      console.log('🔍 发送事件数�?', apiData)
       
       const response = await fetch(url, {
         method,
@@ -284,7 +283,7 @@ export default function AdminDashboard() {
         return true
       } else {
         const error = await response.json()
-        throw new Error(error.error || 'Failed to save event')
+        throw new Error(error.error || error.message || 'Failed to save event')
       }
     } catch (error) {
       console.error('Event save error:', error)
@@ -707,7 +706,7 @@ export default function AdminDashboard() {
                         </p>
                         <div style={{ display: 'flex', gap: '16px', fontSize: '12px', color: 'rgba(255, 255, 255, 0.6)', flexWrap: 'wrap', alignItems: 'center' }}>
                           <span>📞 {merchant.contact_phone || 'No phone'}</span>
-                          <span>✅ {merchant.verified ? 'Verified' : 'Unverified'}</span>
+                          <span>�?{merchant.verified ? 'Verified' : 'Unverified'}</span>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <span>📊 Max Events:</span>
                             {editingMerchant === merchant.id ? (
@@ -746,7 +745,7 @@ export default function AdminDashboard() {
                                     fontSize: '11px'
                                   }}
                                 >
-                                  ✓
+                                  �?
                                 </button>
                                 <button
                                   onClick={() => {
@@ -763,7 +762,7 @@ export default function AdminDashboard() {
                                     fontSize: '11px'
                                   }}
                                 >
-                                  ✕
+                                  �?
                                 </button>
                               </div>
                             ) : (
@@ -786,7 +785,7 @@ export default function AdminDashboard() {
                                   }}
                                   title="Edit max events"
                                 >
-                                  ✎
+                                  �?
                                 </button>
                               </div>
                             )}
@@ -820,7 +819,7 @@ export default function AdminDashboard() {
                 <div style={{ display: 'flex', gap: '12px' }}>
                   <button
                     onClick={() => {
-                      // 编辑默认的Ridiculous Chicken活动
+                      // Edit default Ridiculous Chicken event
                       const defaultEvent = {
                         id: 'ridiculous-chicken',
                         title: 'Ridiculous Chicken Night Event',
@@ -955,7 +954,7 @@ export default function AdminDashboard() {
                           }}>
                             <span>🏪</span>
                             <span style={{ fontWeight: '500' }}>
-                              商家: {event.merchants.name || 'Unknown Merchant'}
+                              Merchant: {event.merchants.name || 'Unknown Merchant'}
                             </span>
                           </div>
                         )}
@@ -973,7 +972,7 @@ export default function AdminDashboard() {
                           }}>
                             <span>🏪</span>
                             <span style={{ fontWeight: '500' }}>
-                              商家ID: {event.merchant_id.substring(0, 8)}...
+                              Merchant ID: {event.merchant_id.substring(0, 8)}...
                             </span>
                           </div>
                         )}
@@ -1012,7 +1011,7 @@ export default function AdminDashboard() {
                             }}
                             title="Move up"
                           >
-                            ↑
+                            �?
                           </button>
                           <button
                             onClick={async () => {
@@ -1046,7 +1045,7 @@ export default function AdminDashboard() {
                             }}
                             title="Move down"
                           >
-                            ↓
+                            �?
                           </button>
                         </div>
                         <button
@@ -1152,7 +1151,7 @@ export default function AdminDashboard() {
                           <span>👤 Age: {customer.age}</span>
                           <span>🎭 Role: {customer.role}</span>
                           <span>📅 Joined: {new Date(customer.created_at).toLocaleDateString()}</span>
-                          <span>✅ {customer.is_active ? 'Active' : 'Inactive'}</span>
+                          <span>�?{customer.is_active ? 'Active' : 'Inactive'}</span>
                         </div>
                       </div>
                       <div style={{ display: 'flex', gap: '8px' }}>
@@ -1300,7 +1299,7 @@ export default function AdminDashboard() {
                         </h3>
                         <div style={{ display: 'flex', gap: '16px', fontSize: '12px', color: 'rgba(255, 255, 255, 0.6)', flexWrap: 'wrap' }}>
                           <span>📅 Created: {new Date(inviteCode.created_at).toLocaleDateString()}</span>
-                          <span>⏰ Expires: {new Date(inviteCode.expires_at).toLocaleDateString()}</span>
+                          <span>�?Expires: {new Date(inviteCode.expires_at).toLocaleDateString()}</span>
                           {inviteCode.used_by ? (
                             <>
                               <span>👤 Used by: {inviteCode.used_by.substring(0, 8)}...</span>
@@ -1436,7 +1435,7 @@ export default function AdminDashboard() {
                             marginTop: '8px'
                           }}
                         >
-                          View full content →
+                          View full content �?
                         </Link>
                         <div style={{ display: 'flex', gap: '8px', fontSize: '12px', color: 'rgba(255, 255, 255, 0.6)' }}>
                           <span>📅 Created: {new Date(activity.created_at).toLocaleDateString()}</span>
@@ -1484,7 +1483,7 @@ export default function AdminDashboard() {
                             }}
                             title="Move up"
                           >
-                            ↑
+                            �?
                           </button>
                           <button
                             onClick={async () => {
@@ -1518,7 +1517,7 @@ export default function AdminDashboard() {
                             }}
                             title="Move down"
                           >
-                            ↓
+                            �?
                           </button>
                         </div>
                         <button

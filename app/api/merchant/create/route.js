@@ -78,32 +78,27 @@ export async function POST(request) {
       )
     }
 
-    let userRecord
-    let finalUserId = userId
+    // 验证邮箱格式（如果提供了邮箱）
+    if (email) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!emailRegex.test(email)) {
+        throw ErrorHandler.validationError(
+          'INVALID_EMAIL',
+          '邮箱格式不正确，请检查后重试'
+        )
+      }
+    }
 
-      // 如果没有 userId，需要先创建用户
-      if (!userId) {
-        if (!email || !password || !name || !age) {
-          throw ErrorHandler.validationError(
-            'MISSING_USER_INFO',
-            'Email, password, name, and age are required when creating a new user'
-          )
-        }
-        
-        // 验证邮箱格式
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-        if (!emailRegex.test(email)) {
-          throw ErrorHandler.validationError(
-            'INVALID_EMAIL',
-            '邮箱格式不正确，请检查后重试'
-          )
-        }
+    let userRecord = null
+    let finalUserId = userId || null
 
-      // 检查邮箱是否已存在（检查所有角色，因为 email 是 UNIQUE 的）
-      // 使用 maybeSingle() 避免 406 错误
+    // 如果提供了用户信息，尝试创建或查找用户（可选）
+    // merchants 表现在可以独立存在，不强制依赖 users 表
+    if (!userId && email && password && name && age) {
+      // 检查邮箱是否已在 users 表中存在
       const { data: existingUser, error: existingUserError } = await supabase
         .from('users')
-        .select('id, role')
+        .select('id, role, email, name')
         .eq('email', email.trim().toLowerCase())
         .maybeSingle()
 
@@ -113,139 +108,169 @@ export async function POST(request) {
       }
 
       if (existingUser) {
-        // 如果用户已存在且是 merchant 角色，抛出错误
-        if (existingUser.role === 'merchant') {
-          throw ErrorHandler.conflictError(
-            'EMAIL_EXISTS',
-            '该邮箱已被注册为商家账户，请使用其他邮箱或直接登录'
+        // 如果用户已存在，使用现有用户（不强制要求是 merchant 角色）
+        // 允许普通用户同时拥有商家账户
+        userRecord = existingUser
+        finalUserId = existingUser.id
+        logger.info('Using existing user for merchant registration', { userId: finalUserId })
+      } else {
+        // 用户不存在，创建新用户（可选，用于关联）
+        // 验证密码长度
+        if (password.length < 8) {
+          throw ErrorHandler.validationError(
+            'PASSWORD_TOO_SHORT',
+            '密码长度至少为 8 个字符'
           )
         }
-        // 如果用户已存在但不是 merchant 角色，也抛出错误（邮箱唯一性）
-        throw ErrorHandler.conflictError(
-          'EMAIL_EXISTS',
-          '该邮箱已被注册，请使用其他邮箱或直接登录'
-        )
-      }
 
-      // 验证密码长度
-      if (password.length < 8) {
-        throw ErrorHandler.validationError(
-          'PASSWORD_TOO_SHORT',
-          '密码长度至少为 8 个字符'
-        )
-      }
+        // 验证年龄（数据库约束要求 age >= 16）
+        const ageInt = parseInt(age)
+        if (isNaN(ageInt) || ageInt < 16) {
+          throw ErrorHandler.validationError(
+            'INVALID_AGE',
+            '年龄必须至少为 16 岁'
+          )
+        }
 
-      // 验证年龄（数据库约束要求 age >= 16）
-      const ageInt = parseInt(age)
-      if (isNaN(ageInt) || ageInt < 16) {
-        throw ErrorHandler.validationError(
-          'INVALID_AGE',
-          '年龄必须至少为 16 岁'
-        )
-      }
+        // 加密密码
+        const hashedPassword = await bcrypt.hash(password, 12)
 
-      // 加密密码
-      const hashedPassword = await bcrypt.hash(password, 12)
-
-      // 创建商家用户
-      // 规范化数据以确保符合数据库约束
-      const { data: newUser, error: userError } = await supabase
-        .from('users')
-        .insert([{
-          email: email.trim().toLowerCase(), // 规范化邮箱
+        // 创建用户（用于关联，但 merchants 表不强制依赖）
+        // 注意：不显式传递 id，让数据库自动生成 UUID
+        const userInsertData = {
+          email: email.trim().toLowerCase(),
           name: name.trim(),
           age: ageInt,
           password_hash: hashedPassword,
-          role: 'merchant',
-          is_active: true // 显式设置默认值
-        }])
-        .select()
-        .single()
+          role: 'merchant', // 设置为 merchant 角色
+          is_active: true
+        }
+        
+        // 确保不传递 id 字段，让数据库使用默认值生成
+        const { data: newUser, error: userError } = await supabase
+          .from('users')
+          .insert([userInsertData])
+          .select()
+          .single()
 
-      if (userError) {
-        // 记录详细的错误信息以便调试
-        logger.error('User creation failed', {
-          error: userError,
-          email: email.trim().toLowerCase(),
-          age: ageInt,
-          role: 'merchant'
-        })
-        
-        // 检查是否是约束违反错误
-        if (userError.code === '23505') { // 唯一约束违反
-          throw ErrorHandler.conflictError(
-            'EMAIL_EXISTS',
-            '该邮箱已被注册，请使用其他邮箱或直接登录'
-          )
-        }
-        
-        if (userError.code === '23514') { // 检查约束违反
-          if (userError.message?.includes('age')) {
-            throw ErrorHandler.validationError(
-              'INVALID_AGE',
-              '年龄必须至少为 16 岁'
+        if (userError) {
+          logger.error('User creation failed', {
+            error: userError,
+            email: email.trim().toLowerCase(),
+            age: ageInt
+          })
+          
+          // 检查是否是约束违反错误
+          if (userError.code === '23505') { // 唯一约束违反
+            throw ErrorHandler.conflictError(
+              'EMAIL_EXISTS',
+              '该邮箱已在用户系统中注册，将使用现有账户关联商家'
             )
           }
-          if (userError.message?.includes('role')) {
-            throw ErrorHandler.validationError(
-              'INVALID_ROLE',
-              '无效的角色设置'
-            )
+          
+          if (userError.code === '23514') { // 检查约束违反
+            if (userError.message?.includes('age')) {
+              throw ErrorHandler.validationError(
+                'INVALID_AGE',
+                '年龄必须至少为 16 岁'
+              )
+            }
+            if (userError.message?.includes('role')) {
+              throw ErrorHandler.validationError(
+                'INVALID_ROLE',
+                '无效的角色设置'
+              )
+            }
           }
+          
+          // 如果创建用户失败，仍然可以创建 merchant（独立表）
+          logger.warn('User creation failed, but will continue with merchant creation', { error: userError })
+        } else {
+          userRecord = newUser
+          finalUserId = newUser.id
         }
-        
-        throw ErrorHandler.fromSupabaseError(userError, 'USER_CREATION_FAILED')
       }
-
-      userRecord = newUser
-      finalUserId = newUser.id
-    } else {
-      // 更新现有用户角色为商家
-      const { data: updatedUser, error: updateError } = await supabase
+    } else if (userId) {
+      // 如果提供了 userId，查找用户
+      const { data: existingUser, error: userError } = await supabase
         .from('users')
-        .update({ role: 'merchant' })
+        .select('id, role, email, name')
         .eq('id', userId)
-        .select()
-        .single()
+        .maybeSingle()
 
-      if (updateError) {
-        throw ErrorHandler.fromSupabaseError(updateError, 'USER_UPDATE_FAILED')
+      if (userError && userError.code !== 'PGRST116') {
+        throw ErrorHandler.fromSupabaseError(userError, 'USER_CHECK_FAILED')
       }
 
-      userRecord = updatedUser
+      if (existingUser) {
+        userRecord = existingUser
+        finalUserId = userId
+      }
     }
 
-    // 检查用户是否已有商家账户
+    // 检查邮箱是否已注册为商家（通过 contact_email 检查，不依赖 users 表）
     // 使用 maybeSingle() 避免 406 错误
-    const { data: existingMerchant, error: existingMerchantError } = await supabase
-      .from('merchants')
-      .select('*')
-      .eq('owner_user_id', finalUserId)
-      .maybeSingle()
+    const normalizedEmail = email ? email.trim().toLowerCase() : null
+    let existingMerchant = null
+    
+    if (normalizedEmail) {
+      const { data: merchantByEmail, error: merchantEmailError } = await supabase
+        .from('merchants')
+        .select('*')
+        .eq('contact_email', normalizedEmail)
+        .maybeSingle()
 
-    // 如果查询出错（非"不存在"的错误），抛出错误
-    if (existingMerchantError && existingMerchantError.code !== 'PGRST116') {
-      throw ErrorHandler.fromSupabaseError(existingMerchantError, 'MERCHANT_CHECK_FAILED')
+      if (merchantEmailError && merchantEmailError.code !== 'PGRST116') {
+        throw ErrorHandler.fromSupabaseError(merchantEmailError, 'MERCHANT_CHECK_FAILED')
+      }
+
+      if (merchantByEmail) {
+        existingMerchant = merchantByEmail
+      }
+    }
+
+    // 如果提供了 userId，也检查该用户是否已有商家账户
+    if (finalUserId && !existingMerchant) {
+      const { data: merchantByUserId, error: merchantUserIdError } = await supabase
+        .from('merchants')
+        .select('*')
+        .eq('owner_user_id', finalUserId)
+        .maybeSingle()
+
+      if (merchantUserIdError && merchantUserIdError.code !== 'PGRST116') {
+        throw ErrorHandler.fromSupabaseError(merchantUserIdError, 'MERCHANT_CHECK_FAILED')
+      }
+
+      if (merchantByUserId) {
+        existingMerchant = merchantByUserId
+      }
     }
 
     if (existingMerchant) {
       throw ErrorHandler.conflictError(
         'MERCHANT_EXISTS',
-        '您已经拥有商家账户，请直接登录'
+        '该邮箱或账户已经注册为商家，请直接登录'
       )
     }
 
     // 创建商家记录
+    // merchants 表现在可以独立存在，owner_user_id 是可选的
+    const merchantData = {
+      name: businessName.trim(),
+      contact_email: normalizedEmail || email?.trim().toLowerCase() || null,
+      contact_phone: phone ? phone.trim() : null,
+      verified: false,
+      status: 'active'
+    }
+
+    // 如果有关联的用户，添加 owner_user_id（可选）
+    if (finalUserId) {
+      merchantData.owner_user_id = finalUserId
+    }
+
     const { data: newMerchant, error: merchantError } = await supabase
       .from('merchants')
-      .insert([{
-        owner_user_id: finalUserId,
-        name: businessName,
-        description: phone ? `商家联系方式: ${phone}` : null,
-        contact_email: userRecord.email,
-        verified: false,
-        status: 'active'
-      }])
+      .insert([merchantData])
       .select()
       .single()
 
@@ -255,12 +280,19 @@ export async function POST(request) {
 
     // 标记邀请码为已使用（一次性使用，设置is_active为false）
     // 注意：admin_invite_codes 表不包含 used_at 字段
+    // 如果有关联的用户，记录 used_by，否则只标记为不活跃
+    const inviteUpdateData = {
+      is_active: false // 标记为不活跃，防止再次使用
+    }
+    
+    // 如果有关联的用户，记录 used_by
+    if (finalUserId) {
+      inviteUpdateData.used_by = finalUserId
+    }
+
     const { error: updateInviteError } = await supabase
       .from('admin_invite_codes')
-      .update({
-        used_by: finalUserId,
-        is_active: false // 标记为不活跃，防止再次使用
-      })
+      .update(inviteUpdateData)
       .eq('id', inviteCodeData.id)
 
     if (updateInviteError) {
@@ -274,7 +306,7 @@ export async function POST(request) {
       ok: true,
       success: true,
       merchant: newMerchant,
-      user: userRecord
+      user: userRecord || null // 如果创建了用户，返回用户信息；否则返回 null
     })
 
   } catch (error) {

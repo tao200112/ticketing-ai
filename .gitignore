@@ -43,3 +43,14 @@ next-env.d.ts
 .vercel
 
 /lib/generated/prisma
+
+# backup and temporary files
+*_backup.*
+*_old.*
+*_copy.*
+*.backup
+*.tmp
+*.temp
+*-summary.txt
+*test-push.txt
+*railway-env.txt

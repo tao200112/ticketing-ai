@@ -51,14 +51,15 @@ export async function POST(request) {
     const code = Math.random().toString(36).substring(2, 10).toUpperCase()
 
     // 插入数据库（新邀请码默认为未使用状态）
-    // 注意：admin_invite_codes 表不包含 max_events 字段，该字段在 merchants 表中
     const { data: newInviteCode, error } = await supabase
       .from('admin_invite_codes')
       .insert({
         code,
         expires_at: expiresAt || new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(), // 默认90天后过期
+        max_events: maxEvents || 1, // 默认max_events为1
         is_active: true, // 新邀请码默认为活跃状态
-        used_by: null // 未使用
+        used_by: null, // 未使用
+        used_at: null // 未使用
       })
       .select()
       .single()

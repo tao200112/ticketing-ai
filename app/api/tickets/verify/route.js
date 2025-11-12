@@ -255,7 +255,8 @@ export async function POST(request) {
       updateData.verification_count = (ticket.verification_count || 0) + 1
     }
 
-    // If redeem is true and ticket is valid and not used, mark it as used
+    // If redeem is true and ticket is valid and not used, process redemption
+    // Support up to 3 redemptions before marking as used
     if (redeem && isValid && ticket.status !== 'used') {
       if (ticket.status === 'refunded' || ticket.status === 'cancelled') {
         throw ErrorHandler.validationError(
@@ -264,10 +265,18 @@ export async function POST(request) {
         )
       }
       
-      updateData.status = 'used'
-      updateData.used_at = now.toISOString()
+      // Calculate current verification count after this redemption
+      const currentVerificationCount = updateData.verification_count || (ticket.verification_count || 0) + 1
+      const MAX_REDEMPTIONS = 3
       
-      logger.info('Redeeming ticket', { ticketId, redeemedAt: now.toISOString() })
+      // Only mark as used after 3 redemptions
+      if (currentVerificationCount >= MAX_REDEMPTIONS) {
+        updateData.status = 'used'
+        updateData.used_at = now.toISOString()
+        logger.info('Redeeming ticket (final redemption)', { ticketId, redeemedAt: now.toISOString(), verificationCount: currentVerificationCount })
+      } else {
+        logger.info('Redeeming ticket (partial redemption)', { ticketId, redeemedAt: now.toISOString(), verificationCount: currentVerificationCount, remaining: MAX_REDEMPTIONS - currentVerificationCount })
+      }
     }
 
     // Update ticket in database
@@ -286,11 +295,22 @@ export async function POST(request) {
         // Otherwise just warn (verification can continue)
         logger.warn('Failed to update verification tracking', { error: updateError })
       } else if (redeem) {
-        // Update ticket status in response if redeemed
-        ticket.status = 'used'
-        ticket.used_at = now.toISOString()
-        isValid = false // After redemption, ticket is considered "used"
-        validityMessage = 'Ticket has been successfully redeemed (used)'
+        // Update ticket status in response based on redemption count
+        const currentVerificationCount = updateData.verification_count || (ticket.verification_count || 0) + 1
+        const MAX_REDEMPTIONS = 3
+        
+        if (currentVerificationCount >= MAX_REDEMPTIONS) {
+          // Final redemption - mark as used
+          ticket.status = 'used'
+          ticket.used_at = updateData.used_at || now.toISOString()
+          isValid = false // After final redemption, ticket is considered "used"
+          validityMessage = 'Ticket has been successfully redeemed (used - all 3 redemptions completed)'
+        } else {
+          // Partial redemption - still valid
+          ticket.status = ticket.status || 'unused'
+          isValid = true // Ticket is still valid for more redemptions
+          validityMessage = `Ticket redeemed (${currentVerificationCount}/${MAX_REDEMPTIONS} redemptions used)`
+        }
       }
     } catch (updateError) {
       // If it's a redeem error, re-throw it
@@ -345,5 +365,7 @@ export async function POST(request) {
     return handleApiError(error, request, logger)
   }
 }
+
+
 
 

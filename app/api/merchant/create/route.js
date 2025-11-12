@@ -216,11 +216,17 @@ export async function POST(request) {
     }
 
     // 检查用户是否已有商家账户
-    const { data: existingMerchant } = await supabase
+    // 使用 maybeSingle() 避免 406 错误
+    const { data: existingMerchant, error: existingMerchantError } = await supabase
       .from('merchants')
       .select('*')
       .eq('owner_user_id', finalUserId)
-      .single()
+      .maybeSingle()
+
+    // 如果查询出错（非"不存在"的错误），抛出错误
+    if (existingMerchantError && existingMerchantError.code !== 'PGRST116') {
+      throw ErrorHandler.fromSupabaseError(existingMerchantError, 'MERCHANT_CHECK_FAILED')
+    }
 
     if (existingMerchant) {
       throw ErrorHandler.conflictError(

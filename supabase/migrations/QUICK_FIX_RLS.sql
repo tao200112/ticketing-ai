@@ -4,14 +4,19 @@
 -- 1. 启用 RLS
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 
--- 2. 删除所有现有策略
-DROP POLICY IF EXISTS "Users can view their own data" ON public.users;
+-- 2. 删除所有现有策略（包括您显示的那些）
+DROP POLICY IF EXISTS "Allow authenticated users to read users" ON public.users;
+DROP POLICY IF EXISTS "Allow public registration" ON public.users;
+DROP POLICY IF EXISTS "Allow service role to manage users" ON public.users;
+DROP POLICY IF EXISTS "Bypass RLS for trigger and service role" ON public.users;
+DROP POLICY IF EXISTS "Users can update own profile" ON public.users;
 DROP POLICY IF EXISTS "Users can update their own data" ON public.users;
+DROP POLICY IF EXISTS "Users can view own profile" ON public.users;
+DROP POLICY IF EXISTS "Users can view their own data" ON public.users;
 DROP POLICY IF EXISTS "Service role can do anything" ON public.users;
 DROP POLICY IF EXISTS "Allow trigger inserts" ON public.users;
 DROP POLICY IF EXISTS "Allow all operations for trigger" ON public.users;
 DROP POLICY IF EXISTS "Allow trigger and service role" ON public.users;
-DROP POLICY IF EXISTS "Bypass RLS for trigger and service role" ON public.users;
 
 -- 3. 关键修复：创建允许所有操作的策略
 -- 这是解决注册问题的关键：触发器函数需要能够插入数据

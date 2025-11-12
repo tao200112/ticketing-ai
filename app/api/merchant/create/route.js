@@ -81,12 +81,18 @@ export async function POST(request) {
         }
 
       // 检查邮箱是否已存在（只检查merchant角色）
-      const { data: existingUser } = await supabase
+      // 使用 maybeSingle() 来处理可能不存在的情况，避免 406 错误
+      const { data: existingUser, error: existingUserError } = await supabase
         .from('users')
         .select('id')
         .eq('email', email)
         .eq('role', 'merchant')
-        .single()
+        .maybeSingle()
+
+      // 如果查询出错（非"不存在"的错误），抛出错误
+      if (existingUserError && existingUserError.code !== 'PGRST116') {
+        throw ErrorHandler.fromSupabaseError(existingUserError, 'USER_CHECK_FAILED')
+      }
 
       if (existingUser) {
         throw ErrorHandler.conflictError(
@@ -171,11 +177,11 @@ export async function POST(request) {
     }
 
     // 标记邀请码为已使用（一次性使用，设置is_active为false）
+    // 注意：admin_invite_codes 表不包含 used_at 字段
     const { error: updateInviteError } = await supabase
       .from('admin_invite_codes')
       .update({
         used_by: finalUserId,
-        used_at: new Date().toISOString(),
         is_active: false // 标记为不活跃，防止再次使用
       })
       .eq('id', inviteCodeData.id)

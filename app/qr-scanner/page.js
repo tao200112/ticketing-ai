@@ -322,7 +322,7 @@ export default function QRScannerPage() {
               event_name: event?.title || 'Unknown Event',
               event_venue: event?.venue_name || 'N/A',
               validity_status: 'redeemed',
-              validity_message: 'âœ?Ticket redeemed successfully',
+              validity_message: 'Ticket redeemed successfully',
               valid_from: validFrom,
               valid_until: validUntil,
               verification_count: ticket.verification_count || 1,
@@ -768,7 +768,7 @@ export default function QRScannerPage() {
                       e.target.style.transform = 'scale(1)'
                     }}
                   >
-                    ðŸ”„ Retry Camera Access
+                     Retry Camera Access
                   </button>
                 </div>
                 
@@ -860,9 +860,9 @@ export default function QRScannerPage() {
                   fontWeight: '600',
                   fontSize: '0.875rem'
                 }}>
-                  {scanResult.validity_status === 'redeemed' ? 'âœ?Ticket Redeemed' :
-                   scanResult.validity_status === 'valid' ? 'âœ?Ticket Valid' : 
-                   'âœ?Ticket Invalid'}
+                  {scanResult.validity_status === 'redeemed' ? 'Ticket Redeemed' :
+                   scanResult.validity_status === 'valid' ? 'Ticket Valid' : 
+                   'Ticket Invalid'}
                 </span>
               </div>
               {scanResult.validity_message && (

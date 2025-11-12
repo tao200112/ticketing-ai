@@ -1015,6 +1015,7 @@ export default function AdminDashboard() {
                               <path d="M18 15l-6-6-6 6"/>
                             </svg>
                           </button>
+                          <button
                             onClick={async () => {
                               try {
                                 const response = await fetch(`/api/admin/events/${event.id}/reorder`, {
@@ -1050,6 +1051,7 @@ export default function AdminDashboard() {
                               <path d="M6 9l6 6 6-6"/>
                             </svg>
                           </button>
+                        </div>
                         <button
                           onClick={() => window.open(`/events/${event.id}`, '_blank')}
                           style={{
@@ -1489,6 +1491,7 @@ export default function AdminDashboard() {
                               <path d="M18 15l-6-6-6 6"/>
                             </svg>
                           </button>
+                          <button
                             onClick={async () => {
                               try {
                                 const response = await fetch(`/api/admin/activities/${activity.id}/reorder`, {
@@ -1524,6 +1527,7 @@ export default function AdminDashboard() {
                               <path d="M6 9l6 6 6-6"/>
                             </svg>
                           </button>
+                        </div>
                         <button
                           onClick={() => {
                             setEditingActivity(activity)

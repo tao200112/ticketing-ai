@@ -116,18 +116,158 @@ export default function AccountPage() {
 
   const loadUserData = async (client, userId) => {
     try {
-      // Get user information
+      // Get user information - use maybeSingle() to handle case where user doesn't exist
       const { data: userData, error: userError } = await client
         .from('users')
         .select('*')
         .eq('id', userId)
-        .single()
+        .maybeSingle()
 
       if (userError) {
         console.error('❌ Failed to get user information:', userError)
+        // If user not found (PGRST116), try to use session data as fallback
+        if (userError.code === 'PGRST116' || userError.message?.includes('0 rows')) {
+          const userSession = localStorage.getItem('userSession')
+          if (userSession) {
+            try {
+              const sessionData = JSON.parse(userSession)
+              console.log('⚠️ User not found in database, using session data as fallback')
+              setUser(sessionData)
+              setProfileData({
+                name: sessionData.name || '',
+                email: sessionData.email || '',
+                age: sessionData.age || ''
+              })
+              
+              // Try to load tickets and orders using session data
+              if (sessionData.email) {
+                try {
+                  const { data: ticketsData } = await client
+                    .from('tickets')
+                    .select(`
+                      *,
+                      orders (
+                        id,
+                        customer_email,
+                        total_amount_cents,
+                        currency,
+                        status,
+                        created_at
+                      ),
+                      events (
+                        id,
+                        title,
+                        start_at,
+                        venue_name,
+                        address
+                      )
+                    `)
+                    .eq('holder_email', sessionData.email)
+                    .order('created_at', { ascending: false })
+
+                  if (ticketsData) {
+                    setTickets(ticketsData)
+                  }
+
+                  const { data: ordersData } = await client
+                    .from('orders')
+                    .select('*')
+                    .eq('customer_email', sessionData.email)
+                    .order('created_at', { ascending: false })
+
+                  if (ordersData) {
+                    setOrders(ordersData)
+                  }
+                } catch (loadError) {
+                  console.warn('⚠️ Failed to load tickets/orders with session data:', loadError)
+                }
+              }
+              
+              setLoading(false)
+              return
+            } catch (parseError) {
+              console.error('❌ Failed to parse session data:', parseError)
+            }
+          }
+        }
         setLoading(false)
         router.push('/auth/login')
         return
+      }
+
+      // If userData is null (user doesn't exist in database), use session data
+      if (!userData) {
+        console.warn('⚠️ User not found in database, using session data as fallback')
+        const userSession = localStorage.getItem('userSession')
+        if (userSession) {
+          try {
+            const sessionData = JSON.parse(userSession)
+            setUser(sessionData)
+            setProfileData({
+              name: sessionData.name || '',
+              email: sessionData.email || '',
+              age: sessionData.age || ''
+            })
+            
+            // Try to load tickets and orders using session data
+            if (sessionData.email) {
+              try {
+                // Get user tickets using email
+                const { data: ticketsData } = await client
+                  .from('tickets')
+                  .select(`
+                    *,
+                    orders (
+                      id,
+                      customer_email,
+                      total_amount_cents,
+                      currency,
+                      status,
+                      created_at
+                    ),
+                    events (
+                      id,
+                      title,
+                      start_at,
+                      venue_name,
+                      address
+                    )
+                  `)
+                  .eq('holder_email', sessionData.email)
+                  .order('created_at', { ascending: false })
+
+                if (ticketsData) {
+                  setTickets(ticketsData)
+                }
+
+                // Get user orders using email
+                const { data: ordersData } = await client
+                  .from('orders')
+                  .select('*')
+                  .eq('customer_email', sessionData.email)
+                  .order('created_at', { ascending: false })
+
+                if (ordersData) {
+                  setOrders(ordersData)
+                }
+              } catch (loadError) {
+                console.warn('⚠️ Failed to load tickets/orders with session data:', loadError)
+              }
+            }
+            
+            setLoading(false)
+            return
+          } catch (parseError) {
+            console.error('❌ Failed to parse session data:', parseError)
+            setLoading(false)
+            router.push('/auth/login')
+            return
+          }
+        } else {
+          setLoading(false)
+          router.push('/auth/login')
+          return
+        }
       }
 
       if (userData) {

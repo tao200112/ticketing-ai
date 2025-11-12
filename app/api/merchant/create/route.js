@@ -80,12 +80,12 @@ export async function POST(request) {
           throw ErrorHandler.validationError('INVALID_EMAIL')
         }
 
-      // 检查邮箱是否已存在（检查所有角色，因为 email 是唯一的）
-      // 使用 maybeSingle() 来处理可能不存在的情况，避免 406 错误
+      // 检查邮箱是否已存在（检查所有角色，因为 email 是 UNIQUE 的）
+      // 使用 maybeSingle() 避免 406 错误
       const { data: existingUser, error: existingUserError } = await supabase
         .from('users')
         .select('id, role')
-        .eq('email', email)
+        .eq('email', email.trim().toLowerCase())
         .maybeSingle()
 
       // 如果查询出错（非"不存在"的错误），抛出错误
@@ -126,7 +126,7 @@ export async function POST(request) {
       const hashedPassword = await bcrypt.hash(password, 12)
 
       // 创建商家用户
-      // 注意：确保所有必需字段都有值，并且符合数据库约束
+      // 规范化数据以确保符合数据库约束
       const { data: newUser, error: userError } = await supabase
         .from('users')
         .insert([{
@@ -135,7 +135,7 @@ export async function POST(request) {
           age: ageInt,
           password_hash: hashedPassword,
           role: 'merchant',
-          is_active: true // 显式设置，确保默认值
+          is_active: true // 显式设置默认值
         }])
         .select()
         .single()
@@ -144,10 +144,9 @@ export async function POST(request) {
         // 记录详细的错误信息以便调试
         logger.error('User creation failed', {
           error: userError,
-          email: email,
+          email: email.trim().toLowerCase(),
           age: ageInt,
-          role: 'merchant',
-          hasPassword: !!hashedPassword
+          role: 'merchant'
         })
         
         // 检查是否是约束违反错误

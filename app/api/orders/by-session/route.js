@@ -171,9 +171,18 @@ async function createOrderFromStripe(sessionId, userId, userEmail) {
   }
 
   if (ticketRows.length > 0) {
-    const { error: ticketError } = await admin.from('tickets').insert(ticketRows)
+    const { data: insertedTickets, error: ticketError } = await admin
+      .from('tickets')
+      .insert(ticketRows)
+      .select()
+    
     if (ticketError) {
-      console.warn('Failed to create ticket rows', ticketError)
+      console.error('Failed to create ticket rows:', ticketError)
+      // Don't throw error here, let the caller handle it
+      // The main function will check if tickets exist and create them if needed
+      console.warn('Order created but tickets failed to create. Error:', ticketError.message)
+    } else {
+      console.log(`Successfully created ${insertedTickets?.length || 0} tickets for order ${order.id}`)
     }
   }
 
@@ -201,10 +210,10 @@ function buildTicketQr(ticket, event) {
 
 export async function GET(request) {
   try {
+    // Try to get user, but don't require authentication
     const user = await getServerUser()
-    if (!user) {
-      return buildUnauthorizedResponse()
-    }
+    const userId = user?.id || null
+    const userEmail = user?.email || null
 
     if (!stripe) {
       return buildConfigError('Stripe not configured')
@@ -222,6 +231,33 @@ export async function GET(request) {
       return NextResponse.json({ ok: false, message: 'Missing session_id parameter' }, { status: 400 })
     }
 
+    // Verify Stripe session first
+    let stripeSession
+    try {
+      stripeSession = await stripe.checkout.sessions.retrieve(sessionId)
+      
+      // Ensure session is paid
+      if (stripeSession.payment_status !== 'paid') {
+        return NextResponse.json({ 
+          ok: false, 
+          message: 'Payment not completed' 
+        }, { status: 400 })
+      }
+    } catch (stripeError) {
+      console.error('Stripe session retrieval error:', stripeError)
+      return NextResponse.json({ 
+        ok: false, 
+        message: 'Invalid session ID' 
+      }, { status: 400 })
+    }
+
+    // Get customer email from Stripe session
+    const customerEmail = stripeSession.customer_email || 
+                          stripeSession.customer_details?.email || 
+                          userEmail || 
+                          null
+
+    // Check if order exists
     let { data: order, error: orderError } = await admin
       .from('orders')
       .select('*')
@@ -232,25 +268,151 @@ export async function GET(request) {
       throw orderError
     }
 
-    if (order && !ownsOrder(order, user.id, user.email)) {
-      return NextResponse.json({ ok: false, message: 'Order not found' }, { status: 404 })
-    }
-
-    if (!order) {
-      order = await createOrderFromStripe(sessionId, user.id, user.email)
+    // If order exists, verify ownership
+    if (order) {
+      // If user is logged in, check ownership
+      if (user) {
+        if (!ownsOrder(order, user.id, user.email)) {
+          // Check if customer email matches
+          if (customerEmail && order.customer_email === customerEmail) {
+            // Allow access if email matches, and try to link user if logged in
+            if (userId && !order.user_id) {
+              order = await ensureOrderOwnedByUser(order, userId)
+            }
+          } else {
+            return NextResponse.json({ ok: false, message: 'Order not found' }, { status: 404 })
+          }
+        } else {
+          order = await ensureOrderOwnedByUser(order, userId)
+        }
+      } else {
+        // If not logged in, check if customer email matches
+        if (customerEmail && order.customer_email !== customerEmail) {
+          return NextResponse.json({ ok: false, message: 'Order not found' }, { status: 404 })
+        }
+      }
     } else {
-      order = await ensureOrderOwnedByUser(order, user.id)
+      // Order doesn't exist, create it from Stripe session
+      try {
+        order = await createOrderFromStripe(sessionId, userId, customerEmail)
+      } catch (createError) {
+        console.error('Error creating order from Stripe:', createError)
+        return NextResponse.json({ 
+          ok: false, 
+          message: createError.message || 'Failed to create order' 
+        }, { status: 500 })
+      }
     }
 
+    // Get tickets for this order
     const { data: tickets = [], error: ticketsError } = await admin
       .from('tickets')
       .select('*')
       .eq('order_id', order.id)
 
     if (ticketsError) {
+      console.error('Error fetching tickets:', ticketsError)
       throw ticketsError
     }
 
+    // If no tickets exist, this means createOrderFromStripe didn't create them
+    // Try to create them now
+    if (tickets.length === 0) {
+      console.log('No tickets found for order, attempting to create them...')
+      
+      const metadata = stripeSession.metadata || {}
+      const eventId = metadata.event_id || null
+      const priceId = metadata.price_id || null
+      const priceName = metadata.price_name || 'general'
+      const quantity = parseInt(metadata.quantity || '1', 10) || 1
+
+      // Get event snapshot
+      let eventSnapshot = null
+      if (eventId) {
+        const { data: eventData } = await admin
+          .from('events')
+          .select('title, description, venue_name, address, start_at, end_at, poster_url')
+          .eq('id', eventId)
+          .single()
+
+        if (eventData) {
+          eventSnapshot = {
+            title: eventData.title,
+            description: eventData.description,
+            venue_name: eventData.venue_name,
+            address: eventData.address,
+            start_at: eventData.start_at,
+            end_at: eventData.end_at,
+            poster_url: eventData.poster_url,
+          }
+        }
+      }
+
+      // Get price snapshot
+      let priceSnapshot = null
+      if (priceId) {
+        const { data: priceData } = await admin
+          .from('prices')
+          .select('name, amount_cents, currency, ticket_kind')
+          .eq('id', priceId)
+          .single()
+
+        if (priceData) {
+          priceSnapshot = {
+            name: priceData.name,
+            amount_cents: priceData.amount_cents,
+            currency: priceData.currency || 'USD',
+            ticket_kind: priceData.ticket_kind,
+          }
+        }
+      }
+
+      // Create tickets
+      const ticketRows = []
+      for (let i = 0; i < quantity; i += 1) {
+        ticketRows.push({
+          order_id: order.id,
+          event_id: eventId,
+          tier: priceName,
+          ticket_kind: priceSnapshot?.ticket_kind || null,
+          holder_email: customerEmail,
+          status: 'unused',
+          used: false,
+          short_id: generateShortTicketId(),
+          user_id: userId,
+          event_title_snapshot: eventSnapshot?.title || null,
+          event_description_snapshot: eventSnapshot?.description || null,
+          event_venue_snapshot: eventSnapshot?.venue_name || null,
+          event_address_snapshot: eventSnapshot?.address || null,
+          event_start_at_snapshot: eventSnapshot?.start_at || null,
+          event_end_at_snapshot: eventSnapshot?.end_at || null,
+          event_poster_url_snapshot: eventSnapshot?.poster_url || null,
+          price_name_snapshot: priceSnapshot?.name || priceName,
+          price_amount_cents_snapshot: priceSnapshot?.amount_cents || null,
+          price_currency_snapshot: priceSnapshot?.currency || 'USD',
+        })
+      }
+
+      if (ticketRows.length > 0) {
+        const { data: newTickets, error: ticketError } = await admin
+          .from('tickets')
+          .insert(ticketRows)
+          .select()
+
+        if (ticketError) {
+          console.error('Failed to create ticket rows:', ticketError)
+          return NextResponse.json({ 
+            ok: false, 
+            message: 'Failed to create tickets: ' + ticketError.message 
+          }, { status: 500 })
+        }
+        
+        // Update tickets array with newly created tickets
+        tickets.push(...(newTickets || []))
+      }
+    }
+
+    // Get event information
     const eventId = tickets[0]?.event_id
     let event = null
 
@@ -266,22 +428,34 @@ export async function GET(request) {
       }
     }
 
-    const ownedTickets = tickets.filter((ticket) => {
-      if (ticket.user_id && ticket.user_id === user.id) return true
-      if (ticket.holder_email && user.email && ticket.holder_email === user.email) return true
-      return false
-    })
+    // Filter tickets based on user or email
+    let ownedTickets = tickets
+    if (user) {
+      ownedTickets = tickets.filter((ticket) => {
+        if (ticket.user_id && ticket.user_id === user.id) return true
+        if (ticket.holder_email && user.email && ticket.holder_email === user.email) return true
+        return false
+      })
 
-    // ensure ticket ownership is set for future queries
-    const ticketsToClaim = ownedTickets.filter((ticket) => !ticket.user_id)
-    if (ticketsToClaim.length > 0) {
-      const ticketIds = ticketsToClaim.map((ticket) => ticket.id)
-      await admin
-        .from('tickets')
-        .update({ user_id: user.id })
-        .in('id', ticketIds)
+      // Ensure ticket ownership is set for future queries
+      const ticketsToClaim = ownedTickets.filter((ticket) => !ticket.user_id)
+      if (ticketsToClaim.length > 0 && userId) {
+        const ticketIds = ticketsToClaim.map((ticket) => ticket.id)
+        await admin
+          .from('tickets')
+          .update({ user_id: userId })
+          .in('id', ticketIds)
+      }
+    } else {
+      // If not logged in, show tickets matching customer email
+      if (customerEmail) {
+        ownedTickets = tickets.filter((ticket) => {
+          return ticket.holder_email === customerEmail
+        })
+      }
     }
 
+    // Build QR codes for tickets
     const ticketsWithQR = ownedTickets.map((ticket) => buildTicketQr(ticket, event))
 
     return NextResponse.json({

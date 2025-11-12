@@ -69,11 +69,16 @@ export default function MerchantLoginPage() {
       console.log('🔍 商家登录响应:', { status: response.status, data })
       
       if (response.ok && data.success) {
-        // Login successful, save user info to localStorage
-        localStorage.setItem('merchantUser', JSON.stringify(data.user))
+        // Login successful, save user and merchant info to localStorage
+        const merchantUser = {
+          ...data.user,
+          merchant: data.merchant || null,
+          merchant_id: data.merchant?.id || null
+        }
+        localStorage.setItem('merchantUser', JSON.stringify(merchantUser))
         localStorage.setItem('merchantToken', 'merchant-logged-in')
         
-        console.log('✅ 商家登录成功，跳转到商家页面')
+        console.log('✅ 商家登录成功，已保存用户和商家信息，跳转到商家页面')
         // Navigate to merchant dashboard
         router.push('/merchant')
       } else {

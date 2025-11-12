@@ -147,6 +147,14 @@ export async function POST(request) {
         }
         
         // 确保不传递 id 字段，让数据库使用默认值生成
+        logger.info('创建商家用户', {
+          email: userInsertData.email,
+          name: userInsertData.name,
+          age: userInsertData.age,
+          hasPasswordHash: !!userInsertData.password_hash,
+          passwordHashLength: userInsertData.password_hash?.length
+        })
+        
         const { data: newUser, error: userError } = await supabase
           .from('users')
           .insert([userInsertData])
@@ -300,14 +308,23 @@ export async function POST(request) {
       // 非阻塞性错误，商家已创建成功
     }
 
-    logger.success('Merchant created successfully', { merchantId: newMerchant.id })
+    logger.success('Merchant created successfully', { merchantId: newMerchant.id, userId: finalUserId || 'none' })
 
-    return NextResponse.json({
+    // 准备返回数据
+    const responseData = {
       ok: true,
       success: true,
-      merchant: newMerchant,
-      user: userRecord || null // 如果创建了用户，返回用户信息；否则返回 null
-    })
+      merchant: newMerchant
+    }
+
+    // 如果创建了用户，返回用户信息（但不包含密码哈希）
+    if (userRecord) {
+      const userResponse = { ...userRecord }
+      delete userResponse.password_hash
+      responseData.user = userResponse
+    }
+
+    return NextResponse.json(responseData)
 
   } catch (error) {
     return handleApiError(error, request, logger)

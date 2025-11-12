@@ -1,5 +1,15 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // ESLint 配置：在构建时完全跳过 ESLint 检查（必须在最前面）
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  
+  // TypeScript 配置：在构建时忽略类型错误
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+  
   outputFileTracingRoot: __dirname,
   
   // 路径别名配置
@@ -33,22 +43,6 @@ const nextConfig = {
       console.warn('无法获取 Git SHA，使用时间戳作为构建 ID');
       return Date.now().toString();
     }
-  },
-
-  // 线上部署优化配置
-  // 注意：serverComponentsExternalPackages 已移动到 serverExternalPackages
-
-  // 简化的配置，避免构建错误
-  // 移除可能导致问题的重写规则和头部配置
-  
-  // ESLint 配置：在构建时完全跳过 ESLint 检查
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-  
-  // TypeScript 配置：在构建时忽略类型错误
-  typescript: {
-    ignoreBuildErrors: true,
   },
 }
 

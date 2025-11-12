@@ -171,13 +171,10 @@ export default function MerchantRegisterPage() {
             setErrors({ age: errorMessage || '年龄必须至少为 16 岁' })
             break
           case 'USER_CREATION_FAILED':
-            setErrors({ general: errorMessage || '创建用户失败，请检查输入信息' })
+            setErrors({ general: errorMessage || '创建用户账户失败，请检查输入信息后重试' })
             break
           case 'MERCHANT_CREATION_FAILED':
             setErrors({ general: errorMessage || '创建商家账户失败，请重试' })
-            break
-          case 'USER_CREATION_FAILED':
-            setErrors({ general: errorMessage || '创建用户账户失败，请检查输入信息后重试' })
             break
           case 'USER_REQUIRED':
             setErrors({ general: errorMessage || '商家注册必须创建用户账户，请检查输入信息' })

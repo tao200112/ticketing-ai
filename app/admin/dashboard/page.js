@@ -1608,7 +1608,7 @@ export default function AdminDashboard() {
           padding: '20px',
           overflowY: 'auto'
         }}>
-          <div style={{ position: 'relative', width: '100%', maxWidth: '800px' }}>
+          <div style={{ position: 'relative', width: '100%', maxWidth: '800px', zIndex: 1002 }}>
             <button
               onClick={() => setShowEventModal(false)}
               style={{
@@ -1626,7 +1626,7 @@ export default function AdminDashboard() {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                zIndex: 1001
+                zIndex: 1003
               }}
             >
               ×

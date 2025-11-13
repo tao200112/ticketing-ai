@@ -19,7 +19,7 @@ function parseHashParams() {
   return new URLSearchParams(hash);
 }
 
-function ResetPasswordContent() {
+function UpdatePasswordContent() {
   const supabase = useMemo(() => getSupabaseClient(), []);
   const router = useRouter();
   const [password, setPassword] = useState("");
@@ -97,7 +97,7 @@ function ResetPasswordContent() {
 
       if (updateError) {
         setStatus(STATUS_ERROR);
-        setMessage(updateError.message || "Reset failed, please try again later.");
+        setMessage(updateError.message || "Failed to update password, please try again later.");
         return;
       }
 
@@ -112,12 +112,12 @@ function ResetPasswordContent() {
       }
 
       setStatus(STATUS_SUCCESS);
-      setMessage("Password reset successful! Redirecting to login page in 3 seconds...");
+      setMessage("Password updated successfully! Redirecting to account page in 3 seconds...");
       setTimeout(() => {
-        router.push("/auth/login");
+        router.push("/account");
       }, 3000);
     } catch (error) {
-      console.error("Failed to reset password", error);
+      console.error("Failed to update password", error);
       setStatus(STATUS_ERROR);
       setMessage("Network error, please try again later.");
     } finally {
@@ -144,7 +144,7 @@ function ResetPasswordContent() {
         <div className="sm:mx-auto sm:w-full sm:max-w-md">
           <div className="text-center">
             <div className="text-6xl mb-4">❌</div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Reset Failed</h1>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Update Failed</h1>
             <p className="text-red-600 mb-6">{message}</p>
             <div className="space-y-2">
               <Link
@@ -172,14 +172,13 @@ function ResetPasswordContent() {
         <div className="sm:mx-auto sm:w-full sm:max-w-md">
           <div className="text-center">
             <div className="text-6xl mb-4">✅</div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Password Reset Successful</h1>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Password Updated Successfully</h1>
             <p className="text-green-600 mb-6">{message}</p>
-            <p className="text-gray-600 mb-6">Redirecting to login page in 3 seconds...</p>
             <Link
-              href="/auth/login"
+              href="/account"
               className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
             >
-              Login Now
+              Go to Account
             </Link>
           </div>
         </div>
@@ -191,7 +190,7 @@ function ResetPasswordContent() {
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">🔑 Reset Password</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">🔑 Update Password</h1>
           <p className="text-gray-600">Please enter your new password</p>
         </div>
       </div>
@@ -249,7 +248,7 @@ function ResetPasswordContent() {
                 disabled={isLoading}
                 className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isLoading ? "Resetting..." : "Reset Password"}
+                {isLoading ? "Updating..." : "Update Password"}
               </button>
             </div>
 
@@ -276,7 +275,7 @@ function ResetPasswordContent() {
   );
 }
 
-export default function ResetPasswordPage() {
+export default function UpdatePasswordPage() {
   return (
     <Suspense
       fallback={
@@ -290,7 +289,7 @@ export default function ResetPasswordPage() {
         </div>
       }
     >
-      <ResetPasswordContent />
+      <UpdatePasswordContent />
     </Suspense>
   );
 }

@@ -226,14 +226,32 @@ export default function AccountPage() {
       }
 
       if (userData) {
+        // Get auth user to check has_password from user_metadata
+        let authUser = null
+        try {
+          const { data: { user: authUserData }, error: authError } = await client.auth.getUser()
+          if (!authError && authUserData) {
+            authUser = authUserData
+          }
+        } catch (authErr) {
+          console.warn('⚠️ Failed to get auth user for has_password check:', authErr)
+        }
+
+        // Check has_password from user_metadata (preferred) or fallback to password_hash check
+        const hasPasswordFromMetadata = authUser?.user_metadata?.has_password === true
         const requiresPassword = requiresPasswordSetup(userData)
-        const hasPassword = !!userData.password_hash && !requiresPassword
+        const hasPasswordFromHash = !!userData.password_hash && !requiresPassword
+        const hasPassword = hasPasswordFromMetadata || hasPasswordFromHash
 
         delete userData.password_hash
 
         // Track password setup status for Google OAuth users
         userData.has_password = hasPassword
         userData.requires_password_setup = requiresPassword
+        // Store auth_user for later use
+        if (authUser) {
+          userData.auth_user = authUser
+        }
 
         // Persist password status in local session (if available)
         try {
@@ -606,7 +624,7 @@ export default function AccountPage() {
         )}
 
         {/* Google OAuth users without password - prompt to set password */}
-        {user && user.auth_provider === 'google' && (user.requires_password_setup || user.has_password === false) && (
+        {user && user.auth_provider === 'google' && user.has_password !== true && (
           <div style={{
             background: 'rgba(96, 165, 250, 0.15)',
             border: '2px solid rgba(96, 165, 250, 0.4)',

@@ -26,13 +26,13 @@ function OAuthSuccessContent() {
       return
     }
 
-    // 如果还在加载，等待一下
+    // If still loading, wait
     if (loading) {
       setStatusMessage('Loading...')
       return
     }
 
-    // 如果没有用户，等待一段时间让 Supabase 处理 OAuth 回调
+    // If no user, wait for Supabase to process OAuth callback
     if (!user && !loading) {
       const checkInterval = setInterval(async () => {
         try {
@@ -69,7 +69,7 @@ function OAuthSuccessContent() {
         }
       }, 500)
 
-      // 设置超时，如果 15 秒后还没有 session，重定向到登录页面
+      // Set timeout, if no session after 15 seconds, redirect to login page
       const timeout = setTimeout(() => {
         clearInterval(checkInterval)
         if (!user) {

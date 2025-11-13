@@ -744,27 +744,27 @@ export default function AccountPage() {
           )
         })()}
 
-        {/* User Profile Card */}
+        {/* User Profile Card - Compact */}
         <div style={{
-          background: 'rgba(255, 255, 255, 0.08)',
+          background: 'rgba(15, 23, 42, 0.8)',
           backdropFilter: 'blur(12px)',
-          borderRadius: '16px',
-          padding: '24px',
-          marginBottom: '24px',
+          borderRadius: '20px',
+          padding: '20px',
+          marginBottom: '20px',
           border: '1px solid rgba(255, 255, 255, 0.1)',
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)'
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '20px', marginBottom: '20px' }}>
-            {/* Avatar */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '16px' }}>
+            {/* Avatar - Circular */}
             <div style={{
-              width: '80px',
-              height: '80px',
+              width: '64px',
+              height: '64px',
               borderRadius: '50%',
-              background: 'rgba(124, 58, 237, 0.3)',
+              background: 'linear-gradient(135deg, #7C3AED 0%, #22D3EE 100%)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: '32px',
+              fontSize: '24px',
               fontWeight: 'bold',
               color: 'white',
               border: '2px solid rgba(255, 255, 255, 0.2)',
@@ -774,91 +774,123 @@ export default function AccountPage() {
             </div>
             
             {/* User Info */}
-            <div style={{ flex: 1 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
               <h2 style={{
                 color: 'white',
-                fontSize: '20px',
+                fontSize: '18px',
                 fontWeight: '600',
                 marginBottom: '4px',
-                textTransform: 'capitalize'
+                textTransform: 'capitalize',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap'
               }}>
                 {user?.name || 'User'}
               </h2>
               <p style={{
                 color: 'rgba(255, 255, 255, 0.7)',
-                fontSize: '14px',
-                margin: 0
+                fontSize: '13px',
+                margin: 0,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap'
               }}>
                 {user?.email || 'No email'}
-            </p>
-          </div>
+              </p>
+            </div>
           </div>
           
-          {/* View My Profile Button */}
-            <button
+          {/* View Profile Button */}
+          <button
             onClick={() => setShowProfileDetails(true)}
-              style={{
+            style={{
               width: '100%',
-              background: 'linear-gradient(135deg, #3b82f6 0%, #22d3ee 100%)',
-                color: 'white',
-                border: 'none',
+              background: 'rgba(255, 255, 255, 0.1)',
+              color: 'white',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
               borderRadius: '12px',
-              padding: '14px',
-              fontSize: '15px',
-                fontWeight: '600',
+              padding: '12px',
+              fontSize: '14px',
+              fontWeight: '600',
               cursor: 'pointer',
-                transition: 'all 0.3s ease'
-              }}
+              transition: 'all 0.3s ease'
+            }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.opacity = '0.9'
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'
               e.currentTarget.style.transform = 'translateY(-1px)'
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.opacity = '1'
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'
               e.currentTarget.style.transform = 'translateY(0)'
             }}
           >
-            View My Profile
-            </button>
+            View Profile
+          </button>
         </div>
 
-        {/* Shortcuts Section */}
-        <div style={{ marginBottom: '24px' }}>
-          <h3 style={{
-            color: 'white',
-            fontSize: '18px',
-            fontWeight: '600',
-            marginBottom: '16px'
-          }}>
-            Shortcuts
-          </h3>
+        {/* Engagement Banner */}
         <div style={{
+          background: 'linear-gradient(135deg, rgba(124, 58, 237, 0.2) 0%, rgba(34, 211, 238, 0.2) 100%)',
+          backdropFilter: 'blur(12px)',
+          borderRadius: '16px',
+          padding: '20px',
+          marginBottom: '24px',
+          border: '1px solid rgba(255, 255, 255, 0.15)',
+          boxShadow: '0 4px 20px rgba(124, 58, 237, 0.2)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ fontSize: '28px' }}>🎉</div>
+            <div style={{ flex: 1 }}>
+              <div style={{
+                color: 'white',
+                fontSize: '16px',
+                fontWeight: '600',
+                marginBottom: '4px'
+              }}>
+                Want free entry? Join our VT Ambassador Program
+              </div>
+              <div style={{
+                color: 'rgba(255, 255, 255, 0.8)',
+                fontSize: '13px'
+              }}>
+                Get free drinks and VIP line skip with PartyTix.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Primary Shortcuts - Grid Cards */}
+        <div style={{ marginBottom: '24px' }}>
+          <div style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
-            gap: '16px'
+            gridTemplateColumns: 'repeat(2, 1fr)',
+            gap: '12px'
           }}>
             {/* My Tickets */}
             <button
               onClick={() => setShowTicketsModal(true)}
               style={{
-                background: 'rgba(255, 255, 255, 0.08)',
+                background: 'rgba(15, 23, 42, 0.8)',
                 border: '1px solid rgba(255, 255, 255, 0.1)',
-          borderRadius: '16px',
-                padding: '24px 16px',
+                borderRadius: '16px',
+                padding: '20px 16px',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
                 gap: '12px',
                 cursor: 'pointer',
-                transition: 'all 0.3s ease'
+                transition: 'all 0.3s ease',
+                boxShadow: '0 4px 16px rgba(0, 0, 0, 0.2)'
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)'
+                e.currentTarget.style.background = 'rgba(15, 23, 42, 0.95)'
                 e.currentTarget.style.transform = 'translateY(-2px)'
+                e.currentTarget.style.boxShadow = '0 6px 20px rgba(0, 0, 0, 0.3)'
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
+                e.currentTarget.style.background = 'rgba(15, 23, 42, 0.8)'
                 e.currentTarget.style.transform = 'translateY(0)'
+                e.currentTarget.style.boxShadow = '0 4px 16px rgba(0, 0, 0, 0.2)'
               }}
             >
               <div style={{
@@ -871,8 +903,8 @@ export default function AccountPage() {
                 justifyContent: 'center',
                 fontSize: '24px'
               }}>
-                🎫
-          </div>
+                🎟
+              </div>
               <span style={{
                 color: 'white',
                 fontSize: '14px',
@@ -886,24 +918,27 @@ export default function AccountPage() {
             <button
               onClick={() => setShowOrdersModal(true)}
               style={{
-                background: 'rgba(255, 255, 255, 0.08)',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
-          borderRadius: '16px',
-                padding: '24px 16px',
+                background: 'rgba(15, 23, 42, 0.8)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '16px',
+                padding: '20px 16px',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
                 gap: '12px',
                 cursor: 'pointer',
-                transition: 'all 0.3s ease'
+                transition: 'all 0.3s ease',
+                boxShadow: '0 4px 16px rgba(0, 0, 0, 0.2)'
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)'
+                e.currentTarget.style.background = 'rgba(15, 23, 42, 0.95)'
                 e.currentTarget.style.transform = 'translateY(-2px)'
+                e.currentTarget.style.boxShadow = '0 6px 20px rgba(0, 0, 0, 0.3)'
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
+                e.currentTarget.style.background = 'rgba(15, 23, 42, 0.8)'
                 e.currentTarget.style.transform = 'translateY(0)'
+                e.currentTarget.style.boxShadow = '0 4px 16px rgba(0, 0, 0, 0.2)'
               }}
             >
               <div style={{
@@ -916,8 +951,8 @@ export default function AccountPage() {
                 justifyContent: 'center',
                 fontSize: '24px'
               }}>
-                📋
-            </div>
+                📜
+              </div>
               <span style={{
                 color: 'white',
                 fontSize: '14px',
@@ -930,28 +965,30 @@ export default function AccountPage() {
             {/* Settings */}
             <button
               onClick={() => {
-                // Settings functionality to be added later
                 alert('Settings feature coming soon!')
               }}
               style={{
-                background: 'rgba(255, 255, 255, 0.08)',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
+                background: 'rgba(15, 23, 42, 0.8)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
                 borderRadius: '16px',
-                padding: '24px 16px',
+                padding: '20px 16px',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
                 gap: '12px',
                 cursor: 'pointer',
-                transition: 'all 0.3s ease'
+                transition: 'all 0.3s ease',
+                boxShadow: '0 4px 16px rgba(0, 0, 0, 0.2)'
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)'
+                e.currentTarget.style.background = 'rgba(15, 23, 42, 0.95)'
                 e.currentTarget.style.transform = 'translateY(-2px)'
+                e.currentTarget.style.boxShadow = '0 6px 20px rgba(0, 0, 0, 0.3)'
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
+                e.currentTarget.style.background = 'rgba(15, 23, 42, 0.8)'
                 e.currentTarget.style.transform = 'translateY(0)'
+                e.currentTarget.style.boxShadow = '0 4px 16px rgba(0, 0, 0, 0.2)'
               }}
             >
               <div style={{
@@ -965,7 +1002,7 @@ export default function AccountPage() {
                 fontSize: '24px'
               }}>
                 ⚙️
-            </div>
+              </div>
               <span style={{ 
                 color: 'white', 
                 fontSize: '14px',
@@ -974,645 +1011,375 @@ export default function AccountPage() {
                 Settings
               </span>
             </button>
-            </div>
-          </div>
 
-        {/* Logout Button */}
-        <div style={{ marginTop: '40px', marginBottom: '20px' }}>
+            {/* Payment Methods */}
+            <button
+              onClick={() => {
+                alert('Payment Methods feature coming soon!')
+              }}
+              style={{
+                background: 'rgba(15, 23, 42, 0.8)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '16px',
+                padding: '20px 16px',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '12px',
+                cursor: 'pointer',
+                transition: 'all 0.3s ease',
+                boxShadow: '0 4px 16px rgba(0, 0, 0, 0.2)'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(15, 23, 42, 0.95)'
+                e.currentTarget.style.transform = 'translateY(-2px)'
+                e.currentTarget.style.boxShadow = '0 6px 20px rgba(0, 0, 0, 0.3)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'rgba(15, 23, 42, 0.8)'
+                e.currentTarget.style.transform = 'translateY(0)'
+                e.currentTarget.style.boxShadow = '0 4px 16px rgba(0, 0, 0, 0.2)'
+              }}
+            >
+              <div style={{
+                width: '48px',
+                height: '48px',
+                borderRadius: '12px',
+                background: 'rgba(34, 197, 94, 0.2)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '24px'
+              }}>
+                💳
+              </div>
+              <span style={{ 
+                color: 'white', 
+                fontSize: '14px',
+                fontWeight: '600'
+              }}>
+                Payment Methods
+              </span>
+            </button>
+          </div>
+        </div>
+
+        {/* Growth / Value Section - Secondary Shortcuts */}
+        <div style={{ marginBottom: '24px' }}>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, 1fr)',
+            gap: '12px'
+          }}>
+            {/* Rewards */}
+            <button
+              onClick={() => {
+                alert('Rewards feature coming soon!')
+              }}
+              style={{
+                background: 'rgba(15, 23, 42, 0.8)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '16px',
+                padding: '20px 12px',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '10px',
+                cursor: 'pointer',
+                transition: 'all 0.3s ease',
+                boxShadow: '0 4px 16px rgba(0, 0, 0, 0.2)'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(15, 23, 42, 0.95)'
+                e.currentTarget.style.transform = 'translateY(-2px)'
+                e.currentTarget.style.boxShadow = '0 6px 20px rgba(0, 0, 0, 0.3)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'rgba(15, 23, 42, 0.8)'
+                e.currentTarget.style.transform = 'translateY(0)'
+                e.currentTarget.style.boxShadow = '0 4px 16px rgba(0, 0, 0, 0.2)'
+              }}
+            >
+              <div style={{
+                width: '40px',
+                height: '40px',
+                borderRadius: '10px',
+                background: 'rgba(251, 191, 36, 0.2)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '20px'
+              }}>
+                ⭐
+              </div>
+              <span style={{ 
+                color: 'white', 
+                fontSize: '13px',
+                fontWeight: '600'
+              }}>
+                Rewards
+              </span>
+            </button>
+
+            {/* Invite Friends */}
+            <button
+              onClick={() => {
+                alert('Invite Friends feature coming soon!')
+              }}
+              style={{
+                background: 'rgba(15, 23, 42, 0.8)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '16px',
+                padding: '20px 12px',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '10px',
+                cursor: 'pointer',
+                transition: 'all 0.3s ease',
+                boxShadow: '0 4px 16px rgba(0, 0, 0, 0.2)'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(15, 23, 42, 0.95)'
+                e.currentTarget.style.transform = 'translateY(-2px)'
+                e.currentTarget.style.boxShadow = '0 6px 20px rgba(0, 0, 0, 0.3)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'rgba(15, 23, 42, 0.8)'
+                e.currentTarget.style.transform = 'translateY(0)'
+                e.currentTarget.style.boxShadow = '0 4px 16px rgba(0, 0, 0, 0.2)'
+              }}
+            >
+              <div style={{
+                width: '40px',
+                height: '40px',
+                borderRadius: '10px',
+                background: 'rgba(236, 72, 153, 0.2)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '20px'
+              }}>
+                👥
+              </div>
+              <span style={{ 
+                color: 'white', 
+                fontSize: '13px',
+                fontWeight: '600'
+              }}>
+                Invite Friends
+              </span>
+            </button>
+
+            {/* Wallet / PartyTix Credit */}
+            <button
+              onClick={() => {
+                alert('Wallet feature coming soon!')
+              }}
+              style={{
+                background: 'rgba(15, 23, 42, 0.8)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '16px',
+                padding: '20px 12px',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '10px',
+                cursor: 'pointer',
+                transition: 'all 0.3s ease',
+                boxShadow: '0 4px 16px rgba(0, 0, 0, 0.2)'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(15, 23, 42, 0.95)'
+                e.currentTarget.style.transform = 'translateY(-2px)'
+                e.currentTarget.style.boxShadow = '0 6px 20px rgba(0, 0, 0, 0.3)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'rgba(15, 23, 42, 0.8)'
+                e.currentTarget.style.transform = 'translateY(0)'
+                e.currentTarget.style.boxShadow = '0 4px 16px rgba(0, 0, 0, 0.2)'
+              }}
+            >
+              <div style={{
+                width: '40px',
+                height: '40px',
+                borderRadius: '10px',
+                background: 'rgba(34, 211, 238, 0.2)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '20px'
+              }}>
+                💵
+              </div>
+              <span style={{ 
+                color: 'white', 
+                fontSize: '13px',
+                fontWeight: '600'
+              }}>
+                Wallet
+              </span>
+            </button>
+          </div>
+        </div>
+
+        {/* Support Section */}
+        <div style={{
+          background: 'rgba(15, 23, 42, 0.6)',
+          backdropFilter: 'blur(12px)',
+          borderRadius: '16px',
+          padding: '20px',
+          marginBottom: '24px',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.2)'
+        }}>
+          <div style={{
+            color: 'rgba(255, 255, 255, 0.9)',
+            fontSize: '16px',
+            fontWeight: '600',
+            marginBottom: '16px'
+          }}>
+            Support
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <button
+              onClick={() => {
+                router.push('/contact')
+              }}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: 'rgba(255, 255, 255, 0.8)',
+                fontSize: '14px',
+                fontWeight: '500',
+                padding: '12px 0',
+                textAlign: 'left',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = 'white'
+                e.currentTarget.style.paddingLeft = '8px'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = 'rgba(255, 255, 255, 0.8)'
+                e.currentTarget.style.paddingLeft = '0'
+              }}
+            >
+              Contact Us
+            </button>
+            <button
+              onClick={() => {
+                alert('Terms of Service - Coming soon!')
+              }}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: 'rgba(255, 255, 255, 0.8)',
+                fontSize: '14px',
+                fontWeight: '500',
+                padding: '12px 0',
+                textAlign: 'left',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = 'white'
+                e.currentTarget.style.paddingLeft = '8px'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = 'rgba(255, 255, 255, 0.8)'
+                e.currentTarget.style.paddingLeft = '0'
+              }}
+            >
+              Terms of Service
+            </button>
+            <button
+              onClick={() => {
+                alert('Privacy Policy - Coming soon!')
+              }}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: 'rgba(255, 255, 255, 0.8)',
+                fontSize: '14px',
+                fontWeight: '500',
+                padding: '12px 0',
+                textAlign: 'left',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = 'white'
+                e.currentTarget.style.paddingLeft = '8px'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = 'rgba(255, 255, 255, 0.8)'
+                e.currentTarget.style.paddingLeft = '0'
+              }}
+            >
+              Privacy Policy
+            </button>
+            <button
+              onClick={() => {
+                alert('Help / FAQ - Coming soon!')
+              }}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: 'rgba(255, 255, 255, 0.8)',
+                fontSize: '14px',
+                fontWeight: '500',
+                padding: '12px 0',
+                textAlign: 'left',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = 'white'
+                e.currentTarget.style.paddingLeft = '8px'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = 'rgba(255, 255, 255, 0.8)'
+                e.currentTarget.style.paddingLeft = '0'
+              }}
+            >
+              Help / FAQ
+            </button>
+          </div>
+        </div>
+
+        {/* Logout Button - Bottom */}
+        <div style={{ marginTop: '32px', marginBottom: '40px', display: 'flex', justifyContent: 'center' }}>
           <button
             onClick={handleLogout}
             style={{
-              width: '100%',
-              background: 'rgba(239, 68, 68, 0.2)',
-              border: '1px solid rgba(239, 68, 68, 0.4)',
-              color: '#fca5a5',
+              background: 'transparent',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              color: 'rgba(255, 255, 255, 0.7)',
               borderRadius: '12px',
-              padding: '14px',
-              fontSize: '15px',
-              fontWeight: '600',
+              padding: '12px 24px',
+              fontSize: '14px',
+              fontWeight: '500',
               cursor: 'pointer',
               transition: 'all 0.3s ease'
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'rgba(239, 68, 68, 0.3)'
-              e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.6)'
+              e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)'
+              e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.4)'
+              e.currentTarget.style.color = '#fca5a5'
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)'
-              e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.4)'
+              e.currentTarget.style.background = 'transparent'
+              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)'
+              e.currentTarget.style.color = 'rgba(255, 255, 255, 0.7)'
             }}
           >
             Logout
           </button>
-        </div>
-
-        {/* My Tickets Section - Hidden, content moved to modal */}
-        <div id="tickets-section" style={{ display: 'none' }}>
-          <h2 style={{ color: 'white', marginBottom: '20px', fontSize: '20px' }}>
-            My Tickets ({tickets?.length || 0})
-          </h2>
-          
-          {(tickets?.length || 0) === 0 ? (
-            <div style={{ 
-              textAlign: 'center', 
-              color: 'rgba(255, 255, 255, 0.6)',
-              padding: '40px'
-            }}>
-              <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎫</div>
-              <div style={{ fontSize: '18px', marginBottom: '8px' }}>No tickets yet</div>
-              <div style={{ fontSize: '14px' }}>Purchase tickets for events to see them here</div>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              {/* Categorize tickets by kind first, then by usage status */}
-              {(() => {
-                // Group tickets by category
-                const ticketsByCategory = {}
-                
-                ;(tickets || []).forEach(ticket => {
-                  const category = getTicketKindCategoryName(ticket.ticket_kind)
-                  if (!ticketsByCategory[category]) {
-                    ticketsByCategory[category] = { unused: [], used: [] }
-                  }
-                  
-                  // Check if ticket is used
-                  const isUsed = ticket.used || ticket.status === 'used'
-                  if (isUsed) {
-                    ticketsByCategory[category].used.push(ticket)
-                  } else {
-                    ticketsByCategory[category].unused.push(ticket)
-                  }
-                })
-                
-                // Define category order and colors
-                const categoryOrder = ['Entry Tickets', 'Drink Tickets', 'Queue Pass', 'Other']
-                const categoryColors = {
-                  'Entry Tickets': { bg: 'rgba(59, 130, 246, 0.2)', color: '#3b82f6' },
-                  'Drink Tickets': { bg: 'rgba(168, 85, 247, 0.2)', color: '#a855f7' },
-                  'Queue Pass': { bg: 'rgba(236, 72, 153, 0.2)', color: '#ec4899' },
-                  'Other': { bg: 'rgba(107, 114, 128, 0.2)', color: '#6b7280' }
-                }
-                
-                return (
-                  <>
-                    {categoryOrder.map(category => {
-                      const categoryTickets = ticketsByCategory[category]
-                      if (!categoryTickets || (categoryTickets.unused.length === 0 && categoryTickets.used.length === 0)) {
-                        return null
-                      }
-                      
-                      const totalCount = categoryTickets.unused.length + categoryTickets.used.length
-                      const categoryColor = categoryColors[category] || categoryColors['Other']
-                      
-                      return (
-                        <div key={category} style={{ marginBottom: '24px' }}>
-                          {/* Category Header */}
-                          <button
-                            onClick={() => setTicketsExpanded(prev => ({
-                              ...prev,
-                              [category]: {
-                                ...prev[category],
-                                categoryExpanded: !prev[category]?.categoryExpanded
-                              }
-                            }))}
-                            style={{
-                              width: '100%',
-                              display: 'flex',
-                              justifyContent: 'space-between',
-                              alignItems: 'center',
-                              background: categoryColor.bg,
-                              border: `1px solid ${categoryColor.color}40`,
-                              borderRadius: '12px',
-                              padding: '16px 20px',
-                              cursor: 'pointer',
-                              transition: 'all 0.3s ease',
-                              marginBottom: '12px'
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.opacity = '0.9'
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.opacity = '1'
-                            }}
-                          >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                              <span style={{ 
-                                background: categoryColor.color,
-                                color: 'white',
-                                padding: '6px 12px',
-                                borderRadius: '6px',
-                                fontSize: '14px',
-                                fontWeight: '600'
-                              }}>
-                                {category}
-                              </span>
-                              <span style={{ color: 'white', fontSize: '16px', fontWeight: '600' }}>
-                                {category} ({totalCount})
-                              </span>
-                            </div>
-                            <span style={{ 
-                              color: 'rgba(255, 255, 255, 0.6)',
-                              fontSize: '20px',
-                              transform: ticketsExpanded[category]?.categoryExpanded !== false ? 'rotate(180deg)' : 'rotate(0deg)',
-                              transition: 'transform 0.3s ease'
-                            }}>
-                              ▼
-                            </span>
-                          </button>
-                          
-                          {/* Category Content */}
-                          {ticketsExpanded[category]?.categoryExpanded !== false && (
-                            <div style={{ paddingLeft: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                              {/* Unused Tickets in this category */}
-                              {categoryTickets.unused.length > 0 && (
-                                <div>
-                                  <button
-                                    onClick={() => setTicketsExpanded(prev => ({
-                                      ...prev,
-                                      [category]: {
-                                        ...prev[category],
-                                        unused: !prev[category]?.unused
-                                      }
-                                    }))}
-                                    style={{
-                                      width: '100%',
-                                      display: 'flex',
-                                      justifyContent: 'space-between',
-                                      alignItems: 'center',
-                                      background: 'rgba(255, 255, 255, 0.05)',
-                                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                                      borderRadius: '12px',
-                                      padding: '12px 16px',
-                                      cursor: 'pointer',
-                                      transition: 'all 0.3s ease',
-                                      marginBottom: '12px'
-                                    }}
-                                    onMouseEnter={(e) => {
-                                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
-                                    }}
-                                    onMouseLeave={(e) => {
-                                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
-                                    }}
-                                  >
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                      <span style={{ 
-                                        background: 'rgba(34, 211, 238, 0.2)',
-                                        color: '#22D3EE',
-                                        padding: '4px 8px',
-                                        borderRadius: '6px',
-                                        fontSize: '12px',
-                                        fontWeight: '600'
-                                      }}>
-                                        Unused
-                                      </span>
-                                      <span style={{ color: 'white', fontSize: '14px', fontWeight: '600' }}>
-                                        Unused ({categoryTickets.unused.length})
-                                      </span>
-                                    </div>
-                                    <span style={{ 
-                                      color: 'rgba(255, 255, 255, 0.6)',
-                                      fontSize: '18px',
-                                      transform: ticketsExpanded[category]?.unused !== false ? 'rotate(180deg)' : 'rotate(0deg)',
-                                      transition: 'transform 0.3s ease'
-                                    }}>
-                                      ▼
-                                    </span>
-                                  </button>
-                                  
-                                  {ticketsExpanded[category]?.unused !== false && (
-                                    <div style={{ display: 'grid', gap: '16px', paddingLeft: '8px' }}>
-                                      {categoryTickets.unused.map(ticket => (
-                <div
-                  key={ticket.id}
-                  style={{
-                    background: 'rgba(255, 255, 255, 0.03)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    borderRadius: '16px',
-                    padding: '24px',
-                    transition: 'all 0.3s ease',
-                    boxShadow: '0 4px 16px rgba(0, 0, 0, 0.2)'
-                  }}
-                >
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '20px', alignItems: 'start' }}>
-                    <div style={{ flex: 1 }}>
-                      <h3 style={{ color: 'white', fontSize: '20px', marginBottom: '8px', fontWeight: '600' }}>
-                        {ticket.event_title_snapshot || ticket.events?.title || 'Event Ticket'}
-                      </h3>
-                      <p style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '14px', marginBottom: '12px' }}>
-                        Ticket #{ticket.short_id || ticket.id.substring(0, 8)}
-                      </p>
-                      
-                      <div style={{ 
-                        display: 'grid', 
-                        gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-                        gap: '12px',
-                        marginBottom: '16px',
-                        fontSize: '14px'
-                      }}>
-                        <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
-                          <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>🎫 Tier:</span> {ticket.tier || 'General'}
-                        </div>
-                        {ticket.ticket_kind && (
-                          <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
-                            <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>🎟️ Type:</span> {getTicketKindDisplayName(ticket.ticket_kind)}
-                          </div>
-                        )}
-                        {(ticket.event_start_at_snapshot || ticket.events?.start_at) && (
-                          <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
-                            <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>📅 Date:</span> {new Date(ticket.event_start_at_snapshot || ticket.events.start_at).toLocaleDateString()}
-                          </div>
-                        )}
-                        {(ticket.event_venue_snapshot || ticket.events?.venue_name) && (
-                          <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
-                            <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>📍 Venue:</span> {ticket.event_venue_snapshot || ticket.events.venue_name}
-                          </div>
-                        )}
-                        <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
-                          <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>📅 Issued:</span> {new Date(ticket.created_at).toLocaleDateString()}
-                        </div>
-                        {ticket.price_amount_cents_snapshot && (
-                          <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
-                            <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>💰 Price:</span> ${(ticket.price_amount_cents_snapshot / 100).toFixed(2)}
-                          </div>
-                        )}
-                      </div>
-
-                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '12px' }}>
-                        <span style={{
-                          background: ticket.status === 'used' || ticket.used ? 'rgba(34, 197, 94, 0.2)' : 
-                                     ticket.status === 'unused' ? 'rgba(34, 211, 238, 0.2)' : 'rgba(239, 68, 68, 0.2)',
-                          color: ticket.status === 'used' || ticket.used ? '#22c55e' : 
-                                 ticket.status === 'unused' ? '#22D3EE' : '#ef4444',
-                          padding: '6px 12px',
-                          borderRadius: '6px',
-                          fontSize: '13px',
-                          fontWeight: '500',
-                          textTransform: 'capitalize'
-                        }}>
-                          {ticket.used ? 'Used' : (ticket.status || 'Unknown')}
-                        </span>
-                        {ticket.orders && (
-                          <span style={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: '13px' }}>
-                            💰 ${ticket.orders.total_amount_cents ? (ticket.orders.total_amount_cents / 100).toFixed(2) : '0.00'}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Triple-click use button - only show for unused tickets */}
-                      {!ticket.used && ticket.status !== 'used' && user && (
-                        <div style={{ marginTop: '12px' }}>
-                          <button
-                            onClick={async () => {
-                              const ticketId = ticket.id
-                              const currentClicks = clickingTickets[ticketId] || { count: 0, timeout: null }
-                              
-                              // Clear previous timeout
-                              if (currentClicks.timeout) {
-                                clearTimeout(currentClicks.timeout)
-                              }
-                              
-                              // Increment click count
-                              const newCount = currentClicks.count + 1
-                              
-                              // If 3 clicks, use the ticket
-                              if (newCount >= 3) {
-                                setClickingTickets(prev => ({ ...prev, [ticketId]: { count: 0, timeout: null } }))
-                                
-                                try {
-                                  const response = await fetch('/api/tickets/use', {
-                                    method: 'POST',
-                                    headers: {
-                                      'Content-Type': 'application/json'
-                                    },
-                                    body: JSON.stringify({
-                                      ticket_id: ticketId,
-                                      userId: user.id
-                                    })
-                                  })
-                                  
-                                  const result = await response.json()
-                                  
-                                  if (result.success) {
-                                    // Update ticket in local state
-                                    setTickets(prev => prev.map(t => 
-                                      t.id === ticketId 
-                                        ? { ...t, used: true, status: 'used', used_at: result.data.used_at }
-                                        : t
-                                    ))
-                                    alert('Ticket has been used successfully!')
-                                  } else {
-                                    alert(result.message || 'Failed to use ticket')
-                                  }
-                                } catch (error) {
-                                  console.error('Error using ticket:', error)
-                                  alert('Failed to use ticket. Please try again.')
-                                }
-                              } else {
-                                // Set timeout to reset after 2 seconds
-                                const timeout = setTimeout(() => {
-                                  setClickingTickets(prev => {
-                                    const updated = { ...prev }
-                                    if (updated[ticketId]) {
-                                      updated[ticketId].count = 0
-                                    }
-                                    return updated
-                                  })
-                                }, 2000)
-                                
-                                setClickingTickets(prev => ({
-                                  ...prev,
-                                  [ticketId]: { count: newCount, timeout }
-                                }))
-                              }
-                            }}
-                            style={{
-                              background: clickingTickets[ticket.id]?.count >= 2
-                                ? 'linear-gradient(135deg, #7c3aed 0%, #ec4899 100%)'
-                                : 'rgba(124, 58, 237, 0.2)',
-                              border: '1px solid rgba(124, 58, 237, 0.5)',
-                              color: 'white',
-                              padding: '10px 20px',
-                              borderRadius: '8px',
-                              fontSize: '14px',
-                              fontWeight: '600',
-                              cursor: 'pointer',
-                              transition: 'all 0.3s ease',
-                              width: '100%'
-                            }}
-                            onMouseEnter={(e) => {
-                              if (clickingTickets[ticket.id]?.count < 2) {
-                                e.target.style.background = 'rgba(124, 58, 237, 0.3)'
-                              }
-                            }}
-                            onMouseLeave={(e) => {
-                              if (clickingTickets[ticket.id]?.count < 2) {
-                                e.target.style.background = 'rgba(124, 58, 237, 0.2)'
-                              }
-                            }}
-                          >
-                            {clickingTickets[ticket.id]?.count === 1
-                              ? 'Click 2 more times to use'
-                              : clickingTickets[ticket.id]?.count === 2
-                              ? 'Click 1 more time to use'
-                              : 'Click 3 times to use ticket'}
-                          </button>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* QR Code */}
-                    <div style={{
-                      background: 'white',
-                      padding: '16px',
-                      borderRadius: '12px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      gap: '8px',
-                      minWidth: '180px'
-                    }}>
-                      <div style={{ 
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        background: 'rgba(124, 58, 237, 0.1)',
-                        borderRadius: '8px',
-                        padding: '8px',
-                        marginBottom: '4px'
-                      }}>
-                        <QRCodeSVG 
-                          value={`${typeof window !== 'undefined' ? window.location.origin : ''}/ticket/${ticket.short_id || ticket.id}`}
-                          size={150}
-                          level="M"
-                        />
-                      </div>
-                      <div style={{ 
-                        fontSize: '11px', 
-                        color: '#666', 
-                        textAlign: 'center',
-                        fontWeight: '500'
-                      }}>
-                        Scan for Info
-                      </div>
-                      {ticket.short_id && (
-                        <div style={{ 
-                          fontSize: '10px', 
-                          color: '#999',
-                          fontFamily: 'monospace'
-                        }}>
-                          ID: {ticket.short_id}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-                              
-                              {/* Used Tickets in this category */}
-                              {categoryTickets.used.length > 0 && (
-                                <div>
-                                  <button
-                                    onClick={() => setTicketsExpanded(prev => ({
-                                      ...prev,
-                                      [category]: {
-                                        ...prev[category],
-                                        used: !prev[category]?.used
-                                      }
-                                    }))}
-                                    style={{
-                                      width: '100%',
-                                      display: 'flex',
-                                      justifyContent: 'space-between',
-                                      alignItems: 'center',
-                                      background: 'rgba(255, 255, 255, 0.05)',
-                                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                                      borderRadius: '12px',
-                                      padding: '12px 16px',
-                                      cursor: 'pointer',
-                                      transition: 'all 0.3s ease',
-                                      marginBottom: '12px'
-                                    }}
-                                    onMouseEnter={(e) => {
-                                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
-                                    }}
-                                    onMouseLeave={(e) => {
-                                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
-                                    }}
-                                  >
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                      <span style={{ 
-                                        background: 'rgba(34, 197, 94, 0.2)',
-                                        color: '#22c55e',
-                                        padding: '4px 8px',
-                                        borderRadius: '6px',
-                                        fontSize: '12px',
-                                        fontWeight: '600'
-                                      }}>
-                                        Used
-                                      </span>
-                                      <span style={{ color: 'white', fontSize: '14px', fontWeight: '600' }}>
-                                        Used ({categoryTickets.used.length})
-                                      </span>
-                                    </div>
-                                    <span style={{ 
-                                      color: 'rgba(255, 255, 255, 0.6)',
-                                      fontSize: '18px',
-                                      transform: ticketsExpanded[category]?.used !== false ? 'rotate(180deg)' : 'rotate(0deg)',
-                                      transition: 'transform 0.3s ease'
-                                    }}>
-                                      ▼
-                                    </span>
-                                  </button>
-                                  
-                                  {ticketsExpanded[category]?.used !== false && (
-                                    <div style={{ display: 'grid', gap: '16px', paddingLeft: '8px' }}>
-                                      {categoryTickets.used.map(ticket => (
-                                        <div
-                                          key={ticket.id}
-                                          style={{
-                                            background: 'rgba(255, 255, 255, 0.03)',
-                                            border: '1px solid rgba(255, 255, 255, 0.1)',
-                                            borderRadius: '16px',
-                                            padding: '24px',
-                                            transition: 'all 0.3s ease',
-                                            boxShadow: '0 4px 16px rgba(0, 0, 0, 0.2)'
-                                          }}
-                                        >
-                                          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '20px', alignItems: 'start' }}>
-                                            <div style={{ flex: 1 }}>
-                                              <h3 style={{ color: 'white', fontSize: '20px', marginBottom: '8px', fontWeight: '600' }}>
-                                                {ticket.event_title_snapshot || ticket.events?.title || 'Event Ticket'}
-                                              </h3>
-                                              <p style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '14px', marginBottom: '12px' }}>
-                                                Ticket #{ticket.short_id || ticket.id.substring(0, 8)}
-                                              </p>
-                                              
-                                              <div style={{ 
-                                                display: 'grid', 
-                                                gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-                                                gap: '12px',
-                                                marginBottom: '16px',
-                                                fontSize: '14px'
-                                              }}>
-                                                <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
-                                                  <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>🎫 Tier:</span> {ticket.tier || 'General'}
-                                                </div>
-                                                {ticket.ticket_kind && (
-                                                  <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
-                                                    <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>🎟️ Type:</span> {getTicketKindDisplayName(ticket.ticket_kind)}
-                                                  </div>
-                                                )}
-                                                {(ticket.event_start_at_snapshot || ticket.events?.start_at) && (
-                                                  <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
-                                                    <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>📅 Date:</span> {new Date(ticket.event_start_at_snapshot || ticket.events.start_at).toLocaleDateString()}
-                                                  </div>
-                                                )}
-                                                {(ticket.event_venue_snapshot || ticket.events?.venue_name) && (
-                                                  <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
-                                                    <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>📍 Venue:</span> {ticket.event_venue_snapshot || ticket.events.venue_name}
-                                                  </div>
-                                                )}
-                                                {ticket.price_amount_cents_snapshot && (
-                                                  <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
-                                                    <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>💰 Price:</span> ${(ticket.price_amount_cents_snapshot / 100).toFixed(2)}
-                                                  </div>
-                                                )}
-                                                <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
-                                                  <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>📅 Issued:</span> {new Date(ticket.created_at).toLocaleDateString()}
-                                                </div>
-                                                {ticket.used_at && (
-                                                  <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
-                                                    <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>✅ Used:</span> {new Date(ticket.used_at).toLocaleDateString()}
-                                                  </div>
-                                                )}
-                                              </div>
-
-                                              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '12px' }}>
-                                                <span style={{
-                                                  background: 'rgba(34, 197, 94, 0.2)',
-                                                  color: '#22c55e',
-                                                  padding: '6px 12px',
-                                                  borderRadius: '6px',
-                                                  fontSize: '13px',
-                                                  fontWeight: '500',
-                                                  textTransform: 'capitalize'
-                                                }}>
-                                                  已使用
-                                                </span>
-                                                {ticket.orders && (
-                                                  <span style={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: '13px' }}>
-                                                    💰 ${ticket.orders.total_amount_cents ? (ticket.orders.total_amount_cents / 100).toFixed(2) : '0.00'}
-                                                  </span>
-                                                )}
-                                              </div>
-                                            </div>
-
-                                            {/* QR Code */}
-                                            <div style={{
-                                              background: 'white',
-                                              padding: '16px',
-                                              borderRadius: '12px',
-                                              display: 'flex',
-                                              flexDirection: 'column',
-                                              alignItems: 'center',
-                                              gap: '8px',
-                                              minWidth: '180px',
-                                              opacity: ticket.used || ticket.status === 'used' ? 0.6 : 1
-                                            }}>
-                                              <div style={{ 
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                background: 'rgba(124, 58, 237, 0.1)',
-                                                borderRadius: '8px',
-                                                padding: '8px',
-                                                marginBottom: '4px'
-                                              }}>
-                                                <QRCodeSVG 
-                                                  value={`${typeof window !== 'undefined' ? window.location.origin : ''}/ticket/${ticket.short_id || ticket.id}`}
-                                                  size={150}
-                                                  level="M"
-                                                />
-                                              </div>
-                                              <div style={{ 
-                                                fontSize: '11px', 
-                                                color: '#666', 
-                                                textAlign: 'center',
-                                                fontWeight: '500'
-                                              }}>
-                                                Scan for Info
-                                              </div>
-                                              {ticket.short_id && (
-                                                <div style={{ 
-                                                  fontSize: '10px', 
-                                                  color: '#999',
-                                                  fontFamily: 'monospace'
-                                                }}>
-                                                  ID: {ticket.short_id}
-                                                </div>
-                                              )}
-                                            </div>
-                                          </div>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      )
-                    })}
-                    </>
-                  )
-                })()}
-            </div>
-          )}
         </div>
 
       </div>

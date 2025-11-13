@@ -114,7 +114,7 @@ function UpdatePasswordContent() {
       setStatus(STATUS_SUCCESS);
       setMessage("Password updated successfully! Redirecting to account page in 3 seconds...");
       setTimeout(() => {
-        router.push("/account");
+        router.push("/account?password_updated=true");
       }, 3000);
     } catch (error) {
       console.error("Failed to update password", error);

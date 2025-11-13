@@ -46,6 +46,13 @@ export default function AccountPage() {
       const client = createClient(supabaseUrl, supabaseKey)
       setSupabase(client)
       
+      // Check if returning from update-password page (refresh user data)
+      const urlParams = new URLSearchParams(window.location.search)
+      if (urlParams.get('password_updated') === 'true') {
+        // Clear the query parameter
+        window.history.replaceState({}, '', '/account')
+      }
+      
       // Get session from Supabase (this also sets cookies for server-side access)
       client.auth.getSession().then(({ data: { session }, error }) => {
         if (error) {
@@ -78,8 +85,10 @@ export default function AccountPage() {
           console.warn('⚠️ Failed to store session in localStorage:', storageError)
         }
         
-        // Load user data
-        loadUserData(client, session.user.id)
+        // Load user data (force refresh if returning from password update)
+        const urlParams = new URLSearchParams(window.location.search)
+        const forceRefresh = urlParams.get('password_updated') === 'true'
+        loadUserData(client, session.user.id, forceRefresh)
       }).catch((error) => {
         console.error('❌ Error getting session:', error)
         setLoading(false)
@@ -125,7 +134,7 @@ export default function AccountPage() {
     setShowLogin(true)
   }
 
-  const loadUserData = async (client, userId) => {
+  const loadUserData = async (client, userId, forceRefresh = false) => {
     try {
       // Get user information from users table
       let { data: userData, error: userError } = await client
@@ -227,11 +236,18 @@ export default function AccountPage() {
 
       if (userData) {
         // Get auth user to check has_password from user_metadata
+        // Always fetch fresh auth user data, especially after password update
         let authUser = null
         try {
           const { data: { user: authUserData }, error: authError } = await client.auth.getUser()
           if (!authError && authUserData) {
             authUser = authUserData
+            // Log for debugging
+            console.log('Account page - Loaded auth user:', {
+              provider: authUserData.app_metadata?.provider,
+              has_password: authUserData.user_metadata?.has_password,
+              forceRefresh
+            })
           }
         } catch (authErr) {
           console.warn('⚠️ Failed to get auth user for has_password check:', authErr)
@@ -270,6 +286,21 @@ export default function AccountPage() {
         // Email verification is optional unless REQUIRE_EMAIL_VERIFICATION=true
         // We'll show a banner reminder instead of blocking access
 
+        // Refresh auth user data when setting user to ensure latest has_password status
+        if (userData.auth_user) {
+          // Force refresh auth user to get latest metadata
+          try {
+            const { data: { user: latestAuthUser }, error: refreshError } = await client.auth.getUser()
+            if (!refreshError && latestAuthUser) {
+              userData.auth_user = latestAuthUser
+              // Update has_password from latest auth user
+              userData.has_password = latestAuthUser.user_metadata?.has_password === true
+            }
+          } catch (refreshErr) {
+            console.warn('⚠️ Failed to refresh auth user:', refreshErr)
+          }
+        }
+        
         setUser(userData)
         setProfileData({
           name: userData.name || '',
@@ -624,7 +655,18 @@ export default function AccountPage() {
         )}
 
         {/* Google OAuth users without password - prompt to set password */}
-        {user && user.auth_provider === 'google' && user.has_password !== true && (
+        {(() => {
+          // Get latest auth user to check has_password status
+          const authUser = user?.auth_user || null
+          const provider = authUser?.app_metadata?.provider || user?.auth_provider || null
+          const hasPassword = authUser?.user_metadata?.has_password === true
+          
+          // Debug logging
+          console.log('Account page - provider:', provider, 'hasPassword:', hasPassword, 'authUser:', authUser)
+          
+          const showBackupPasswordBanner = provider === 'google' && !hasPassword
+          
+          return showBackupPasswordBanner && user && (
           <div style={{
             background: 'rgba(96, 165, 250, 0.15)',
             border: '2px solid rgba(96, 165, 250, 0.4)',
@@ -699,7 +741,8 @@ export default function AccountPage() {
               </div>
             </div>
           </div>
-        )}
+          )
+        })()}
 
         {/* User Profile Card */}
         <div style={{

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase-api'
 import { ErrorHandler, handleApiError } from '@/lib/error-handler'
 import { createLogger } from '@/lib/logger'
+import { getTicketRedemptionLocation } from '@/lib/ticket-helpers'
 
 const logger = createLogger('ticket-use-api')
 
@@ -41,7 +42,7 @@ export async function POST(request) {
     // First, get ticket without order join to avoid potential RLS issues
     const { data: ticket, error: ticketError } = await supabase
       .from('tickets')
-      .select('id, user_id, holder_email, status, used, used_at, order_id, event_id')
+      .select('id, user_id, holder_email, status, used, used_at, order_id, event_id, ticket_kind')
       .eq('id', ticket_id)
       .single()
 
@@ -156,18 +157,23 @@ export async function POST(request) {
       )
     }
 
-    // Update ticket: set used = true, used_at = now, used_method = 'triple_click', status = 'used'
+    // Determine redemption location based on ticket_kind
+    const redeemLocation = getTicketRedemptionLocation(ticket.ticket_kind)
+    const redeemMethod = 'tap_tap_slide' // New redemption method
+    
+    // Update ticket: set used = true, used_at = now, used_method = 'tap_tap_slide', status = 'used'
     const now = new Date().toISOString()
     const { error: updateError } = await supabase
       .from('tickets')
       .update({
         used: true,
         used_at: now,
-        used_method: 'triple_click',
+        used_method: redeemMethod,
         used_context: {
           user_id: userId,
           used_at: now,
-          method: 'triple_click'
+          method: redeemMethod,
+          location: redeemLocation
         },
         status: 'used'
       })
@@ -178,7 +184,39 @@ export async function POST(request) {
       throw ErrorHandler.databaseError(updateError, 'UPDATE_FAILED')
     }
 
-    logger.info('Ticket used successfully', { ticket_id, userId, used_at: now })
+    // Create redemption log entry
+    const { error: redemptionLogError } = await supabase
+      .from('ticket_redemptions')
+      .insert({
+        ticket_id: ticket_id,
+        user_id: userId,
+        ticket_kind: ticket.ticket_kind,
+        redeemed_at: now,
+        redeem_source: 'customer_phone',
+        redeem_location: redeemLocation,
+        metadata: {
+          method: redeemMethod,
+          ticket_id: ticket_id
+        }
+      })
+
+    if (redemptionLogError) {
+      // Log error but don't fail the redemption (non-critical)
+      logger.warn('Failed to create redemption log (non-critical)', { 
+        error: redemptionLogError, 
+        ticket_id 
+      })
+    } else {
+      logger.info('Redemption log created', { ticket_id, redeemLocation })
+    }
+
+    logger.info('Ticket used successfully', { 
+      ticket_id, 
+      userId, 
+      used_at: now, 
+      redeemLocation,
+      ticket_kind: ticket.ticket_kind
+    })
 
     return NextResponse.json({
       success: true,
@@ -187,7 +225,8 @@ export async function POST(request) {
         ticket_id,
         used: true,
         used_at: now,
-        used_method: 'triple_click'
+        used_method: redeemMethod,
+        redeem_location: redeemLocation
       }
     })
 

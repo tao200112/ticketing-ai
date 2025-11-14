@@ -136,7 +136,24 @@ export async function POST(request) {
       
       // Check if this is a combo ticket (check both ticket_kind and price name)
       const isCombo = isComboTicket(priceName, ticketKindFromPrice)
-      const comboKinds = isCombo ? getComboTicketKinds(priceName, ticketKindFromPrice) : [ticketKindFromPrice || getTicketKindFromPriceName(priceName) || null]
+      
+      // For combo tickets, get both ENTRY_COMBO and DRINK_COMBO
+      // For non-combo tickets, get the single ticket kind
+      let ticketKindsToCreate = []
+      if (isCombo) {
+        // Combo tickets MUST create two separate tickets
+        ticketKindsToCreate = getComboTicketKinds(priceName, ticketKindFromPrice)
+        console.log('🎫 Combo ticket detected, will create tickets:', ticketKindsToCreate)
+      } else {
+        // Single ticket - determine kind from price or metadata
+        const singleKind = ticketKindFromPrice || getTicketKindFromPriceName(priceName) || null
+        if (singleKind) {
+          ticketKindsToCreate = [singleKind]
+        } else {
+          console.warn('⚠️ Could not determine ticket_kind, defaulting to ENTRY_21_PLUS')
+          ticketKindsToCreate = ['ENTRY_21_PLUS']
+        }
+      }
       
       const tickets = []
 
@@ -240,10 +257,9 @@ export async function POST(request) {
       }
 
       // Create tickets: for combo tickets, create multiple tickets per quantity
+      // Each quantity unit creates all ticket kinds (e.g., 1 combo = 2 tickets, 2 combos = 4 tickets)
       for (let i = 0; i < quantity; i++) {
-        const ticketKinds = isCombo ? comboKinds : [comboKinds[0]]
-        
-        for (const ticketKind of ticketKinds) {
+        for (const ticketKind of ticketKindsToCreate) {
           const shortId = generateShortTicketId()
           
           const { data: ticket, error: ticketError } = await supabase

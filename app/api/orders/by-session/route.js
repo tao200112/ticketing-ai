@@ -84,12 +84,23 @@ async function createOrderFromStripe(sessionId, userId, userEmail) {
   const priceName = metadata.price_name || 'general'
   const quantity = parseInt(metadata.quantity || '1', 10) || 1
 
+  // 从 metadata 获取 supabase_uid（优先），如果没有则使用 userId
+  const supabaseUid = metadata.supabase_uid || userId || null
+  
+  // 调试日志
+  console.log('[OrdersBySession] supabase_uid =', supabaseUid)
+  console.log('[OrdersBySession] session.metadata =', metadata)
+  
+  if (!supabaseUid) {
+    console.warn('[OrdersBySession] Missing supabase_uid in metadata and userId:', { metadata, userId })
+  }
+
   const { data: order, error: orderError } = await admin
     .from('orders')
     .insert({
       stripe_session_id: session.id,
       user_id: userId,
-      supabase_uid: userId, // userId 在这里应该是 Supabase Auth UID
+      supabase_uid: supabaseUid, // 使用从 metadata 获取的 supabase_uid
       customer_email: customerEmail,
       total_amount_cents: session.amount_total,
       currency: session.currency?.toUpperCase() || 'USD',
@@ -97,7 +108,7 @@ async function createOrderFromStripe(sessionId, userId, userEmail) {
       metadata: {
         ...metadata,
         user_id: userId,
-        supabase_uid: userId,
+        supabase_uid: supabaseUid,
         customer_email: customerEmail,
       },
     })
@@ -184,7 +195,7 @@ async function createOrderFromStripe(sessionId, userId, userEmail) {
         used: false,
         short_id: generateShortTicketId(),
         user_id: userId,
-        supabase_uid: userId, // userId 在这里应该是 Supabase Auth UID
+        supabase_uid: supabaseUid, // 使用从 metadata 获取的 supabase_uid
         event_title_snapshot: eventSnapshot?.title || null,
         event_description_snapshot: eventSnapshot?.description || null,
         event_venue_snapshot: eventSnapshot?.venue_name || null,
@@ -333,6 +344,10 @@ export async function GET(request) {
       }
     }
 
+    // 调试日志
+    console.log('[OrdersBySession] supabase_uid =', userId)
+    console.log('[OrdersBySession] Querying tickets for order:', order.id)
+
     // Get tickets for this order
     const { data: tickets = [], error: ticketsError } = await admin
       .from('tickets')
@@ -396,6 +411,10 @@ export async function GET(request) {
         }
       }
 
+      // 从 metadata 获取 supabase_uid（优先），如果没有则使用 userId
+      const supabaseUidFromMetadata = stripeSession.metadata?.supabase_uid || userId || null
+      console.log('[OrdersBySession] Creating tickets with supabase_uid:', supabaseUidFromMetadata)
+
       // Create tickets
       const ticketRows = []
       for (let i = 0; i < quantity; i += 1) {
@@ -409,7 +428,7 @@ export async function GET(request) {
           used: false,
           short_id: generateShortTicketId(),
           user_id: userId,
-          supabase_uid: userId, // userId 在这里应该是 Supabase Auth UID
+          supabase_uid: supabaseUidFromMetadata, // 使用从 metadata 获取的 supabase_uid
           event_title_snapshot: eventSnapshot?.title || null,
           event_description_snapshot: eventSnapshot?.description || null,
           event_venue_snapshot: eventSnapshot?.venue_name || null,
@@ -463,12 +482,27 @@ export async function GET(request) {
     if (user && userId) {
       // 只使用 supabase_uid 匹配
       ownedTickets = tickets.filter((ticket) => {
-        return ticket.supabase_uid === userId
+        const matches = ticket.supabase_uid === userId
+        if (!matches) {
+          console.warn('[OrdersBySession] Ticket does not match supabase_uid:', {
+            ticketId: ticket.id,
+            ticketSupabaseUid: ticket.supabase_uid,
+            currentUserId: userId
+          })
+        }
+        return matches
+      })
+
+      console.log('[OrdersBySession] Filtered tickets:', {
+        total: tickets.length,
+        owned: ownedTickets.length,
+        supabaseUid: userId
       })
 
       // Ensure ticket ownership is set for future queries (使用 supabase_uid)
       const ticketsToClaim = ownedTickets.filter((ticket) => !ticket.supabase_uid)
       if (ticketsToClaim.length > 0 && userId) {
+        console.log('[OrdersBySession] Updating tickets with supabase_uid:', ticketsToClaim.length)
         const ticketIds = ticketsToClaim.map((ticket) => ticket.id)
         await admin
           .from('tickets')
@@ -477,6 +511,7 @@ export async function GET(request) {
       }
     } else {
       // If not logged in, return empty array (RLS will block anyway)
+      console.warn('[OrdersBySession] No user or userId, returning empty tickets')
       ownedTickets = []
     }
 

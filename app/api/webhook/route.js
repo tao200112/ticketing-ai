@@ -67,18 +67,35 @@ export async function POST(request) {
         return NextResponse.json({ received: true })
       }
 
-      // 获取 Supabase Auth UID（优先从 metadata，其次通过邮箱查找）
-      let supabaseUid = null
-      if (session.metadata?.supabase_uid) {
-        supabaseUid = session.metadata.supabase_uid
-      } else if (session.customer_email) {
-        // 通过邮箱从 auth.users 查找 Supabase UID
-        const { data: authUsers } = await supabase.auth.admin.listUsers()
-        const matchingUser = authUsers?.users?.find(u => u.email === session.customer_email)
-        if (matchingUser) {
-          supabaseUid = matchingUser.id
-          console.log('✅ 通过邮箱找到 Supabase UID:', supabaseUid)
+      // 获取 Supabase Auth UID（优先从 metadata）
+      let supabaseUid = session.metadata?.supabase_uid || null
+      
+      // 调试日志
+      console.log('[Webhook] supabase_uid =', supabaseUid)
+      console.log('[Webhook] session.metadata =', session.metadata)
+      
+      // 如果 metadata 中没有 supabase_uid，发出警告
+      if (!supabaseUid) {
+        console.warn('[Webhook] Missing supabase_uid in metadata:', session.metadata)
+        console.warn('[Webhook] Attempting to find by email:', session.customer_email)
+        
+        // 回退：通过邮箱从 auth.users 查找 Supabase UID
+        if (session.customer_email) {
+          try {
+            const { data: authUsers } = await supabase.auth.admin.listUsers()
+            const matchingUser = authUsers?.users?.find(u => u.email === session.customer_email)
+            if (matchingUser) {
+              supabaseUid = matchingUser.id
+              console.log('✅ [Webhook] Found Supabase UID by email:', supabaseUid)
+            } else {
+              console.error('❌ [Webhook] Could not find user by email:', session.customer_email)
+            }
+          } catch (error) {
+            console.error('❌ [Webhook] Error finding user by email:', error)
+          }
         }
+      } else {
+        console.log('✅ [Webhook] Using supabase_uid from metadata:', supabaseUid)
       }
 
       // 获取客户年龄（从 metadata 或用户数据）

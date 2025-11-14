@@ -24,6 +24,16 @@ export async function POST(request) {
     // 获取当前登录用户的 Supabase Auth UID
     const authUser = await getServerUser()
     const supabaseUid = authUser?.id || null
+    const userEmail = authUser?.email || null
+
+    // 调试日志
+    console.log('[CheckoutSessions] supabase_uid =', supabaseUid)
+    console.log('[CheckoutSessions] user email =', userEmail)
+    logger.info('Checkout request - Auth info', { 
+      supabaseUid,
+      userEmail,
+      hasAuth: !!authUser
+    })
 
     const body = await request.json()
     const { event_id, price_id, quantity = 1, customer_email, customer_name, customer_age, customerAge, userId } = body
@@ -36,7 +46,8 @@ export async function POST(request) {
     logger.info('Received checkout request', { 
       eventId: event_id, 
       priceId: price_id, 
-      quantity 
+      quantity,
+      supabaseUid
     })
 
     if (!event_id || !price_id) {
@@ -111,7 +122,7 @@ export async function POST(request) {
       mode: 'payment',
       success_url: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/events/${event_id}`,
-      customer_email: customer_email,
+      customer_email: customer_email || userEmail,
       metadata: {
         event_id: event_id,
         price_id: price_id,
@@ -120,7 +131,8 @@ export async function POST(request) {
         customer_name: customer_name || '',
         customer_age: age ? age.toString() : '',
         user_id: finalUserId || '', // 兼容旧代码
-        supabase_uid: supabaseUid || '', // 新增：Supabase Auth UID
+        supabase_uid: supabaseUid || '', // 必须：Supabase Auth UID
+        customer_email: customer_email || userEmail || '', // 确保 metadata 中有邮箱
       },
     })
 

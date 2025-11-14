@@ -67,16 +67,22 @@ export async function POST(request) {
         return NextResponse.json({ received: true })
       }
 
-      // 获取 Supabase Auth UID（优先从 metadata）
+      // 获取 Supabase Auth UID（必须从 metadata 获取）
+      // 注意：supabase_uid 可能是空字符串，需要处理
       let supabaseUid = session.metadata?.supabase_uid || null
+      if (supabaseUid === '') {
+        supabaseUid = null
+      }
       
       // 调试日志
       console.log('[Webhook] supabase_uid =', supabaseUid)
-      console.log('[Webhook] session.metadata =', session.metadata)
+      console.log('[Webhook] session.metadata =', JSON.stringify(session.metadata, null, 2))
+      console.log('[Webhook] session.customer_email =', session.customer_email)
       
-      // 如果 metadata 中没有 supabase_uid，发出警告
+      // 如果 metadata 中没有 supabase_uid，尝试通过邮箱查找
       if (!supabaseUid) {
-        console.warn('[Webhook] Missing supabase_uid in metadata:', session.metadata)
+        console.warn('[Webhook] ⚠️ Missing supabase_uid in metadata!')
+        console.warn('[Webhook] Full session metadata:', JSON.stringify(session.metadata, null, 2))
         console.warn('[Webhook] Attempting to find by email:', session.customer_email)
         
         // 回退：通过邮箱从 auth.users 查找 Supabase UID
@@ -89,10 +95,13 @@ export async function POST(request) {
               console.log('✅ [Webhook] Found Supabase UID by email:', supabaseUid)
             } else {
               console.error('❌ [Webhook] Could not find user by email:', session.customer_email)
+              console.error('❌ [Webhook] Available users:', authUsers?.users?.map(u => u.email).slice(0, 5))
             }
           } catch (error) {
             console.error('❌ [Webhook] Error finding user by email:', error)
           }
+        } else {
+          console.error('❌ [Webhook] No customer_email available for fallback lookup')
         }
       } else {
         console.log('✅ [Webhook] Using supabase_uid from metadata:', supabaseUid)
@@ -118,7 +127,19 @@ export async function POST(request) {
         }
       }
 
+      // 验证 supabase_uid 不为 null 再创建订单
+      if (!supabaseUid) {
+        console.error('❌ [Webhook] CRITICAL: Cannot create order without supabase_uid!')
+        console.error('❌ [Webhook] Session metadata:', JSON.stringify(session.metadata, null, 2))
+        console.error('❌ [Webhook] Customer email:', session.customer_email)
+        return NextResponse.json({ 
+          error: 'Missing supabase_uid in checkout session metadata',
+          details: 'The checkout session does not contain supabase_uid. Please ensure user is logged in when creating checkout session.'
+        }, { status: 500 })
+      }
+
       // 创建订单
+      console.log('[Webhook] Creating order with supabase_uid:', supabaseUid)
       const { data: order, error: orderError } = await supabase
         .from('orders')
         .insert({
@@ -129,7 +150,7 @@ export async function POST(request) {
           total_amount_cents: session.amount_total,
           currency: session.currency.toUpperCase(),
           status: 'paid',
-          supabase_uid: supabaseUid, // 使用 Supabase Auth UID
+          supabase_uid: supabaseUid, // 使用 Supabase Auth UID（必须不为 null）
           metadata: {
             payment_intent: session.payment_intent,
             event_id: session.metadata?.event_id,
@@ -143,10 +164,19 @@ export async function POST(request) {
 
       if (orderError) {
         console.error('❌ 创建订单失败:', orderError)
+        console.error('❌ Order data attempted:', {
+          stripe_session_id: session.id,
+          supabase_uid: supabaseUid,
+          customer_email: session.customer_email
+        })
         return NextResponse.json({ error: 'Failed to create order' }, { status: 500 })
       }
 
-      console.log('✅ 订单创建成功:', order.id)
+      console.log('✅ 订单创建成功:', order.id, 'supabase_uid:', order.supabase_uid)
+      // 验证创建的订单确实有 supabase_uid
+      if (!order.supabase_uid) {
+        console.error('❌ [Webhook] CRITICAL: Created order has null supabase_uid!', order.id)
+      }
 
       // 创建票据
       const quantity = parseInt(session.metadata?.quantity || '1')
@@ -313,6 +343,17 @@ export async function POST(request) {
           
           console.log(`  Creating ticket ${i + 1}/${quantity} with kind: ${ticketKind}`)
           
+          // 验证 supabase_uid 不为 null
+          if (!supabaseUid) {
+            console.error('❌ [Webhook] CRITICAL: supabase_uid is null when creating ticket!')
+            console.error('❌ [Webhook] Session metadata:', JSON.stringify(session.metadata, null, 2))
+            console.error('❌ [Webhook] Customer email:', session.customer_email)
+            // 不创建票，但继续处理其他票（如果有）
+            continue
+          }
+          
+          console.log(`  [Webhook] Creating ticket with supabase_uid: ${supabaseUid}`)
+          
           const { data: ticket, error: ticketError } = await supabase
           .from('tickets')
           .insert({
@@ -324,7 +365,7 @@ export async function POST(request) {
             holder_name: holderName,
             holder_age: ticketHolderAge,
             user_id: session.metadata?.user_id || null,
-            supabase_uid: supabaseUid, // 使用 Supabase Auth UID
+            supabase_uid: supabaseUid, // 使用 Supabase Auth UID（必须不为 null）
             status: 'unused',
             used: false,
             short_id: shortId,
@@ -348,12 +389,21 @@ export async function POST(request) {
 
           if (ticketError) {
             console.error('❌ 创建票据失败:', ticketError)
+            console.error('❌ Ticket data attempted:', {
+              order_id: order.id,
+              supabase_uid: supabaseUid,
+              holder_email: session.customer_email
+            })
             return NextResponse.json({ 
               error: 'Failed to create ticket', 
               details: ticketError.message 
             }, { status: 500 })
           } else {
-            console.log('✅ 票据创建成功:', ticket.id)
+            console.log('✅ 票据创建成功:', ticket.id, 'supabase_uid:', ticket.supabase_uid)
+            // 验证创建的票确实有 supabase_uid
+            if (!ticket.supabase_uid) {
+              console.error('❌ [Webhook] CRITICAL: Created ticket has null supabase_uid!', ticket.id)
+            }
             tickets.push(ticket)
           }
         }

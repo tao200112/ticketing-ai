@@ -21,7 +21,7 @@ export async function POST(request) {
       )
     }
 
-    // 获取当前登录用户的 Supabase Auth UID
+    // 获取当前登录用户的 Supabase Auth UID（必须）
     const authUser = await getServerUser()
     const supabaseUid = authUser?.id || null
     const userEmail = authUser?.email || null
@@ -29,19 +29,29 @@ export async function POST(request) {
     // 调试日志
     console.log('[CheckoutSessions] supabase_uid =', supabaseUid)
     console.log('[CheckoutSessions] user email =', userEmail)
+    console.log('[CheckoutSessions] hasAuth =', !!authUser)
     logger.info('Checkout request - Auth info', { 
       supabaseUid,
       userEmail,
       hasAuth: !!authUser
     })
 
+    // 如果用户未登录，拒绝创建 checkout session
+    if (!supabaseUid) {
+      console.error('[CheckoutSessions] CRITICAL: User not authenticated!')
+      throw ErrorHandler.unauthorizedError(
+        'AUTHENTICATION_REQUIRED',
+        'User must be logged in to create checkout session'
+      )
+    }
+
     const body = await request.json()
     const { event_id, price_id, quantity = 1, customer_email, customer_name, customer_age, customerAge, userId } = body
     // 支持两种字段名：customer_age 或 customerAge
     const age = customer_age || customerAge
     
-    // 优先使用 Supabase Auth UID，如果没有则使用传入的 userId（兼容旧代码）
-    const finalUserId = supabaseUid || userId
+    // 使用 Supabase Auth UID（必须）
+    const finalUserId = supabaseUid
 
     logger.info('Received checkout request', { 
       eventId: event_id, 
@@ -131,7 +141,7 @@ export async function POST(request) {
         customer_name: customer_name || '',
         customer_age: age ? age.toString() : '',
         user_id: finalUserId || '', // 兼容旧代码
-        supabase_uid: supabaseUid || '', // 必须：Supabase Auth UID
+        supabase_uid: supabaseUid, // 必须：Supabase Auth UID（不能为空字符串）
         customer_email: customer_email || userEmail || '', // 确保 metadata 中有邮箱
       },
     })

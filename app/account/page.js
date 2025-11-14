@@ -24,8 +24,11 @@ export default function AccountPage() {
   const [showRegister, setShowRegister] = useState(false)
   const [ordersExpanded, setOrdersExpanded] = useState(true)
   // Redemption state: track tap-tap-slide flow per ticket
-  const [redemptionState, setRedemptionState] = useState({}) // { ticketId: { step: 0|1|2, timestamp: number, longPressActive: boolean } }
+  const [redemptionState, setRedemptionState] = useState({}) // { ticketId: { state: 'idle'|'warning'|'confirm'|'redeeming'|'redeemed', timestamp: number } }
   const [activeTab, setActiveTab] = useState('entry') // 'entry', 'drink', 'other'
+  const [showQRCodes, setShowQRCodes] = useState({}) // { ticketId: boolean } - Track which tickets show QR codes
+  const [showActiveSection, setShowActiveSection] = useState(false) // Collapsible state for Active section
+  const [showUsedSection, setShowUsedSection] = useState(false) // Collapsible state for Used section
   const [showProfileDetails, setShowProfileDetails] = useState(false) // Show profile edit modal
   const [editingProfile, setEditingProfile] = useState(false) // Edit mode for profile
   const [profileData, setProfileData] = useState({ name: '', email: '', age: '' }) // Profile form data
@@ -442,25 +445,31 @@ export default function AccountPage() {
     router.push('/auth/forgot-password')
   }
 
-  // Tap-tap-slide redemption handlers
+  // Tap-tap-slide redemption handlers - state machine: idle -> warning -> confirm -> redeeming -> redeemed
   const handleRedemptionTap = (ticketId) => {
+    const ticket = tickets.find(t => t.id === ticketId)
+    if (!ticket || !isTicketActive(ticket)) {
+      return // Don't allow redemption if ticket is already used
+    }
+
     const now = Date.now()
-    const currentState = redemptionState[ticketId] || { step: 0, timestamp: 0 }
+    const currentState = redemptionState[ticketId] || { state: 'idle', timestamp: 0 }
     
-    // Reset if more than 5 seconds have passed
-    if (currentState.timestamp && (now - currentState.timestamp > 5000)) {
-      setRedemptionState(prev => ({ ...prev, [ticketId]: { step: 0, timestamp: 0 } }))
+    // Reset if more than 10 seconds have passed
+    if (currentState.timestamp && (now - currentState.timestamp > 10000)) {
+      setRedemptionState(prev => ({ ...prev, [ticketId]: { state: 'idle', timestamp: 0 } }))
       return
     }
     
-    // First tap: show warning
-    if (currentState.step === 0) {
-      setRedemptionState(prev => ({ ...prev, [ticketId]: { step: 1, timestamp: now } }))
+    // State machine transitions
+    if (currentState.state === 'idle') {
+      // First tap: show warning
+      setRedemptionState(prev => ({ ...prev, [ticketId]: { state: 'warning', timestamp: now } }))
+    } else if (currentState.state === 'warning') {
+      // Second tap: show confirmation
+      setRedemptionState(prev => ({ ...prev, [ticketId]: { state: 'confirm', timestamp: now } }))
     }
-    // Second tap: show confirmation
-    else if (currentState.step === 1) {
-      setRedemptionState(prev => ({ ...prev, [ticketId]: { step: 2, timestamp: now } }))
-    }
+    // If already in 'confirm' or 'redeeming' state, do nothing (wait for long-press)
   }
 
   const handleRedemptionLongPress = async (ticketId) => {
@@ -468,6 +477,15 @@ export default function AccountPage() {
     if (!ticket || !user || !isTicketActive(ticket)) {
       return
     }
+
+    const currentState = redemptionState[ticketId]
+    // Only allow redemption if we're in 'confirm' state
+    if (currentState?.state !== 'confirm') {
+      return
+    }
+
+    // Set state to 'redeeming' while API call is in progress
+    setRedemptionState(prev => ({ ...prev, [ticketId]: { state: 'redeeming', timestamp: Date.now() } }))
 
     try {
       const response = await fetch('/api/tickets/use', {
@@ -490,27 +508,27 @@ export default function AccountPage() {
             ? { ...t, used: true, status: 'used', used_at: result.data.used_at }
             : t
         ))
-        // Reset redemption state
-        setRedemptionState(prev => {
-          const updated = { ...prev }
-          delete updated[ticketId]
-          return updated
-        })
+        // Set state to 'redeemed'
+        setRedemptionState(prev => ({ ...prev, [ticketId]: { state: 'redeemed', timestamp: Date.now() } }))
       } else {
+        // On failure, revert to 'confirm' state
+        setRedemptionState(prev => ({ ...prev, [ticketId]: { state: 'confirm', timestamp: Date.now() } }))
         alert(result.message || 'Failed to redeem ticket')
       }
     } catch (error) {
       console.error('Error redeeming ticket:', error)
+      // On error, revert to 'confirm' state
+      setRedemptionState(prev => ({ ...prev, [ticketId]: { state: 'confirm', timestamp: Date.now() } }))
       alert('Failed to redeem ticket. Please try again.')
     }
   }
 
   const resetRedemptionState = (ticketId) => {
-    setRedemptionState(prev => {
-      const updated = { ...prev }
-      delete updated[ticketId]
-      return updated
-    })
+    setRedemptionState(prev => ({ ...prev, [ticketId]: { state: 'idle', timestamp: 0 } }))
+  }
+
+  const toggleQRCode = (ticketId) => {
+    setShowQRCodes(prev => ({ ...prev, [ticketId]: !prev[ticketId] }))
   }
 
   if (loading) {
@@ -1504,7 +1522,10 @@ export default function AccountPage() {
                 onClick={() => {
                   setShowTicketsModal(false)
                   setActiveTab('entry')
+                  setShowActiveSection(false)
+                  setShowUsedSection(false)
                   setRedemptionState({})
+                  setShowQRCodes({})
                 }}
                 style={{
                   background: 'transparent',
@@ -1641,19 +1662,30 @@ export default function AccountPage() {
                   {/* Unused Tickets */}
                   {unusedTickets.length > 0 && (
                     <div>
-                      <h3 style={{
-                        color: 'white',
-                        fontSize: '18px',
-                        fontWeight: '600',
-                        marginBottom: '16px'
-                      }}>
-                        Active ({unusedTickets.length})
-                      </h3>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                        {unusedTickets.map(ticket => {
-                          const redemptionStep = redemptionState[ticket.id]?.step || 0
-                          const redeemLocation = getTicketRedemptionLocation(ticket.ticket_kind)
-                          const ticketLabel = getTicketKindDisplayName(ticket.ticket_kind)
+                      <div
+                        onClick={() => setShowActiveSection(!showActiveSection)}
+                        style={{
+                          color: 'white',
+                          fontSize: '18px',
+                          fontWeight: '600',
+                          marginBottom: '16px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          userSelect: 'none'
+                        }}
+                      >
+                        <span>Active ({unusedTickets.length})</span>
+                        <span style={{ fontSize: '14px' }}>{showActiveSection ? '▾' : '▸'}</span>
+                      </div>
+                      {showActiveSection && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                          {unusedTickets.map(ticket => {
+                            const redemptionStateValue = redemptionState[ticket.id]?.state || 'idle'
+                            const redeemLocation = getTicketRedemptionLocation(ticket.ticket_kind)
+                            const ticketLabel = getTicketKindDisplayName(ticket.ticket_kind)
+                            const showQR = showQRCodes[ticket.id] || false
                           
                           return (
                             <div
@@ -1732,7 +1764,7 @@ export default function AccountPage() {
                               </div>
 
                               {/* Redemption Warning/Confirmation */}
-                              {redemptionStep === 1 && (
+                              {redemptionStateValue === 'warning' && (
                                 <div style={{
                                   background: 'rgba(251, 191, 36, 0.15)',
                                   border: '1px solid rgba(251, 191, 36, 0.4)',
@@ -1757,7 +1789,7 @@ export default function AccountPage() {
                                 </div>
                               )}
 
-                              {redemptionStep === 2 && (
+                              {redemptionStateValue === 'confirm' && (
                                 <div style={{
                                   background: 'rgba(124, 58, 237, 0.15)',
                                   border: '1px solid rgba(124, 58, 237, 0.4)',
@@ -1795,7 +1827,8 @@ export default function AccountPage() {
                                     <strong>Location:</strong> {redeemLocation === 'door' ? 'Door' : 'Bar'}
                                   </div>
                                   <button
-                                    onMouseDown={() => {
+                                    onMouseDown={(e) => {
+                                      e.preventDefault()
                                       const timer = setTimeout(() => {
                                         handleRedemptionLongPress(ticket.id)
                                       }, 1500)
@@ -1814,7 +1847,18 @@ export default function AccountPage() {
                                         }))
                                       }
                                     }}
-                                    onTouchStart={() => {
+                                    onMouseLeave={() => {
+                                      const state = redemptionState[ticket.id]
+                                      if (state?.longPressTimer) {
+                                        clearTimeout(state.longPressTimer)
+                                        setRedemptionState(prev => ({
+                                          ...prev,
+                                          [ticket.id]: { ...prev[ticket.id], longPressTimer: null }
+                                        }))
+                                      }
+                                    }}
+                                    onTouchStart={(e) => {
+                                      e.preventDefault()
                                       const timer = setTimeout(() => {
                                         handleRedemptionLongPress(ticket.id)
                                       }, 1500)
@@ -1833,20 +1877,24 @@ export default function AccountPage() {
                                         }))
                                       }
                                     }}
+                                    disabled={redemptionStateValue === 'redeeming'}
                                     style={{
                                       width: '100%',
-                                      background: 'linear-gradient(135deg, #7C3AED 0%, #22D3EE 100%)',
+                                      background: redemptionStateValue === 'redeeming' 
+                                        ? 'rgba(124, 58, 237, 0.5)' 
+                                        : 'linear-gradient(135deg, #7C3AED 0%, #22D3EE 100%)',
                                       color: 'white',
                                       border: 'none',
                                       borderRadius: '12px',
                                       padding: '14px',
                                       fontSize: '15px',
                                       fontWeight: '600',
-                                      cursor: 'pointer',
-                                      transition: 'all 0.3s ease'
+                                      cursor: redemptionStateValue === 'redeeming' ? 'not-allowed' : 'pointer',
+                                      transition: 'all 0.3s ease',
+                                      opacity: redemptionStateValue === 'redeeming' ? 0.7 : 1
                                     }}
                                   >
-                                    Press and hold to redeem
+                                    {redemptionStateValue === 'redeeming' ? 'Redeeming...' : 'Press and hold to redeem'}
                                   </button>
                                   <button
                                     onClick={() => resetRedemptionState(ticket.id)}
@@ -1867,10 +1915,11 @@ export default function AccountPage() {
                                 </div>
                               )}
 
-                              {/* Redemption Button (only show if step 0) */}
-                              {redemptionStep === 0 && (
+                              {/* Redemption Button - show for idle and warning states */}
+                              {(redemptionStateValue === 'idle' || redemptionStateValue === 'warning') && (
                                 <button
                                   onClick={() => handleRedemptionTap(ticket.id)}
+                                  disabled={redemptionStateValue === 'redeeming'}
                                   style={{
                                     width: '100%',
                                     background: 'rgba(124, 58, 237, 0.2)',
@@ -1880,62 +1929,125 @@ export default function AccountPage() {
                                     padding: '12px',
                                     fontSize: '14px',
                                     fontWeight: '600',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.3s ease'
+                                    cursor: redemptionStateValue === 'redeeming' ? 'not-allowed' : 'pointer',
+                                    transition: 'all 0.3s ease',
+                                    opacity: redemptionStateValue === 'redeeming' ? 0.7 : 1
                                   }}
                                 >
-                                  Redeem
+                                  {redemptionStateValue === 'warning' ? 'Tap again to confirm' : 'Redeem'}
                                 </button>
                               )}
 
-                              {/* QR Code */}
-                              <div style={{
-                                marginTop: '16px',
-                                background: 'white',
-                                padding: '16px',
-                                borderRadius: '12px',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                gap: '8px'
-                              }}>
-                                <QRCodeSVG 
-                                  value={`${typeof window !== 'undefined' ? window.location.origin : ''}/ticket/${ticket.short_id || ticket.id}`}
-                                  size={150}
-                                  level="M"
-                                />
-                                {ticket.short_id && (
-                                  <div style={{ 
-                                    fontSize: '12px', 
-                                    color: '#666',
-                                    fontFamily: 'monospace'
+                              {/* QR Code - collapsible */}
+                              <div style={{ marginTop: '16px' }}>
+                                {!showQR ? (
+                                  <button
+                                    onClick={() => toggleQRCode(ticket.id)}
+                                    style={{
+                                      width: '100%',
+                                      background: 'rgba(255, 255, 255, 0.05)',
+                                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                                      color: 'rgba(255, 255, 255, 0.8)',
+                                      borderRadius: '12px',
+                                      padding: '12px',
+                                      fontSize: '14px',
+                                      fontWeight: '500',
+                                      cursor: 'pointer',
+                                      transition: 'all 0.3s ease'
+                                    }}
+                                  >
+                                    Show QR Code
+                                  </button>
+                                ) : (
+                                  <div style={{
+                                    background: 'rgba(15, 23, 42, 0.9)',
+                                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                                    borderRadius: '12px',
+                                    padding: '20px',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    gap: '12px',
+                                    maxWidth: '280px',
+                                    margin: '0 auto',
+                                    transition: 'all 0.3s ease'
                                   }}>
-                                    ID: {ticket.short_id}
+                                    <div style={{
+                                      background: 'white',
+                                      padding: '12px',
+                                      borderRadius: '8px',
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      alignItems: 'center',
+                                      gap: '8px'
+                                    }}>
+                                      <QRCodeSVG 
+                                        value={`${typeof window !== 'undefined' ? window.location.origin : ''}/ticket/${ticket.short_id || ticket.id}`}
+                                        size={150}
+                                        level="M"
+                                      />
+                                      {ticket.short_id && (
+                                        <div style={{ 
+                                          fontSize: '12px', 
+                                          color: '#666',
+                                          fontFamily: 'monospace'
+                                        }}>
+                                          ID: {ticket.short_id}
+                                        </div>
+                                      )}
+                                    </div>
+                                    <button
+                                      onClick={() => toggleQRCode(ticket.id)}
+                                      style={{
+                                        background: 'transparent',
+                                        border: '1px solid rgba(255, 255, 255, 0.2)',
+                                        color: 'rgba(255, 255, 255, 0.7)',
+                                        borderRadius: '8px',
+                                        padding: '8px 16px',
+                                        fontSize: '12px',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.3s ease'
+                                      }}
+                                    >
+                                      Hide QR Code
+                                    </button>
                                   </div>
                                 )}
                               </div>
                             </div>
                           )
-                        })}
-                      </div>
+                          })}
+                        </div>
+                      )}
                     </div>
                   )}
 
                   {/* Used Tickets */}
                   {usedTickets.length > 0 && (
                     <div>
-                      <h3 style={{
-                        color: 'white',
-                        fontSize: '18px',
-                        fontWeight: '600',
-                        marginBottom: '16px'
-                      }}>
-                        Used ({usedTickets.length})
-                      </h3>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                        {usedTickets.map(ticket => {
-                          const ticketLabel = getTicketKindDisplayName(ticket.ticket_kind)
-                          const redeemLocation = getTicketRedemptionLocation(ticket.ticket_kind)
+                      <div
+                        onClick={() => setShowUsedSection(!showUsedSection)}
+                        style={{
+                          color: 'white',
+                          fontSize: '18px',
+                          fontWeight: '600',
+                          marginBottom: '16px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          userSelect: 'none'
+                        }}
+                      >
+                        <span>Used ({usedTickets.length})</span>
+                        <span style={{ fontSize: '14px' }}>{showUsedSection ? '▾' : '▸'}</span>
+                      </div>
+                      {showUsedSection && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                          {usedTickets.map(ticket => {
+                            const ticketLabel = getTicketKindDisplayName(ticket.ticket_kind)
+                            const redeemLocation = getTicketRedemptionLocation(ticket.ticket_kind)
+                            const showQR = showQRCodes[ticket.id] || false
                           
                           return (
                             <div
@@ -1988,28 +2100,81 @@ export default function AccountPage() {
                                   USED
                                 </span>
                               </div>
-                              <div style={{
-                                marginTop: '16px',
-                                background: 'white',
-                                padding: '16px',
-                                borderRadius: '12px',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                gap: '8px',
-                                opacity: 0.6
-                              }}>
-                                <QRCodeSVG 
-                                  value={`${typeof window !== 'undefined' ? window.location.origin : ''}/ticket/${ticket.short_id || ticket.id}`}
-                                  size={150}
-                                  level="M"
-                                />
+                              {/* QR Code - collapsible for used tickets */}
+                              <div style={{ marginTop: '16px' }}>
+                                {!showQR ? (
+                                  <button
+                                    onClick={() => toggleQRCode(ticket.id)}
+                                    style={{
+                                      width: '100%',
+                                      background: 'rgba(255, 255, 255, 0.05)',
+                                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                                      color: 'rgba(255, 255, 255, 0.6)',
+                                      borderRadius: '12px',
+                                      padding: '12px',
+                                      fontSize: '14px',
+                                      fontWeight: '500',
+                                      cursor: 'pointer',
+                                      transition: 'all 0.3s ease',
+                                      opacity: 0.7
+                                    }}
+                                  >
+                                    Show QR Code
+                                  </button>
+                                ) : (
+                                  <div style={{
+                                    background: 'rgba(15, 23, 42, 0.9)',
+                                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                                    borderRadius: '12px',
+                                    padding: '20px',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    gap: '12px',
+                                    maxWidth: '280px',
+                                    margin: '0 auto',
+                                    transition: 'all 0.3s ease',
+                                    opacity: 0.7
+                                  }}>
+                                    <div style={{
+                                      background: 'white',
+                                      padding: '12px',
+                                      borderRadius: '8px',
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      alignItems: 'center',
+                                      gap: '8px'
+                                    }}>
+                                      <QRCodeSVG 
+                                        value={`${typeof window !== 'undefined' ? window.location.origin : ''}/ticket/${ticket.short_id || ticket.id}`}
+                                        size={150}
+                                        level="M"
+                                      />
+                                    </div>
+                                    <button
+                                      onClick={() => toggleQRCode(ticket.id)}
+                                      style={{
+                                        background: 'transparent',
+                                        border: '1px solid rgba(255, 255, 255, 0.2)',
+                                        color: 'rgba(255, 255, 255, 0.6)',
+                                        borderRadius: '8px',
+                                        padding: '8px 16px',
+                                        fontSize: '12px',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.3s ease'
+                                      }}
+                                    >
+                                      Hide QR Code
+                                    </button>
+                                  </div>
+                                )}
                               </div>
                             </div>
                           )
                         })}
                       </div>
-                    </div>
+                    )}
+                  </div>
                   )}
                 </div>
               )

@@ -258,9 +258,13 @@ export async function POST(request) {
 
       // Create tickets: for combo tickets, create multiple tickets per quantity
       // Each quantity unit creates all ticket kinds (e.g., 1 combo = 2 tickets, 2 combos = 4 tickets)
+      console.log(`📝 Creating ${ticketKindsToCreate.length} ticket(s) per quantity unit. Total quantity: ${quantity}. Ticket kinds:`, ticketKindsToCreate)
+      
       for (let i = 0; i < quantity; i++) {
         for (const ticketKind of ticketKindsToCreate) {
           const shortId = generateShortTicketId()
+          
+          console.log(`  Creating ticket ${i + 1}/${quantity} with kind: ${ticketKind}`)
           
           const { data: ticket, error: ticketError } = await supabase
           .from('tickets')

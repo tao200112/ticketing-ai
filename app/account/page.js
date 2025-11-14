@@ -1754,22 +1754,22 @@ export default function AccountPage() {
                                     fontWeight: '500',
                                     marginBottom: '4px'
                                   }}>
-                                    {ticket.event_title_snapshot || ticket.events?.title || 'Event'}
+                                    {ticket.event_snapshot?.title || ticket.events?.title || 'Event'}
                                   </div>
-                                  {(ticket.event_start_at_snapshot || ticket.events?.start_at) && (
+                                  {(ticket.event_snapshot?.start_at || ticket.events?.start_at) && (
                                     <div style={{
                                       color: 'rgba(255, 255, 255, 0.6)',
                                       fontSize: '14px'
                                     }}>
-                                      {new Date(ticket.event_start_at_snapshot || ticket.events.start_at).toLocaleString()}
+                                      {new Date(ticket.event_snapshot?.start_at || ticket.events.start_at).toLocaleString()}
                                     </div>
                                   )}
-                                  {ticket.event_venue_snapshot && (
+                                  {ticket.event_snapshot?.venue && (
                                     <div style={{
                                       color: 'rgba(255, 255, 255, 0.6)',
                                       fontSize: '14px'
                                     }}>
-                                      📍 {ticket.event_venue_snapshot}
+                                      📍 {ticket.event_snapshot.venue}
                                     </div>
                                   )}
                                 </div>
@@ -1848,7 +1848,7 @@ export default function AccountPage() {
                                     fontSize: '14px',
                                     marginBottom: '8px'
                                   }}>
-                                    <strong>Event:</strong> {ticket.event_title_snapshot || 'Event'}
+                                    <strong>Event:</strong> {ticket.event_snapshot?.title || 'Event'}
                                   </div>
                                   <div style={{
                                     color: 'rgba(255, 255, 255, 0.9)',
@@ -2115,7 +2115,7 @@ export default function AccountPage() {
                                     fontWeight: '500',
                                     marginBottom: '4px'
                                   }}>
-                                    {ticket.event_title_snapshot || ticket.events?.title || 'Event'}
+                                    {ticket.event_snapshot?.title || ticket.events?.title || 'Event'}
                                   </div>
                                   {ticket.used_at && (
                                     <div style={{

@@ -194,18 +194,9 @@ async function createOrderFromStripe(sessionId, userId, userEmail) {
         status: 'unused',
         used: false,
         short_id: generateShortTicketId(),
-        user_id: userId,
-        supabase_uid: supabaseUid, // 使用从 metadata 获取的 supabase_uid
-        event_title_snapshot: eventSnapshot?.title || null,
-        event_description_snapshot: eventSnapshot?.description || null,
-        event_venue_snapshot: eventSnapshot?.venue_name || null,
-        event_address_snapshot: eventSnapshot?.address || null,
-        event_start_at_snapshot: eventSnapshot?.start_at || null,
-        event_end_at_snapshot: eventSnapshot?.end_at || null,
-        event_poster_url_snapshot: eventSnapshot?.poster_url || null,
-        price_name_snapshot: priceSnapshot?.name || priceName,
-        price_amount_cents_snapshot: priceSnapshot?.amount_cents || null,
-        price_currency_snapshot: priceSnapshot?.currency || 'USD',
+        supabase_uid: supabaseUid,
+        event_snapshot: eventSnapshot || null,
+        price_snapshot: priceSnapshot || null
       })
     }
   }
@@ -427,18 +418,9 @@ export async function GET(request) {
           status: 'unused',
           used: false,
           short_id: generateShortTicketId(),
-          user_id: userId,
-          supabase_uid: supabaseUidFromMetadata, // 使用从 metadata 获取的 supabase_uid
-          event_title_snapshot: eventSnapshot?.title || null,
-          event_description_snapshot: eventSnapshot?.description || null,
-          event_venue_snapshot: eventSnapshot?.venue_name || null,
-          event_address_snapshot: eventSnapshot?.address || null,
-          event_start_at_snapshot: eventSnapshot?.start_at || null,
-          event_end_at_snapshot: eventSnapshot?.end_at || null,
-          event_poster_url_snapshot: eventSnapshot?.poster_url || null,
-          price_name_snapshot: priceSnapshot?.name || priceName,
-          price_amount_cents_snapshot: priceSnapshot?.amount_cents || null,
-          price_currency_snapshot: priceSnapshot?.currency || 'USD',
+          supabase_uid: supabaseUidFromMetadata,
+          event_snapshot: eventSnapshot || null,
+          price_snapshot: priceSnapshot || null
         })
       }
 

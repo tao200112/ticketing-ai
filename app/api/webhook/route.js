@@ -126,17 +126,6 @@ export async function POST(request) {
         if (!isNaN(ageFromMetadata) && ageFromMetadata > 0) {
           customerAge = ageFromMetadata
         }
-      } else if (session.metadata?.user_id) {
-        // 如果metadata中没有年龄，尝试从用户数据获取
-        const { data: userData } = await supabase
-          .from('users')
-          .select('age')
-          .eq('id', session.metadata.user_id)
-          .single()
-        
-        if (userData?.age) {
-          customerAge = userData.age
-        }
       }
 
       // 验证 supabase_uid 不为 null 再创建订单
@@ -167,7 +156,6 @@ export async function POST(request) {
             payment_intent: session.payment_intent,
             event_id: session.metadata?.event_id,
             tier: session.metadata?.price_name || 'general',
-            user_id: session.metadata?.user_id || null,
             supabase_uid: supabaseUid
           }
         })
@@ -315,26 +303,9 @@ export async function POST(request) {
         }
       }
 
-      // Get user information if available
-      let holderName = session.customer_email
+      // Get user information from metadata
+      let holderName = session.metadata?.customer_name || session.customer_email
       let holderAge = null
-      
-      if (session.metadata?.user_id) {
-        const { data: userData, error: userDataError } = await supabase
-          .from('users')
-          .select('name, age')
-          .eq('id', session.metadata.user_id)
-          .single()
-        
-        if (userDataError) {
-          console.warn('⚠️ 获取用户信息失败:', userDataError)
-        } else if (userData) {
-          holderName = userData.name || session.metadata?.customer_name || session.customer_email
-          holderAge = userData.age
-        }
-      } else if (session.metadata?.customer_name) {
-        holderName = session.metadata.customer_name
-      }
 
       // 获取年龄（优先从metadata，其次从用户数据）
       let ticketHolderAge = holderAge
@@ -375,25 +346,16 @@ export async function POST(request) {
             holder_email: session.customer_email,
             holder_name: holderName,
             holder_age: ticketHolderAge,
-            user_id: session.metadata?.user_id || null,
-            supabase_uid: supabaseUid, // 使用 Supabase Auth UID（必须不为 null）
+            supabase_uid: supabaseUid,
             status: 'unused',
             used: false,
             short_id: shortId,
             validity_start_time: validityStartTime,
             validity_end_time: validityEndTime,
-            // Event snapshot fields
-            event_title_snapshot: eventSnapshot?.title || null,
-            event_description_snapshot: eventSnapshot?.description || null,
-            event_venue_snapshot: eventSnapshot?.venue_name || null,
-            event_address_snapshot: eventSnapshot?.address || null,
-            event_start_at_snapshot: eventSnapshot?.start_at || null,
-            event_end_at_snapshot: eventSnapshot?.end_at || null,
-            event_poster_url_snapshot: eventSnapshot?.poster_url || null,
-            // Price snapshot fields
-            price_name_snapshot: priceSnapshot?.name || session.metadata?.price_name || null,
-            price_amount_cents_snapshot: priceSnapshot?.amount_cents || null,
-            price_currency_snapshot: priceSnapshot?.currency || 'USD'
+            // Event snapshot (JSONB)
+            event_snapshot: eventSnapshot || null,
+            // Price snapshot (JSONB)
+            price_snapshot: priceSnapshot || null
           }
           
           // 调试日志：打印即将插入的数据

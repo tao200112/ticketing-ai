@@ -9,12 +9,14 @@ const stripe = process.env.STRIPE_SECRET_KEY
   ? new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2023-10-16' })
   : null
 
-function buildUnauthorizedResponse() {
-  return NextResponse.json({ ok: false, message: 'Authentication required' }, { status: 401 })
-}
+// buildUnauthorizedResponse function removed - not used
 
 function buildConfigError(message) {
-  return NextResponse.json({ ok: false, message }, { status: 500 })
+  return NextResponse.json({ 
+    success: false,
+    error: 'CONFIGURATION_ERROR',
+    message 
+  }, { status: 500 })
 }
 
 function ownsOrder(order, supabaseUid, userEmail) {
@@ -258,7 +260,11 @@ export async function GET(request) {
     const sessionId = searchParams.get('session_id')
 
     if (!sessionId) {
-      return NextResponse.json({ ok: false, message: 'Missing session_id parameter' }, { status: 400 })
+      return NextResponse.json({ 
+        success: false,
+        error: 'VALIDATION_ERROR',
+        message: 'Missing session_id parameter' 
+      }, { status: 400 })
     }
 
     // Verify Stripe session first
@@ -269,14 +275,16 @@ export async function GET(request) {
       // Ensure session is paid
       if (stripeSession.payment_status !== 'paid') {
         return NextResponse.json({ 
-          ok: false, 
+          success: false,
+          error: 'VALIDATION_ERROR',
           message: 'Payment not completed' 
         }, { status: 400 })
       }
     } catch (stripeError) {
       console.error('Stripe session retrieval error:', stripeError)
       return NextResponse.json({ 
-        ok: false, 
+        success: false,
+        error: 'VALIDATION_ERROR',
         message: 'Invalid session ID' 
       }, { status: 400 })
     }
@@ -310,7 +318,11 @@ export async function GET(request) {
               order = await ensureOrderOwnedByUser(order, userId)
             }
           } else {
-            return NextResponse.json({ ok: false, message: 'Order not found' }, { status: 404 })
+            return NextResponse.json({ 
+              success: false,
+              error: 'NOT_FOUND',
+              message: 'Order not found' 
+            }, { status: 404 })
           }
         } else {
           order = await ensureOrderOwnedByUser(order, userId)
@@ -328,7 +340,8 @@ export async function GET(request) {
       } catch (createError) {
         console.error('Error creating order from Stripe:', createError)
         return NextResponse.json({ 
-          ok: false, 
+          success: false,
+          error: 'INTERNAL_ERROR',
           message: createError.message || 'Failed to create order' 
         }, { status: 500 })
       }
@@ -426,7 +439,8 @@ export async function GET(request) {
         if (ticketError) {
           console.error('Failed to create ticket rows:', ticketError)
           return NextResponse.json({ 
-            ok: false, 
+            success: false,
+            error: 'DATABASE_ERROR',
             message: 'Failed to create tickets: ' + ticketError.message 
           }, { status: 500 })
         }
@@ -476,15 +490,21 @@ export async function GET(request) {
     const ticketsWithQR = ownedTickets.map((ticket) => buildTicketQr(ticket, event))
 
     return NextResponse.json({
-      ok: true,
-      order,
-      tickets: ticketsWithQR,
-      event,
+      success: true,
+      data: {
+        order,
+        tickets: ticketsWithQR,
+        event,
+      }
     })
   } catch (error) {
     console.error('orders/by-session error', error)
     const message = error?.message || 'Internal Server Error'
     const status = error?.status || 500
-    return NextResponse.json({ ok: false, message }, { status })
+    return NextResponse.json({ 
+      success: false,
+      error: 'INTERNAL_ERROR',
+      message 
+    }, { status })
   }
 }

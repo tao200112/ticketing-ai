@@ -16,7 +16,11 @@ export async function POST(request) {
   // 检查Stripe是否已初始化
   if (!stripe) {
     console.error('[Webhook] Stripe not configured')
-    return NextResponse.json({ error: 'Stripe not configured' }, { status: 500 })
+    return NextResponse.json({ 
+      success: false,
+      error: 'CONFIGURATION_ERROR',
+      message: 'Stripe not configured' 
+    }, { status: 500 })
   }
 
   const body = await request.text()
@@ -26,7 +30,11 @@ export async function POST(request) {
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
   if (!webhookSecret) {
     console.error('[Webhook] STRIPE_WEBHOOK_SECRET not configured')
-    return NextResponse.json({ error: 'Webhook secret not configured' }, { status: 500 })
+    return NextResponse.json({ 
+      success: false,
+      error: 'CONFIGURATION_ERROR',
+      message: 'Webhook secret not configured' 
+    }, { status: 500 })
   }
 
   let event
@@ -35,7 +43,11 @@ export async function POST(request) {
     event = stripe.webhooks.constructEvent(body, sig, webhookSecret)
   } catch (err) {
     console.error('[Webhook] Signature verification failed:', err.message)
-    return NextResponse.json({ error: 'Webhook signature verification failed' }, { status: 400 })
+    return NextResponse.json({ 
+      success: false,
+      error: 'VALIDATION_ERROR',
+      message: 'Webhook signature verification failed' 
+    }, { status: 400 })
   }
 
   // 处理支付成功事件
@@ -46,7 +58,11 @@ export async function POST(request) {
       // 连接 Supabase
       if (!supabaseUrl || !supabaseKey) {
         console.error('[Webhook] Supabase not configured')
-        return NextResponse.json({ error: 'Supabase not configured' }, { status: 500 })
+        return NextResponse.json({ 
+          success: false,
+          error: 'CONFIGURATION_ERROR',
+          message: 'Supabase not configured' 
+        }, { status: 500 })
       }
 
       const supabase = createClient(supabaseUrl, supabaseKey)
@@ -59,7 +75,10 @@ export async function POST(request) {
         .single()
 
       if (existingOrder) {
-        return NextResponse.json({ received: true })
+        return NextResponse.json({ 
+        success: true,
+        data: { received: true }
+      })
       }
 
       // 获取 Supabase Auth UID（必须从 metadata 获取）
@@ -117,7 +136,9 @@ export async function POST(request) {
         console.error('❌ [Webhook] Session metadata:', JSON.stringify(session.metadata, null, 2))
         console.error('❌ [Webhook] Customer email:', session.customer_email)
         return NextResponse.json({ 
-          error: 'Missing supabase_uid in checkout session metadata',
+          success: false,
+          error: 'VALIDATION_ERROR',
+          message: 'Missing supabase_uid in checkout session metadata',
           details: 'The checkout session does not contain supabase_uid. Please ensure user is logged in when creating checkout session.'
         }, { status: 500 })
       }
@@ -151,7 +172,11 @@ export async function POST(request) {
           supabase_uid: supabaseUid,
           customer_email: session.customer_email
         })
-        return NextResponse.json({ error: 'Failed to create order' }, { status: 500 })
+        return NextResponse.json({ 
+          success: false, 
+          error: 'DATABASE_ERROR',
+          message: 'Failed to create order' 
+        }, { status: 500 })
       }
 
       // 验证创建的订单确实有 supabase_uid
@@ -346,7 +371,9 @@ export async function POST(request) {
               error_message: ticketError.message
             })
             return NextResponse.json({ 
-              error: 'Failed to create ticket', 
+              success: false,
+              error: 'DATABASE_ERROR',
+              message: 'Failed to create ticket',
               details: ticketError.message 
             }, { status: 500 })
           } else {
@@ -363,13 +390,23 @@ export async function POST(request) {
         }
       }
 
-      return NextResponse.json({ received: true, order, tickets })
+      return NextResponse.json({ 
+        success: true,
+        data: { received: true, order, tickets }
+      })
 
     } catch (error) {
       console.error('❌ Webhook 处理错误:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ 
+        success: false,
+        error: 'INTERNAL_ERROR',
+        message: error.message 
+      }, { status: 500 })
     }
   }
 
-  return NextResponse.json({ received: true })
+  return NextResponse.json({ 
+    success: true,
+    data: { received: true }
+  })
 }

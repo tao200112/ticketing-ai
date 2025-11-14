@@ -160,7 +160,7 @@ export async function POST(request) {
         customer_name: customer_name || '',
         customer_age: age ? age.toString() : '',
         user_id: finalUserId || '', // 兼容旧代码
-        supabase_uid: supabaseUid, // 必须：Supabase Auth UID（不能为空字符串）
+        supabase_uid: supabaseUid || '', // 必须：Supabase Auth UID（Stripe metadata 不支持 null，使用空字符串作为占位符）
         customer_email: customer_email || userEmail || '', // 确保 metadata 中有邮箱
       },
     })

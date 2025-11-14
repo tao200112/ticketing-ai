@@ -458,17 +458,12 @@ export async function GET(request) {
       }
     }
 
-    // Filter tickets based on supabase_uid or email
+    // Filter tickets based on supabase_uid only
     let ownedTickets = tickets
-    if (user) {
+    if (user && userId) {
+      // 只使用 supabase_uid 匹配
       ownedTickets = tickets.filter((ticket) => {
-        // 优先使用 supabase_uid 匹配
-        if (ticket.supabase_uid && ticket.supabase_uid === user.id) return true
-        // 回退到 user_id 匹配（兼容旧数据）
-        if (ticket.user_id && ticket.user_id === user.id) return true
-        // 回退到邮箱匹配
-        if (ticket.holder_email && user.email && ticket.holder_email === user.email) return true
-        return false
+        return ticket.supabase_uid === userId
       })
 
       // Ensure ticket ownership is set for future queries (使用 supabase_uid)
@@ -481,12 +476,8 @@ export async function GET(request) {
           .in('id', ticketIds)
       }
     } else {
-      // If not logged in, show tickets matching customer email
-      if (customerEmail) {
-        ownedTickets = tickets.filter((ticket) => {
-          return ticket.holder_email === customerEmail
-        })
-      }
+      // If not logged in, return empty array (RLS will block anyway)
+      ownedTickets = []
     }
 
     // Build QR codes for tickets

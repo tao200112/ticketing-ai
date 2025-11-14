@@ -312,14 +312,23 @@ export default function AccountPage() {
         const { data: { user: authUser }, error: authError } = await client.auth.getUser()
         if (!authError && authUser) {
           supabaseUid = authUser.id
-          console.log('🔍 Account Page - Current Supabase UID:', supabaseUid)
+          console.log('🔍 Account Page - Auth UID:', supabaseUid)
+        } else {
+          console.error('❌ Failed to get Auth UID:', authError)
         }
       } catch (authErr) {
-        console.warn('⚠️ Failed to get Supabase Auth UID:', authErr)
+        console.error('❌ Error getting Auth UID:', authErr)
       }
 
-      // Get user tickets (优先使用 supabase_uid，回退到 user_id 和 email)
-      let ticketsQuery = client
+      if (!supabaseUid) {
+        console.error('❌ No Supabase UID available, cannot query tickets/orders')
+        setTickets([])
+        setOrders([])
+        return
+      }
+
+      // Get user tickets (只使用 supabase_uid)
+      const { data: ticketsData, error: ticketsError } = await client
         .from('tickets')
         .select(`
           *,
@@ -339,56 +348,30 @@ export default function AccountPage() {
             address
           )
         `)
-      
-      if (supabaseUid) {
-        // 优先使用 supabase_uid 查询
-        ticketsQuery = ticketsQuery.or(`supabase_uid.eq.${supabaseUid},user_id.eq.${userData.id},holder_email.eq.${userData.email}`)
-      } else {
-        // 回退到旧的查询方式
-        ticketsQuery = ticketsQuery.or(`user_id.eq.${userData.id},holder_email.eq.${userData.email}`)
-      }
-      
-      const { data: ticketsData } = await ticketsQuery.order('created_at', { ascending: false })
+        .eq('supabase_uid', supabaseUid)
+        .order('created_at', { ascending: false })
 
-      if (ticketsData) {
-        console.log('🎫 Account Page - Tickets found:', ticketsData.length, 'tickets')
-        console.log('🎫 Account Page - First 2 tickets:', ticketsData.slice(0, 2).map(t => ({
-          id: t.id,
-          supabase_uid: t.supabase_uid,
-          user_id: t.user_id,
-          holder_email: t.holder_email
-        })))
-        setTickets(ticketsData)
+      if (ticketsError) {
+        console.error('❌ Failed to fetch tickets:', ticketsError)
+        setTickets([])
       } else {
-        console.log('🎫 Account Page - No tickets found')
+        console.log('🎫 Account Page - Tickets returned:', ticketsData?.length || 0, ticketsData || [])
+        setTickets(ticketsData || [])
       }
 
-      // Get user orders (优先使用 supabase_uid，回退到 email)
-      let ordersQuery = client
+      // Get user orders (只使用 supabase_uid)
+      const { data: ordersData, error: ordersError } = await client
         .from('orders')
         .select('*')
-      
-      if (supabaseUid) {
-        // 优先使用 supabase_uid 查询
-        ordersQuery = ordersQuery.or(`supabase_uid.eq.${supabaseUid},customer_email.eq.${userData.email}`)
-      } else {
-        // 回退到邮箱查询
-        ordersQuery = ordersQuery.eq('customer_email', userData.email)
-      }
-      
-      const { data: ordersData } = await ordersQuery.order('created_at', { ascending: false })
+        .eq('supabase_uid', supabaseUid)
+        .order('created_at', { ascending: false })
 
-      if (ordersData) {
-        console.log('📦 Account Page - Orders found:', ordersData.length, 'orders')
-        console.log('📦 Account Page - First 2 orders:', ordersData.slice(0, 2).map(o => ({
-          id: o.id,
-          supabase_uid: o.supabase_uid,
-          user_id: o.user_id,
-          customer_email: o.customer_email
-        })))
-        setOrders(ordersData)
+      if (ordersError) {
+        console.error('❌ Failed to fetch orders:', ordersError)
+        setOrders([])
       } else {
-        console.log('📦 Account Page - No orders found')
+        console.log('📦 Account Page - Orders returned:', ordersData?.length || 0, ordersData || [])
+        setOrders(ordersData || [])
       }
 
       // 调试日志：打印当前用户信息

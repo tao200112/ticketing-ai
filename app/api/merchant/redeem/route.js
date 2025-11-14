@@ -3,6 +3,7 @@ import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase-api'
 import { ErrorHandler, handleApiError } from '@/lib/error-handler'
 import { createLogger } from '@/lib/logger'
 import { verifyTicketQRPayload } from '@/lib/qr-crypto'
+import { getServerUser } from '@/lib/auth-server'
 
 const logger = createLogger('merchant-redeem-api')
 
@@ -29,22 +30,33 @@ export async function POST(request) {
 
     const supabase = createSupabaseClient()
 
-    // Get user from request (this should be set by authentication middleware)
-    // For now, we'll get it from the Authorization header or request body
-    const authHeader = request.headers.get('authorization')
-    let userId = null
-    
-    // Try to get user_id from body (set by frontend after login)
-    if (body.user_id) {
-      userId = body.user_id
-    } else {
-      // TODO: Implement proper JWT authentication
-      // For now, throw error if no user_id provided
+    // Get current user from Supabase Auth (supabase_uid)
+    const authUser = await getServerUser()
+    const supabaseUid = authUser?.id || null
+
+    if (!supabaseUid) {
+      throw ErrorHandler.unauthorizedError(
+        'AUTHENTICATION_REQUIRED',
+        'User must be logged in to redeem tickets'
+      )
+    }
+
+    // 兼容旧代码：如果 body 中有 user_id，也支持（但优先使用 supabaseUid）
+    const { user_id: bodyUserId } = body
+    const userId = supabaseUid || bodyUserId
+
+    if (!userId) {
       throw ErrorHandler.authenticationError(
         'AUTH_REQUIRED',
         'User authentication required'
       )
     }
+
+    logger.info('Merchant redemption request', { 
+      supabaseUid,
+      bodyUserId,
+      finalUserId: userId
+    })
 
     // Parse QR payload to get ticket ID
     // Support both new TKT format and old JSON format
@@ -139,7 +151,7 @@ export async function POST(request) {
     // Get merchant to check owner
     const { data: merchant, error: merchantError } = await supabase
       .from('merchants')
-      .select('id, owner_user_id')
+      .select('id, owner_user_id, owner_supabase_uid')
       .eq('id', ticketMerchantId)
       .single()
 
@@ -152,14 +164,17 @@ export async function POST(request) {
     }
 
     // Check if user is a member of this merchant OR is the owner
+    // 优先使用 supabase_uid 查询
     const { data: member, error: memberError } = await supabase
       .from('merchant_members')
       .select('merchant_id, role')
-      .eq('user_id', userId)
+      .eq('supabase_uid', supabaseUid)
       .eq('merchant_id', ticketMerchantId)
       .single()
 
-    const isOwner = merchant.owner_user_id === userId
+    // 验证所有权：优先使用 owner_supabase_uid，回退到 owner_user_id
+    const isOwner = (merchant.owner_supabase_uid && merchant.owner_supabase_uid === supabaseUid) ||
+                    (merchant.owner_user_id && merchant.owner_user_id === userId)
     const isMember = !memberError && member && member.merchant_id === ticketMerchantId
 
     if (!isOwner && !isMember) {
@@ -195,8 +210,9 @@ export async function POST(request) {
       .from('tickets')
       .update({
         status: 'used',
+        used: true,
         used_at: now.toISOString(),
-        redeemed_by: userId,
+        redeemed_by_supabase_uid: supabaseUid,  // 使用 Supabase Auth UID
         redeemed_at: now.toISOString(),
         last_verified_at: now.toISOString()
       })
@@ -207,9 +223,38 @@ export async function POST(request) {
       throw ErrorHandler.databaseError(updateError, 'REDEEM_FAILED')
     }
 
+    // Create redemption log entry
+    const { error: redemptionLogError } = await supabase
+      .from('ticket_redemptions')
+      .insert({
+        ticket_id: ticketId,
+        supabase_uid: ticket.supabase_uid || null,  // 票务所有者的 supabase_uid
+        redeemed_by_supabase_uid: supabaseUid,  // 操作人（商家员工）的 supabase_uid
+        ticket_kind: ticket.ticket_kind,
+        redeemed_at: now.toISOString(),
+        redeem_source: 'merchant_scan',
+        redeem_location: 'door',  // 默认位置，可以根据实际情况调整
+        metadata: {
+          method: 'merchant_scan',
+          ticket_id: ticketId,
+          merchant_id: ticketMerchantId,
+          redeemed_by: supabaseUid
+        }
+      })
+
+    if (redemptionLogError) {
+      // Log error but don't fail the redemption (non-critical)
+      logger.warn('Failed to create redemption log (non-critical)', { 
+        error: redemptionLogError, 
+        ticketId 
+      })
+    } else {
+      logger.info('Redemption log created', { ticketId, supabaseUid })
+    }
+
     logger.info('Ticket redeemed successfully', {
       ticketId,
-      redeemedBy: userId,
+      redeemedBy: supabaseUid,
       merchantId: ticketMerchantId
     })
 
@@ -220,7 +265,7 @@ export async function POST(request) {
         ticket_id: ticket.short_id || ticket.id,
         status: 'used',
         redeemed_at: now.toISOString(),
-        redeemed_by: userId
+        redeemed_by_supabase_uid: supabaseUid
       }
     })
 

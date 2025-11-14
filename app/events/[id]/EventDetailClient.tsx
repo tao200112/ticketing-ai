@@ -136,13 +136,47 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
 
     try {
       // 获取用户信息 - 确保只在客户端执行
+      // 优先从 Supabase client 获取 Auth UID，回退到 localStorage
+      let supabaseUid = null
       let user = null
+      
       if (typeof window !== 'undefined') {
         try {
-          const userSession = localStorage.getItem('userSession')
-          user = userSession ? JSON.parse(userSession) : null
+          // 尝试从 Supabase client 获取当前用户（最可靠的方式）
+          const { createClient } = await import('@supabase/supabase-js')
+          const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+          const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+          
+          if (supabaseUrl && supabaseAnonKey) {
+            const supabaseClient = createClient(supabaseUrl, supabaseAnonKey)
+            const { data: { user: authUser }, error: authError } = await supabaseClient.auth.getUser()
+            
+            if (!authError && authUser) {
+              supabaseUid = authUser.id
+              console.log('[EventDetailClient] Got Supabase Auth UID from client:', supabaseUid)
+            } else {
+              console.warn('[EventDetailClient] Could not get user from Supabase client:', authError)
+            }
+          }
+          
+          // 回退：从 localStorage 获取
+          if (!supabaseUid) {
+            const userSession = localStorage.getItem('userSession')
+            user = userSession ? JSON.parse(userSession) : null
+            // userSession 中的 id 应该是 Supabase Auth UID（如果是从 account page 存储的）
+            if (user?.id) {
+              // 验证是否是 UUID 格式（Supabase Auth UID）
+              const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+              if (uuidRegex.test(user.id)) {
+                supabaseUid = user.id
+                console.log('[EventDetailClient] Using Supabase Auth UID from localStorage:', supabaseUid)
+              } else {
+                console.warn('[EventDetailClient] user.id from localStorage is not a valid UUID:', user.id)
+              }
+            }
+          }
         } catch (error) {
-          console.error('Failed to get user information:', error)
+          console.error('[EventDetailClient] Failed to get user information:', error)
         }
       }
 
@@ -153,13 +187,13 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          eventId: event.id,
-          ticketType: selectedPrice.label,
+          event_id: event.id, // 使用 event_id（API 期望的字段名）
+          price_id: selectedPrice.id, // 使用 price_id（API 期望的字段名）
           quantity: quantity,
-          customerEmail: customerEmail,
-          customerName: customerName,
-          customerAge: parseInt(customerAge),
-          userId: user?.id,
+          customer_email: customerEmail,
+          customer_name: customerName,
+          customer_age: parseInt(customerAge),
+          userId: supabaseUid, // 传递 Supabase Auth UID
           userToken: user?.token ?? 'local-token',
           eventData: event
         }),

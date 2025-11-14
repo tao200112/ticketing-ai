@@ -104,6 +104,25 @@ export default function EventDetailPage() {
     setError('')
 
     try {
+      // 获取 Supabase Auth UID
+      let supabaseUid = null
+      try {
+        const { createClient } = await import('@supabase/supabase-js')
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+        const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+        
+        if (supabaseUrl && supabaseAnonKey) {
+          const supabaseClient = createClient(supabaseUrl, supabaseAnonKey)
+          const { data: { user: authUser }, error: authError } = await supabaseClient.auth.getUser()
+          
+          if (!authError && authUser) {
+            supabaseUid = authUser.id
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to get Supabase Auth UID:', error)
+      }
+
       const priceData = event.prices.find(p => p.id === selectedPrice)
       const response = await fetch('/api/checkout_sessions', {
         method: 'POST',
@@ -116,7 +135,8 @@ export default function EventDetailPage() {
           quantity: quantity,
           customer_email: customerEmail,
           customer_name: customerName,
-          customer_age: parseInt(customerAge)
+          customer_age: parseInt(customerAge),
+          userId: supabaseUid // 传递 Supabase Auth UID
         }),
       })
 

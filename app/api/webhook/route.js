@@ -67,6 +67,20 @@ export async function POST(request) {
         return NextResponse.json({ received: true })
       }
 
+      // 获取 Supabase Auth UID（优先从 metadata，其次通过邮箱查找）
+      let supabaseUid = null
+      if (session.metadata?.supabase_uid) {
+        supabaseUid = session.metadata.supabase_uid
+      } else if (session.customer_email) {
+        // 通过邮箱从 auth.users 查找 Supabase UID
+        const { data: authUsers } = await supabase.auth.admin.listUsers()
+        const matchingUser = authUsers?.users?.find(u => u.email === session.customer_email)
+        if (matchingUser) {
+          supabaseUid = matchingUser.id
+          console.log('✅ 通过邮箱找到 Supabase UID:', supabaseUid)
+        }
+      }
+
       // 获取客户年龄（从 metadata 或用户数据）
       let customerAge = null
       if (session.metadata?.customer_age) {
@@ -98,11 +112,13 @@ export async function POST(request) {
           total_amount_cents: session.amount_total,
           currency: session.currency.toUpperCase(),
           status: 'paid',
+          supabase_uid: supabaseUid, // 使用 Supabase Auth UID
           metadata: {
             payment_intent: session.payment_intent,
             event_id: session.metadata?.event_id,
             tier: session.metadata?.price_name || 'general',
-            user_id: session.metadata?.user_id || null
+            user_id: session.metadata?.user_id || null,
+            supabase_uid: supabaseUid
           }
         })
         .select()
@@ -291,6 +307,7 @@ export async function POST(request) {
             holder_name: holderName,
             holder_age: ticketHolderAge,
             user_id: session.metadata?.user_id || null,
+            supabase_uid: supabaseUid, // 使用 Supabase Auth UID
             status: 'unused',
             used: false,
             short_id: shortId,

@@ -306,8 +306,20 @@ export default function AccountPage() {
         })
       }
 
-      // Get user tickets (filter by user ID, fallback to email)
-      const { data: ticketsData } = await client
+      // 获取当前登录用户的 Supabase Auth UID
+      let supabaseUid = null
+      try {
+        const { data: { user: authUser }, error: authError } = await client.auth.getUser()
+        if (!authError && authUser) {
+          supabaseUid = authUser.id
+          console.log('🔍 Account Page - Current Supabase UID:', supabaseUid)
+        }
+      } catch (authErr) {
+        console.warn('⚠️ Failed to get Supabase Auth UID:', authErr)
+      }
+
+      // Get user tickets (优先使用 supabase_uid，回退到 user_id 和 email)
+      let ticketsQuery = client
         .from('tickets')
         .select(`
           *,
@@ -327,23 +339,66 @@ export default function AccountPage() {
             address
           )
         `)
-        .or(`user_id.eq.${userData.id},holder_email.eq.${userData.email}`)
-        .order('created_at', { ascending: false })
+      
+      if (supabaseUid) {
+        // 优先使用 supabase_uid 查询
+        ticketsQuery = ticketsQuery.or(`supabase_uid.eq.${supabaseUid},user_id.eq.${userData.id},holder_email.eq.${userData.email}`)
+      } else {
+        // 回退到旧的查询方式
+        ticketsQuery = ticketsQuery.or(`user_id.eq.${userData.id},holder_email.eq.${userData.email}`)
+      }
+      
+      const { data: ticketsData } = await ticketsQuery.order('created_at', { ascending: false })
 
       if (ticketsData) {
+        console.log('🎫 Account Page - Tickets found:', ticketsData.length, 'tickets')
+        console.log('🎫 Account Page - First 2 tickets:', ticketsData.slice(0, 2).map(t => ({
+          id: t.id,
+          supabase_uid: t.supabase_uid,
+          user_id: t.user_id,
+          holder_email: t.holder_email
+        })))
         setTickets(ticketsData)
+      } else {
+        console.log('🎫 Account Page - No tickets found')
       }
 
-      // Get user orders (filter by email)
-      const { data: ordersData } = await client
+      // Get user orders (优先使用 supabase_uid，回退到 email)
+      let ordersQuery = client
         .from('orders')
         .select('*')
-        .eq('customer_email', userData.email)
-        .order('created_at', { ascending: false })
+      
+      if (supabaseUid) {
+        // 优先使用 supabase_uid 查询
+        ordersQuery = ordersQuery.or(`supabase_uid.eq.${supabaseUid},customer_email.eq.${userData.email}`)
+      } else {
+        // 回退到邮箱查询
+        ordersQuery = ordersQuery.eq('customer_email', userData.email)
+      }
+      
+      const { data: ordersData } = await ordersQuery.order('created_at', { ascending: false })
 
       if (ordersData) {
+        console.log('📦 Account Page - Orders found:', ordersData.length, 'orders')
+        console.log('📦 Account Page - First 2 orders:', ordersData.slice(0, 2).map(o => ({
+          id: o.id,
+          supabase_uid: o.supabase_uid,
+          user_id: o.user_id,
+          customer_email: o.customer_email
+        })))
         setOrders(ordersData)
+      } else {
+        console.log('📦 Account Page - No orders found')
       }
+
+      // 调试日志：打印当前用户信息
+      console.log('👤 Account Page - Current User Info:', {
+        id: userData.id,
+        email: userData.email,
+        supabase_uid: supabaseUid,
+        has_tickets: ticketsData?.length > 0,
+        has_orders: ordersData?.length > 0
+      })
 
     } catch (error) {
       console.error('❌ Failed to load user data:', error)

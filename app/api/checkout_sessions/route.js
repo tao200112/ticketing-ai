@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { ErrorHandler, handleApiError } from '@/lib/error-handler'
 import { createLogger } from '@/lib/logger'
+import { getServerUser } from '@/lib/auth-server'
 
 const logger = createLogger('checkout-sessions-api')
 
@@ -20,10 +21,17 @@ export async function POST(request) {
       )
     }
 
+    // 获取当前登录用户的 Supabase Auth UID
+    const authUser = await getServerUser()
+    const supabaseUid = authUser?.id || null
+
     const body = await request.json()
     const { event_id, price_id, quantity = 1, customer_email, customer_name, customer_age, customerAge, userId } = body
     // 支持两种字段名：customer_age 或 customerAge
     const age = customer_age || customerAge
+    
+    // 优先使用 Supabase Auth UID，如果没有则使用传入的 userId（兼容旧代码）
+    const finalUserId = supabaseUid || userId
 
     logger.info('Received checkout request', { 
       eventId: event_id, 
@@ -111,7 +119,8 @@ export async function POST(request) {
         quantity: quantityNum.toString(),
         customer_name: customer_name || '',
         customer_age: age ? age.toString() : '',
-        user_id: userId || '',
+        user_id: finalUserId || '', // 兼容旧代码
+        supabase_uid: supabaseUid || '', // 新增：Supabase Auth UID
       },
     })
 

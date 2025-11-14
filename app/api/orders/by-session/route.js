@@ -89,6 +89,7 @@ async function createOrderFromStripe(sessionId, userId, userEmail) {
     .insert({
       stripe_session_id: session.id,
       user_id: userId,
+      supabase_uid: userId, // userId 在这里应该是 Supabase Auth UID
       customer_email: customerEmail,
       total_amount_cents: session.amount_total,
       currency: session.currency?.toUpperCase() || 'USD',
@@ -96,6 +97,7 @@ async function createOrderFromStripe(sessionId, userId, userEmail) {
       metadata: {
         ...metadata,
         user_id: userId,
+        supabase_uid: userId,
         customer_email: customerEmail,
       },
     })
@@ -182,6 +184,7 @@ async function createOrderFromStripe(sessionId, userId, userEmail) {
         used: false,
         short_id: generateShortTicketId(),
         user_id: userId,
+        supabase_uid: userId, // userId 在这里应该是 Supabase Auth UID
         event_title_snapshot: eventSnapshot?.title || null,
         event_description_snapshot: eventSnapshot?.description || null,
         event_venue_snapshot: eventSnapshot?.venue_name || null,
@@ -406,6 +409,7 @@ export async function GET(request) {
           used: false,
           short_id: generateShortTicketId(),
           user_id: userId,
+          supabase_uid: userId, // userId 在这里应该是 Supabase Auth UID
           event_title_snapshot: eventSnapshot?.title || null,
           event_description_snapshot: eventSnapshot?.description || null,
           event_venue_snapshot: eventSnapshot?.venue_name || null,
@@ -454,22 +458,26 @@ export async function GET(request) {
       }
     }
 
-    // Filter tickets based on user or email
+    // Filter tickets based on supabase_uid or email
     let ownedTickets = tickets
     if (user) {
       ownedTickets = tickets.filter((ticket) => {
+        // 优先使用 supabase_uid 匹配
+        if (ticket.supabase_uid && ticket.supabase_uid === user.id) return true
+        // 回退到 user_id 匹配（兼容旧数据）
         if (ticket.user_id && ticket.user_id === user.id) return true
+        // 回退到邮箱匹配
         if (ticket.holder_email && user.email && ticket.holder_email === user.email) return true
         return false
       })
 
-      // Ensure ticket ownership is set for future queries
-      const ticketsToClaim = ownedTickets.filter((ticket) => !ticket.user_id)
+      // Ensure ticket ownership is set for future queries (使用 supabase_uid)
+      const ticketsToClaim = ownedTickets.filter((ticket) => !ticket.supabase_uid)
       if (ticketsToClaim.length > 0 && userId) {
         const ticketIds = ticketsToClaim.map((ticket) => ticket.id)
         await admin
           .from('tickets')
-          .update({ user_id: userId })
+          .update({ supabase_uid: userId })
           .in('id', ticketIds)
       }
     } else {

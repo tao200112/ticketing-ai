@@ -3,6 +3,7 @@ import Stripe from 'stripe'
 import { getServerUser } from '@/lib/auth-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { generateShortTicketId } from '@/lib/ticket-utils'
+import { isComboTicket, getComboTicketKinds } from '@/lib/ticket-helpers'
 
 const stripe = process.env.STRIPE_SECRET_KEY
   ? new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2023-10-16' })
@@ -145,29 +146,54 @@ async function createOrderFromStripe(sessionId, userId, userEmail) {
     }
   }
 
+  // Check if this is a combo ticket and determine ticket kinds to create
+  const ticketKindFromPrice = priceSnapshot?.ticket_kind || null
+  const isCombo = isComboTicket(priceName, ticketKindFromPrice)
+  
+  let ticketKindsToCreate = []
+  if (isCombo) {
+    // Combo tickets MUST create two separate tickets: ENTRY_COMBO and DRINK_COMBO
+    ticketKindsToCreate = getComboTicketKinds(priceName, ticketKindFromPrice)
+    console.log(`[createOrderFromStripe] Combo ticket detected, will create tickets:`, ticketKindsToCreate)
+    
+    // Safety check: ensure we have exactly 2 tickets for combo
+    if (ticketKindsToCreate.length !== 2) {
+      console.error(`[createOrderFromStripe] ERROR: Combo ticket should create 2 tickets, but got ${ticketKindsToCreate.length}. Using default combo kinds.`)
+      ticketKindsToCreate = ['ENTRY_COMBO', 'DRINK_COMBO']
+    }
+  } else {
+    // Single ticket - use ticket_kind from price or determine from price name
+    const singleKind = ticketKindFromPrice || null
+    ticketKindsToCreate = singleKind ? [singleKind] : [null]
+  }
+
   const ticketRows = []
+  // For combo tickets, create multiple tickets per quantity
+  // Each quantity unit creates all ticket kinds (e.g., 1 combo = 2 tickets, 2 combos = 4 tickets)
   for (let i = 0; i < quantity; i += 1) {
-    ticketRows.push({
-      order_id: order.id,
-      event_id: eventId,
-      tier: priceName,
-      ticket_kind: priceSnapshot?.ticket_kind || null,
-      holder_email: customerEmail,
-      status: 'unused',
-      used: false,
-      short_id: generateShortTicketId(),
-      user_id: userId,
-      event_title_snapshot: eventSnapshot?.title || null,
-      event_description_snapshot: eventSnapshot?.description || null,
-      event_venue_snapshot: eventSnapshot?.venue_name || null,
-      event_address_snapshot: eventSnapshot?.address || null,
-      event_start_at_snapshot: eventSnapshot?.start_at || null,
-      event_end_at_snapshot: eventSnapshot?.end_at || null,
-      event_poster_url_snapshot: eventSnapshot?.poster_url || null,
-      price_name_snapshot: priceSnapshot?.name || priceName,
-      price_amount_cents_snapshot: priceSnapshot?.amount_cents || null,
-      price_currency_snapshot: priceSnapshot?.currency || 'USD',
-    })
+    for (const ticketKind of ticketKindsToCreate) {
+      ticketRows.push({
+        order_id: order.id,
+        event_id: eventId,
+        tier: priceName,
+        ticket_kind: ticketKind,
+        holder_email: customerEmail,
+        status: 'unused',
+        used: false,
+        short_id: generateShortTicketId(),
+        user_id: userId,
+        event_title_snapshot: eventSnapshot?.title || null,
+        event_description_snapshot: eventSnapshot?.description || null,
+        event_venue_snapshot: eventSnapshot?.venue_name || null,
+        event_address_snapshot: eventSnapshot?.address || null,
+        event_start_at_snapshot: eventSnapshot?.start_at || null,
+        event_end_at_snapshot: eventSnapshot?.end_at || null,
+        event_poster_url_snapshot: eventSnapshot?.poster_url || null,
+        price_name_snapshot: priceSnapshot?.name || priceName,
+        price_amount_cents_snapshot: priceSnapshot?.amount_cents || null,
+        price_currency_snapshot: priceSnapshot?.currency || 'USD',
+      })
+    }
   }
 
   if (ticketRows.length > 0) {

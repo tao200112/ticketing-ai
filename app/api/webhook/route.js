@@ -135,7 +135,9 @@ export async function POST(request) {
       }
       
       // Check if this is a combo ticket (check both ticket_kind and price name)
+      console.log(`🔍 Checking combo status - priceName: "${priceName}", ticketKindFromPrice: "${ticketKindFromPrice}"`)
       const isCombo = isComboTicket(priceName, ticketKindFromPrice)
+      console.log(`🔍 isCombo result: ${isCombo}`)
       
       // For combo tickets, get both ENTRY_COMBO and DRINK_COMBO
       // For non-combo tickets, get the single ticket kind
@@ -144,6 +146,18 @@ export async function POST(request) {
         // Combo tickets MUST create two separate tickets
         ticketKindsToCreate = getComboTicketKinds(priceName, ticketKindFromPrice)
         console.log('🎫 Combo ticket detected, will create tickets:', ticketKindsToCreate)
+        
+        // Safety check: ensure we have exactly 2 tickets for combo
+        if (ticketKindsToCreate.length !== 2) {
+          console.error(`❌ ERROR: Combo ticket should create 2 tickets, but got ${ticketKindsToCreate.length}. Using default combo kinds.`)
+          ticketKindsToCreate = ['ENTRY_COMBO', 'DRINK_COMBO']
+        }
+        
+        // Verify both ticket kinds are present
+        if (!ticketKindsToCreate.includes('ENTRY_COMBO') || !ticketKindsToCreate.includes('DRINK_COMBO')) {
+          console.error(`❌ ERROR: Combo ticket missing required kinds. Got: ${ticketKindsToCreate}. Using default.`)
+          ticketKindsToCreate = ['ENTRY_COMBO', 'DRINK_COMBO']
+        }
       } else {
         // Single ticket - determine kind from price or metadata
         const singleKind = ticketKindFromPrice || getTicketKindFromPriceName(priceName) || null

@@ -189,16 +189,6 @@ export default function NavbarPartyTix() {
           >
             Activity
           </NavLinkItem>
-          <NavLinkItem
-            href="/contact"
-            style={{
-              color: 'white',
-              textDecoration: 'none',
-              transition: 'color 0.3s ease'
-            }}
-          >
-            Contact Us
-          </NavLinkItem>
             {renderAuthLinks('desktop')}
           </div>
         )}
@@ -261,19 +251,6 @@ export default function NavbarPartyTix() {
             onClick={closeMobileMenu}
           >
             Activity
-          </NavLinkItem>
-          <NavLinkItem
-            href="/contact"
-            style={{
-              color: 'white',
-              textDecoration: 'none',
-              fontSize: '16px',
-              padding: '8px 0',
-              transition: 'color 0.3s ease'
-            }}
-            onClick={closeMobileMenu}
-          >
-            Contact Us
           </NavLinkItem>
           {renderAuthLinks('mobile')}
         </div>

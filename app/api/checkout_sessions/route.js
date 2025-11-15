@@ -16,7 +16,8 @@ export async function POST(request) {
     // 详细日志：打印 incoming cookies（用于调试）
     try {
       const { cookies } = await import('next/headers')
-      const cookieStore = cookies() as any
+      const cookieStore = cookies()
+      // cookies() returns ReadonlyRequestCookies which has getAll() method
       const allCookies = cookieStore.getAll()
       const supabaseCookies = allCookies.filter(c => 
         c.name.startsWith('sb-') || c.name.includes('supabase')

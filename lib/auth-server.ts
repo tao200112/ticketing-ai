@@ -4,14 +4,15 @@ import { createServerClient } from '@supabase/ssr'
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-export function getRouteHandlerSupabase() {
+export async function getRouteHandlerSupabase() {
   if (!supabaseUrl || !supabaseAnonKey) {
     console.warn('⚠️ Supabase environment variables missing')
     return null
   }
 
   try {
-    const cookieStore = cookies()
+    // In Next.js App Router API routes, cookies() needs to be awaited
+    const cookieStore = await cookies()
     
     return createServerClient(
       supabaseUrl,
@@ -53,27 +54,56 @@ export function getRouteHandlerSupabase() {
 
 export async function getServerUser() {
   try {
-    const supabase = getRouteHandlerSupabase()
+    const supabase = await getRouteHandlerSupabase()
     if (!supabase) {
       console.warn('[getServerUser] Supabase client not available')
       return null
     }
 
-    const { data, error } = await supabase.auth.getUser()
+    // First try to get session (which reads from cookies)
+    // This is more reliable in API routes than getUser()
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+    
+    if (sessionError) {
+      console.warn('[getServerUser] Error getting session:', sessionError.message)
+      // Fallback to getUser() if getSession() fails
+      const { data: userData, error: userError } = await supabase.auth.getUser()
+      if (userError) {
+        console.warn('[getServerUser] Error getting user:', userError.message)
+        return null
+      }
+      if (!userData?.user) {
+        console.warn('[getServerUser] No user found')
+        return null
+      }
+      return userData.user
+    }
 
-    if (error) {
-      console.warn('[getServerUser] Error getting user:', error.message)
+    // If we have a session, return the user from session
+    if (sessionData?.session?.user) {
+      return sessionData.session.user
+    }
+
+    // If no session, try getUser() as fallback
+    const { data: userData, error: userError } = await supabase.auth.getUser()
+    if (userError) {
+      console.warn('[getServerUser] Error getting user:', userError.message)
       return null
     }
 
-    if (!data?.user) {
+    if (!userData?.user) {
       console.warn('[getServerUser] No user found in session')
       return null
     }
 
-    return data.user
+    return userData.user
   } catch (error) {
     console.error('[getServerUser] Exception:', error)
+    // Log full error details for debugging
+    if (error instanceof Error) {
+      console.error('[getServerUser] Error message:', error.message)
+      console.error('[getServerUser] Error stack:', error.stack)
+    }
     return null
   }
 }

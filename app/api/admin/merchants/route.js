@@ -17,7 +17,7 @@ export async function GET() {
       .from('merchants')
       .select(`
         *,
-        users!merchants_owner_user_id_fkey (
+        users!merchants_owner_supabase_uid_fkey (
           id,
           email,
           name

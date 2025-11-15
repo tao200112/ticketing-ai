@@ -153,7 +153,7 @@ export async function POST(request) {
             payment_intent: session.payment_intent,
             event_id: session.metadata?.event_id,
             tier: session.metadata?.price_name || 'general',
-            supabase_uid: supabaseUid
+            auth_user_id: authUserId // Unified identity in metadata
           }
         })
         .select()

@@ -29,7 +29,7 @@ export async function POST(request) {
     const authIdentity = await getServerAuthIdentity()
     
     if (!authIdentity || !authIdentity.id) {
-      throw ErrorHandler.unauthorizedError(
+      throw ErrorHandler.authenticationError(
         'AUTHENTICATION_REQUIRED',
         'User must be logged in to create checkout session. Please refresh the page and try again.'
       )

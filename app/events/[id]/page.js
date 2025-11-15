@@ -115,7 +115,11 @@ export default function EventDetailPage() {
       // 检查响应状态码
       if (response.status === 401) {
         // 用户未登录，立即重定向到登录页面（不延迟）
-        console.warn('[handleBuyTickets] Authentication required, redirecting to login')
+        console.error('[handleBuyTickets] Unauthorized when creating checkout session', {
+          status: response.status,
+          error: result.error || result.message,
+          url: window.location.pathname
+        })
         router.push('/auth/login?redirect=' + encodeURIComponent(window.location.pathname))
         return
       }
@@ -123,7 +127,11 @@ export default function EventDetailPage() {
       if (!response.ok) {
         // 其他错误
         const errorMessage = result.message || result.error || 'Failed to create payment session'
-        console.error('[handleBuyTickets] API error:', errorMessage, result)
+        console.error('[handleBuyTickets] API error:', {
+          status: response.status,
+          error: errorMessage,
+          result
+        })
         setError(errorMessage)
         return
       }

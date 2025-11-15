@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { ErrorHandler, handleApiError } from '@/lib/error-handler'
 import { createLogger } from '@/lib/logger'
-import { getServerAuthIdentity } from '@/lib/auth-identity'
+import { requireServerUser } from '@/lib/auth-server'
 
 const logger = createLogger('checkout-sessions-api')
 
@@ -13,6 +13,22 @@ const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SEC
 
 export async function POST(request) {
   try {
+    // 详细日志：打印 incoming cookies（用于调试）
+    try {
+      const { cookies } = await import('next/headers')
+      const cookieStore = cookies() as any
+      const allCookies = cookieStore.getAll()
+      const supabaseCookies = allCookies.filter(c => 
+        c.name.startsWith('sb-') || c.name.includes('supabase')
+      )
+      logger.info('[CHECKOUT_SESSIONS] Incoming cookies', {
+        totalCookies: allCookies.length,
+        supabaseCookies: supabaseCookies.map(c => ({ name: c.name, hasValue: !!c.value }))
+      })
+    } catch (cookieError) {
+      logger.warn('[CHECKOUT_SESSIONS] Failed to read cookies:', cookieError.message)
+    }
+
     // 检查Stripe是否已初始化
     if (!stripe) {
       throw ErrorHandler.configurationError(
@@ -25,18 +41,17 @@ export async function POST(request) {
     const body = await request.json()
     const { event_id, price_id, quantity = 1, customer_email, customer_name, customer_age, customerAge } = body
 
-    // 获取当前登录用户的身份（从 AuthContext/Supabase Auth）
-    const authIdentity = await getServerAuthIdentity()
+    // 获取当前登录用户（基于 Supabase server auth）
+    // requireServerUser() 会抛出 AUTHENTICATION_ERROR 如果用户未登录
+    const user = await requireServerUser()
     
-    if (!authIdentity || !authIdentity.id) {
-      throw ErrorHandler.authenticationError(
-        'AUTHENTICATION_REQUIRED',
-        'User must be logged in to create checkout session. Please refresh the page and try again.'
-      )
-    }
+    logger.info('[CHECKOUT_SESSIONS] Authenticated user:', {
+      id: user.id,
+      email: user.email
+    })
 
-    const authUserId = authIdentity.id // Supabase Auth UID - unified identity
-    const userEmail = authIdentity.email
+    const authUserId = user.id // Supabase Auth UID - unified identity
+    const userEmail = user.email
 
     logger.info('Checkout request - Auth info', { 
       authUserId,
@@ -147,11 +162,22 @@ export async function POST(request) {
     })
 
   } catch (error) {
+    // 详细错误日志
     console.error('[checkout-sessions-api] RAW ERROR OBJECT:', error)
     if (error instanceof Error) {
       console.error('[checkout-sessions-api] error.message:', error.message)
       console.error('[checkout-sessions-api] error.stack:', error.stack)
     }
+    
+    // 如果是认证错误，记录详细信息
+    if (error && typeof error === 'object' && 'type' in error && error.type === 'AUTHENTICATION_ERROR') {
+      logger.warn('[CHECKOUT_SESSIONS] Authentication failed', {
+        code: error.code,
+        message: error.message
+      })
+    }
+    
+    // 使用统一的错误处理
     return handleApiError(error, request, logger)
   }
 }

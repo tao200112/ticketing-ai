@@ -158,11 +158,17 @@ export async function middleware(request) {
 
 export const config = {
   matcher: [
-    // Match all routes to enable path-based and domain-based routing
-    '/((?!api|_next/static|_next/image|favicon.ico).*)',
-    '/event/:path*',
-    '/events/:path*',
-    '/merchant/:path*',
-    '/admin/:path*'
+    // Match all routes including API routes to refresh Supabase session
+    // Exclude static files and Next.js internals
+    '/((?!_next/static|_next/image|favicon.ico).*)',
+    // Explicitly include API routes that need authentication
+    '/api/checkout_sessions',
+    '/api/orders/:path*',
+    '/api/tickets/:path*',
+    '/api/events/:path*',
+    '/api/merchant/:path*',
+    '/api/admin/:path*',
+    '/api/users/:path*',
+    '/api/auth/:path*',
   ]
 }

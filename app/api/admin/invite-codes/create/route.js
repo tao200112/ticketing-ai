@@ -81,20 +81,43 @@ export async function POST(request) {
     // 规范化邀请码
     const normalizedCode = code.trim().toUpperCase()
 
-    // 检查邀请码是否已存在
-    const { data: existingCode, error: checkError } = await supabase
+    // 检查使用哪个表：优先使用 invite_codes，如果不存在则使用 admin_invite_codes
+    let useNewTable = true
+    let existingCode = null
+
+    // 首先尝试检查新表
+    const { data: newTableCode, error: newTableError } = await supabase
       .from('invite_codes')
       .select('id')
       .eq('code', normalizedCode)
       .maybeSingle()
 
-    if (checkError && checkError.code !== 'PGRST116') {
-      logger.error('Error checking invite code', { error: checkError, code: normalizedCode })
-      throw ErrorHandler.databaseError(
-        checkError,
-        'DATABASE_ERROR',
-        '检查邀请码失败'
-      )
+    if (newTableCode) {
+      existingCode = newTableCode
+    } else if (newTableError && newTableError.code !== 'PGRST116') {
+      // 如果表不存在，回退到旧表
+      logger.info('invite_codes table not available, using admin_invite_codes', { error: newTableError })
+      useNewTable = false
+      
+      // 检查旧表
+      const { data: oldTableCode, error: oldTableError } = await supabase
+        .from('admin_invite_codes')
+        .select('id')
+        .eq('code', normalizedCode)
+        .maybeSingle()
+
+      if (oldTableError && oldTableError.code !== 'PGRST116') {
+        logger.error('Error checking invite code', { error: oldTableError, code: normalizedCode })
+        throw ErrorHandler.databaseError(
+          oldTableError,
+          'DATABASE_ERROR',
+          '检查邀请码失败'
+        )
+      }
+
+      if (oldTableCode) {
+        existingCode = oldTableCode
+      }
     }
 
     if (existingCode) {
@@ -105,19 +128,50 @@ export async function POST(request) {
     }
 
     // 创建邀请码
-    const { data: newInviteCode, error: createError } = await supabase
-      .from('invite_codes')
-      .insert([{
-        code: normalizedCode,
+    let newInviteCode = null
+    let createError = null
+
+    if (useNewTable) {
+      // 使用新表
+      const { data, error } = await supabase
+        .from('invite_codes')
+        .insert([{
+          code: normalizedCode,
+          type: type,
+          used: false,
+          created_by: adminUser.id
+        }])
+        .select('id, code, type, used, created_at')
+        .single()
+
+      newInviteCode = data
+      createError = error
+    } else {
+      // 使用旧表（向后兼容）
+      const { data, error } = await supabase
+        .from('admin_invite_codes')
+        .insert([{
+          code: normalizedCode,
+          max_events: 10,
+          is_active: true,
+          expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(), // 1年后过期
+          created_by: 'admin'
+        }])
+        .select('id, code, max_events, is_active, created_at')
+        .single()
+
+      newInviteCode = data ? {
+        id: data.id,
+        code: data.code,
         type: type,
         used: false,
-        created_by: adminUser.id
-      }])
-      .select('id, code, type, used, created_at')
-      .single()
+        created_at: data.created_at
+      } : null
+      createError = error
+    }
 
     if (createError) {
-      logger.error('Error creating invite code', { error: createError, code: normalizedCode })
+      logger.error('Error creating invite code', { error: createError, code: normalizedCode, useNewTable })
       throw ErrorHandler.fromSupabaseError(createError, 'INVITE_CODE_CREATION_FAILED')
     }
 

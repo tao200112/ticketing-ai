@@ -11,8 +11,32 @@ import { ErrorHandler, handleApiError } from '@/lib/error-handler'
 import { createLogger } from '@/lib/logger'
 import bcrypt from 'bcryptjs'
 import { generateMerchantToken, setMerchantTokenCookie } from '@/lib/auth/merchant-jwt'
+import { createClient } from '@supabase/supabase-js'
 
 const logger = createLogger('merchant-register-api')
+
+/**
+ * 创建使用 Service Role Key 的 Supabase 客户端
+ * 绕过 RLS 策略，用于商家注册等操作
+ */
+function createServiceRoleClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  if (!supabaseUrl || !supabaseServiceKey) {
+    throw ErrorHandler.configurationError(
+      'CONFIG_ERROR',
+      'Supabase Service Role Key 未配置'
+    )
+  }
+
+  return createClient(supabaseUrl, supabaseServiceKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  })
+}
 
 export async function POST(request) {
   try {
@@ -34,7 +58,8 @@ export async function POST(request) {
       )
     }
 
-    const supabase = createSupabaseClient()
+    // 使用 Service Role Key 创建客户端，绕过 RLS 策略
+    const supabase = createServiceRoleClient()
 
     // 验证邮箱格式
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -56,24 +81,87 @@ export async function POST(request) {
     }
 
     // 1. 验证邀请码
+    // 支持两种表：invite_codes（新表）和 admin_invite_codes（旧表，向后兼容）
     const normalizedInviteCode = inviteCode.trim().toUpperCase()
-    const { data: inviteCodeData, error: inviteError } = await supabase
-      .from('invite_codes')
+    let inviteCodeData = null
+    let inviteTableName = null
+
+    // 首先尝试查询 admin_invite_codes 表（当前使用的表）
+    // 因为 invite_codes 表可能还不存在（迁移未运行）
+    const { data: oldInviteCode, error: oldInviteError } = await supabase
+      .from('admin_invite_codes')
       .select('*')
       .eq('code', normalizedInviteCode)
-      .eq('type', 'merchant')
       .maybeSingle()
 
-    if (inviteError && inviteError.code !== 'PGRST116') {
-      logger.error('Error checking invite code', { error: inviteError, code: normalizedInviteCode })
-      throw ErrorHandler.databaseError(
-        inviteError,
-        'INVITE_CODE_CHECK_FAILED',
-        '验证邀请码失败'
-      )
+    if (oldInviteCode) {
+      // 找到邀请码，使用旧表
+      inviteCodeData = oldInviteCode
+      inviteTableName = 'admin_invite_codes'
+      logger.info('Found invite code in admin_invite_codes', { code: normalizedInviteCode })
+    } else if (oldInviteError && oldInviteError.code !== 'PGRST116') {
+      // 查询出错（不是"未找到"的错误）
+      logger.error('Error checking invite code in admin_invite_codes', { 
+        error: oldInviteError, 
+        code: normalizedInviteCode,
+        errorCode: oldInviteError.code,
+        errorMessage: oldInviteError.message
+      })
+      
+      // 尝试查询新表（如果存在）
+      const { data: newInviteCode, error: newInviteError } = await supabase
+        .from('invite_codes')
+        .select('*')
+        .eq('code', normalizedInviteCode)
+        .eq('type', 'merchant')
+        .maybeSingle()
+
+      if (newInviteCode) {
+        inviteCodeData = newInviteCode
+        inviteTableName = 'invite_codes'
+        logger.info('Found invite code in invite_codes', { code: normalizedInviteCode })
+      } else if (newInviteError && newInviteError.code !== 'PGRST116') {
+        // 新表查询也出错
+        logger.error('Error checking invite code in both tables', { 
+          oldError: oldInviteError,
+          newError: newInviteError,
+          code: normalizedInviteCode
+        })
+        throw ErrorHandler.databaseError(
+          oldInviteError,
+          'INVITE_CODE_CHECK_FAILED',
+          '验证邀请码失败'
+        )
+      }
+    } else {
+      // 旧表未找到，尝试新表
+      const { data: newInviteCode, error: newInviteError } = await supabase
+        .from('invite_codes')
+        .select('*')
+        .eq('code', normalizedInviteCode)
+        .eq('type', 'merchant')
+        .maybeSingle()
+
+      if (newInviteCode) {
+        inviteCodeData = newInviteCode
+        inviteTableName = 'invite_codes'
+        logger.info('Found invite code in invite_codes', { code: normalizedInviteCode })
+      } else if (newInviteError && newInviteError.code !== 'PGRST116') {
+        // 新表查询出错（不是"未找到"）
+        logger.error('Error checking invite code in invite_codes', { 
+          error: newInviteError, 
+          code: normalizedInviteCode 
+        })
+        throw ErrorHandler.databaseError(
+          newInviteError,
+          'INVITE_CODE_CHECK_FAILED',
+          '验证邀请码失败'
+        )
+      }
     }
 
     if (!inviteCodeData) {
+      logger.warn('Invite code not found', { code: normalizedInviteCode })
       throw ErrorHandler.validationError(
         'INVALID_INVITE_CODE',
         '邀请码无效，请检查是否正确'
@@ -81,10 +169,33 @@ export async function POST(request) {
     }
 
     // 检查邀请码是否已被使用
-    if (inviteCodeData.used) {
+    // 新表使用 used 字段，旧表使用 used_by 字段
+    const isUsed = inviteTableName === 'invite_codes' 
+      ? inviteCodeData.used 
+      : (inviteCodeData.used_by !== null || inviteCodeData.is_active === false)
+
+    if (isUsed) {
       throw ErrorHandler.validationError(
         'INVITE_CODE_ALREADY_USED',
         '邀请码已被使用，请联系管理员获取新的邀请码'
+      )
+    }
+
+    // 检查邀请码是否过期（仅对旧表）
+    if (inviteTableName === 'admin_invite_codes' && inviteCodeData.expires_at) {
+      if (new Date(inviteCodeData.expires_at) < new Date()) {
+        throw ErrorHandler.validationError(
+          'INVITE_CODE_EXPIRED',
+          '邀请码已过期，请联系管理员获取新的邀请码'
+        )
+      }
+    }
+
+    // 检查邀请码是否活跃（仅对旧表）
+    if (inviteTableName === 'admin_invite_codes' && !inviteCodeData.is_active) {
+      throw ErrorHandler.validationError(
+        'INVITE_CODE_INACTIVE',
+        '邀请码已失效，请联系管理员获取新的邀请码'
       )
     }
 
@@ -134,17 +245,35 @@ export async function POST(request) {
     }
 
     // 5. 标记邀请码为已使用
-    const { error: updateInviteError } = await supabase
-      .from('invite_codes')
-      .update({
-        used: true,
-        used_at: new Date().toISOString()
-      })
-      .eq('id', inviteCodeData.id)
+    if (inviteTableName === 'invite_codes') {
+      // 新表：使用 used 和 used_at 字段
+      const { error: updateInviteError } = await supabase
+        .from('invite_codes')
+        .update({
+          used: true,
+          used_at: new Date().toISOString()
+        })
+        .eq('id', inviteCodeData.id)
 
-    if (updateInviteError) {
-      logger.warn('Failed to update invite code', { error: updateInviteError })
-      // 非阻塞性错误，商家已创建成功
+      if (updateInviteError) {
+        logger.warn('Failed to update invite code', { error: updateInviteError })
+        // 非阻塞性错误，商家已创建成功
+      }
+    } else {
+      // 旧表：使用 used_by 和 is_active 字段
+      const { error: updateInviteError } = await supabase
+        .from('admin_invite_codes')
+        .update({
+          used_by: newMerchant.id, // 使用商家 ID
+          used_at: new Date().toISOString(),
+          is_active: false
+        })
+        .eq('id', inviteCodeData.id)
+
+      if (updateInviteError) {
+        logger.warn('Failed to update invite code', { error: updateInviteError })
+        // 非阻塞性错误，商家已创建成功
+      }
     }
 
     // 6. 生成 JWT token

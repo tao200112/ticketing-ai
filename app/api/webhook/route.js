@@ -81,43 +81,37 @@ export async function POST(request) {
       })
       }
 
-      // 获取 Supabase Auth UID（必须从 metadata 获取）
-      // 注意：Stripe metadata 中的值都是字符串，空字符串需要转换为 null
-      let supabaseUid = session.metadata?.supabase_uid || null
+      // 获取统一身份标识（从 metadata 获取）
+      // 支持新字段名 auth_user_id 和旧字段名 supabase_uid（向后兼容）
+      let authUserId = session.metadata?.auth_user_id || session.metadata?.supabase_uid || null
       
       // 处理空字符串（Stripe metadata 不支持 null，会转换为空字符串）
-      if (supabaseUid === '' || supabaseUid === 'null' || supabaseUid === 'undefined') {
-        supabaseUid = null
+      if (authUserId === '' || authUserId === 'null' || authUserId === 'undefined') {
+        authUserId = null
       }
       
-      // 验证 UUID 格式（如果 supabase_uid 存在，必须是有效的 UUID）
-      if (supabaseUid) {
-        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-        if (!uuidRegex.test(supabaseUid)) {
-          console.warn('[Webhook] ⚠️ supabase_uid in metadata is not a valid UUID:', supabaseUid)
-          supabaseUid = null
+      // 验证 UUID 格式
+      if (authUserId) {
+        const { isValidAuthIdentity } = await import('@/lib/auth-identity')
+        if (!isValidAuthIdentity(authUserId)) {
+          console.warn('[Webhook] auth_user_id in metadata is not a valid UUID:', authUserId)
+          authUserId = null
         }
       }
       
-      // 如果 metadata 中没有 supabase_uid，尝试通过邮箱查找
-      if (!supabaseUid) {
-        console.warn('[Webhook] Missing supabase_uid in metadata, attempting to find by email')
-        
-        // 回退：通过邮箱从 auth.users 查找 Supabase UID
-        if (session.customer_email) {
-          try {
-            const { data: authUsers } = await supabase.auth.admin.listUsers()
-            const matchingUser = authUsers?.users?.find(u => u.email === session.customer_email)
-            if (matchingUser) {
-              supabaseUid = matchingUser.id
-            } else {
-              console.error('[Webhook] Could not find user by email:', session.customer_email)
-            }
-          } catch (error) {
-            console.error('[Webhook] Error finding user by email:', error)
+      // 如果 metadata 中没有身份标识，尝试通过邮箱查找
+      if (!authUserId && session.customer_email) {
+        console.warn('[Webhook] Missing auth_user_id in metadata, attempting to find by email')
+        try {
+          const { data: authUsers } = await supabase.auth.admin.listUsers()
+          const matchingUser = authUsers?.users?.find(u => u.email === session.customer_email)
+          if (matchingUser) {
+            authUserId = matchingUser.id
+          } else {
+            console.error('[Webhook] Could not find user by email:', session.customer_email)
           }
-        } else {
-          console.error('[Webhook] No customer_email available for fallback lookup')
+        } catch (error) {
+          console.error('[Webhook] Error finding user by email:', error)
         }
       }
 
@@ -130,16 +124,16 @@ export async function POST(request) {
         }
       }
 
-      // 验证 supabase_uid 不为 null 再创建订单
-      if (!supabaseUid) {
-        console.error('❌ [Webhook] CRITICAL: Cannot create order without supabase_uid!')
-        console.error('❌ [Webhook] Session metadata:', JSON.stringify(session.metadata, null, 2))
-        console.error('❌ [Webhook] Customer email:', session.customer_email)
+      // 验证身份标识不为 null 再创建订单
+      if (!authUserId) {
+        console.error('[Webhook] CRITICAL: Cannot create order without auth_user_id!')
+        console.error('[Webhook] Session metadata:', JSON.stringify(session.metadata, null, 2))
+        console.error('[Webhook] Customer email:', session.customer_email)
         return NextResponse.json({ 
           success: false,
           error: 'VALIDATION_ERROR',
-          message: 'Missing supabase_uid in checkout session metadata',
-          details: 'The checkout session does not contain supabase_uid. Please ensure user is logged in when creating checkout session.'
+          message: 'Missing auth_user_id in checkout session metadata',
+          details: 'The checkout session does not contain auth_user_id. Please ensure user is logged in when creating checkout session.'
         }, { status: 500 })
       }
 
@@ -154,7 +148,7 @@ export async function POST(request) {
           total_amount_cents: session.amount_total,
           currency: session.currency.toUpperCase(),
           status: 'paid',
-          supabase_uid: supabaseUid, // 使用 Supabase Auth UID（必须不为 null）
+          supabase_uid: authUserId, // Unified identity: Supabase Auth UID
           metadata: {
             payment_intent: session.payment_intent,
             event_id: session.metadata?.event_id,
@@ -169,7 +163,7 @@ export async function POST(request) {
         console.error('[Webhook] Failed to create order:', orderError)
         console.error('[Webhook] Order data attempted:', {
           stripe_session_id: session.id,
-          supabase_uid: supabaseUid,
+          supabase_uid: authUserId,
           customer_email: session.customer_email
         })
         return NextResponse.json({ 
@@ -325,9 +319,9 @@ export async function POST(request) {
         for (const ticketKind of ticketKindsToCreate) {
           const shortId = generateShortTicketId()
           
-          // 验证 supabase_uid 不为 null
-          if (!supabaseUid) {
-            console.error('[Webhook] CRITICAL: supabase_uid is null when creating ticket!')
+          // 验证身份标识不为 null
+          if (!authUserId) {
+            console.error('[Webhook] CRITICAL: auth_user_id is null when creating ticket!')
             console.error('[Webhook] Session metadata:', JSON.stringify(session.metadata, null, 2))
             console.error('[Webhook] Customer email:', session.customer_email)
             // 不创建票，但继续处理其他票（如果有）
@@ -343,7 +337,7 @@ export async function POST(request) {
             holder_email: session.customer_email,
             holder_name: holderName,
             holder_age: ticketHolderAge,
-            supabase_uid: supabaseUid,
+            supabase_uid: authUserId, // Database field name (stores Supabase Auth UID)
             status: 'unused',
             used: false,
             short_id: shortId,

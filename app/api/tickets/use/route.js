@@ -3,7 +3,7 @@ import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase-api'
 import { ErrorHandler, handleApiError } from '@/lib/error-handler'
 import { createLogger } from '@/lib/logger'
 import { getTicketRedemptionLocation } from '@/lib/ticket-helpers'
-import { getServerUser } from '@/lib/auth-server'
+import { getServerAuthIdentity } from '@/lib/auth-identity'
 
 const logger = createLogger('ticket-use-api')
 
@@ -28,40 +28,29 @@ export async function POST(request) {
 
     const supabase = createSupabaseClient()
 
-    // Get current user from Supabase Auth (supabase_uid)
-    const authUser = await getServerUser()
-    const supabaseUid = authUser?.id || null
+    // Get current user identity from AuthContext
+    const authIdentity = await getServerAuthIdentity()
 
-    if (!supabaseUid) {
+    if (!authIdentity || !authIdentity.id) {
       throw ErrorHandler.unauthorizedError(
         'AUTHENTICATION_REQUIRED',
         'User must be logged in to redeem tickets'
       )
     }
 
-    // 兼容旧代码：如果 body 中有 userId，也支持（但优先使用 supabaseUid）
-    const { userId: bodyUserId } = body
-    const userId = supabaseUid || bodyUserId
-
-    if (!userId) {
-      throw ErrorHandler.validationError(
-        'MISSING_USER_ID',
-        'User ID is required'
-      )
-    }
+    const authUserId = authIdentity.id // Unified identity: Supabase Auth UID
+    const userEmail = authIdentity.email
 
     logger.info('Ticket redemption request', { 
       ticket_id, 
-      supabaseUid,
-      bodyUserId,
-      finalUserId: userId
+      authUserId
     })
 
     // Fetch ticket (simplified query - avoid complex joins that might fail)
     // First, get ticket without order join to avoid potential RLS issues
     const { data: ticket, error: ticketError } = await supabase
       .from('tickets')
-      .select('id, user_id, supabase_uid, holder_email, status, used, used_at, order_id, event_id, ticket_kind')
+      .select('id, supabase_uid, holder_email, status, used, used_at, order_id, event_id, ticket_kind')
       .eq('id', ticket_id)
       .single()
 
@@ -81,7 +70,7 @@ export async function POST(request) {
     if (ticket.order_id) {
       const { data: order, error: orderError } = await supabase
         .from('orders')
-        .select('customer_email, metadata, user_id, supabase_uid')
+        .select('customer_email, metadata, supabase_uid')
         .eq('id', ticket.order_id)
         .single()
       
@@ -92,26 +81,23 @@ export async function POST(request) {
       }
     }
 
-    // Get user email from auth.users (Supabase Auth)
-    const userEmail = authUser?.email || null
-
     // Verify ticket belongs to the user
-    // 优先使用 supabase_uid 验证
-    const ticketSupabaseUid = ticket.supabase_uid
-    const orderSupabaseUid = orderData?.supabase_uid
+    // 优先使用 supabase_uid 验证（数据库字段存储 Supabase Auth UID）
+    const ticketAuthId = ticket.supabase_uid
+    const orderAuthId = orderData?.supabase_uid
     
-    // 验证所有权：优先使用 supabase_uid，回退到旧字段
+    // 验证所有权：优先使用 supabase_uid，回退到邮箱匹配
     const isOwner = 
-      (ticketSupabaseUid && ticketSupabaseUid === supabaseUid) ||
-      (orderSupabaseUid && orderSupabaseUid === supabaseUid) ||
+      (ticketAuthId && ticketAuthId === authUserId) ||
+      (orderAuthId && orderAuthId === authUserId) ||
       (ticket.holder_email && ticket.holder_email === userEmail) ||
       (orderData?.customer_email && orderData.customer_email === userEmail)
     
     logger.info('Ticket ownership check', {
       ticket_id,
-      supabaseUid,
-      ticketSupabaseUid,
-      orderSupabaseUid,
+      authUserId,
+      ticketAuthId,
+      orderAuthId,
       ticketHolderEmail: ticket.holder_email,
       orderEmail: orderData?.customer_email,
       userEmail,
@@ -155,13 +141,13 @@ export async function POST(request) {
         used_at: now,
         used_method: redeemMethod,
         used_context: {
-          supabase_uid: supabaseUid,
+          auth_user_id: authUserId, // Unified identity in context
           used_at: now,
           method: redeemMethod,
           location: redeemLocation
         },
         status: 'used',
-        redeemed_by_supabase_uid: supabaseUid  // 记录核销操作人
+        redeemed_by_supabase_uid: authUserId  // Database field stores Supabase Auth UID
       })
       .eq('id', ticket_id)
 
@@ -175,8 +161,8 @@ export async function POST(request) {
       .from('ticket_redemptions')
       .insert({
         ticket_id: ticket_id,
-        supabase_uid: supabaseUid,  // 使用 Supabase Auth UID
-        redeemed_by_supabase_uid: supabaseUid,  // 操作人也是当前用户
+        supabase_uid: authUserId,  // Database field stores Supabase Auth UID
+        redeemed_by_supabase_uid: authUserId,  // Operator is current user
         ticket_kind: ticket.ticket_kind,
         redeemed_at: now,
         redeem_source: 'customer_phone',
@@ -184,7 +170,7 @@ export async function POST(request) {
         metadata: {
           method: redeemMethod,
           ticket_id: ticket_id,
-          supabase_uid: supabaseUid
+          auth_user_id: authUserId // Unified identity in metadata
         }
       })
 
@@ -200,7 +186,7 @@ export async function POST(request) {
 
     logger.info('Ticket used successfully', { 
       ticket_id, 
-      supabaseUid,
+      authUserId,
       used_at: now, 
       redeemLocation,
       ticket_kind: ticket.ticket_kind

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import Stripe from 'stripe'
-import { getServerUser } from '@/lib/auth-server'
+import { getServerAuthIdentity } from '@/lib/auth-identity'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { generateShortTicketId } from '@/lib/ticket-utils'
 import { isComboTicket, getComboTicketKinds } from '@/lib/ticket-helpers'
@@ -19,20 +19,21 @@ function buildConfigError(message) {
   }, { status: 500 })
 }
 
-function ownsOrder(order, supabaseUid, userEmail) {
+function ownsOrder(order, authUserId, userEmail) {
   if (!order) return false
   
-  // 优先使用 supabase_uid 验证
-  if (order.supabase_uid && order.supabase_uid === supabaseUid) return true
+  // 优先使用 supabase_uid 验证（数据库字段存储 Supabase Auth UID）
+  if (order.supabase_uid && order.supabase_uid === authUserId) return true
   
   // 回退到邮箱匹配（用于未登录用户）
   if (order.customer_email && userEmail && order.customer_email === userEmail) return true
 
-  // 检查 metadata 中的 supabase_uid
+  // 检查 metadata 中的身份标识
   if (order.metadata) {
     try {
       const metadata = typeof order.metadata === 'string' ? JSON.parse(order.metadata) : order.metadata
-      if (metadata?.supabase_uid && metadata.supabase_uid === supabaseUid) {
+      const metadataAuthId = metadata?.auth_user_id || metadata?.supabase_uid
+      if (metadataAuthId && metadataAuthId === authUserId) {
         return true
       }
       if (metadata?.customer_email && userEmail && metadata.customer_email === userEmail) {
@@ -46,16 +47,16 @@ function ownsOrder(order, supabaseUid, userEmail) {
   return false
 }
 
-async function ensureOrderOwnedByUser(order, supabaseUid) {
+async function ensureOrderOwnedByUser(order, authUserId) {
   if (!order) return order
-  if (order.supabase_uid === supabaseUid) return order
+  if (order.supabase_uid === authUserId) return order
 
   const admin = supabaseAdmin
   if (!admin) return order
 
   const { data, error } = await admin
     .from('orders')
-    .update({ supabase_uid: supabaseUid })
+    .update({ supabase_uid: authUserId })
     .eq('id', order.id)
     .select()
     .single()
@@ -68,7 +69,7 @@ async function ensureOrderOwnedByUser(order, supabaseUid) {
   return data
 }
 
-async function createOrderFromStripe(sessionId, supabaseUid, userEmail) {
+async function createOrderFromStripe(sessionId, authUserId, userEmail) {
   if (!stripe) {
     throw new Error('Stripe not configured')
   }
@@ -91,25 +92,26 @@ async function createOrderFromStripe(sessionId, supabaseUid, userEmail) {
   const priceName = metadata.price_name || 'general'
   const quantity = parseInt(metadata.quantity || '1', 10) || 1
 
-  // 从 metadata 获取 supabase_uid（优先），如果没有则使用传入的 supabaseUid
-  const finalSupabaseUid = metadata.supabase_uid || supabaseUid || null
+  // 从 metadata 获取身份标识（优先），如果没有则使用传入的 authUserId
+  // 支持新字段名 auth_user_id 和旧字段名 supabase_uid（向后兼容）
+  const finalAuthUserId = metadata.auth_user_id || metadata.supabase_uid || authUserId || null
   
-  if (!finalSupabaseUid) {
-    console.warn('[OrdersBySession] Missing supabase_uid in metadata')
+  if (!finalAuthUserId) {
+    console.warn('[OrdersBySession] Missing auth_user_id in metadata')
   }
 
   const { data: order, error: orderError } = await admin
     .from('orders')
     .insert({
       stripe_session_id: session.id,
-      supabase_uid: finalSupabaseUid,
+      supabase_uid: finalAuthUserId, // Database field stores Supabase Auth UID
       customer_email: customerEmail,
       total_amount_cents: session.amount_total,
       currency: session.currency?.toUpperCase() || 'USD',
       status: 'paid',
       metadata: {
         ...metadata,
-        supabase_uid: finalSupabaseUid,
+        auth_user_id: finalAuthUserId, // Unified identity in metadata
         customer_email: customerEmail,
       },
     })
@@ -195,7 +197,7 @@ async function createOrderFromStripe(sessionId, supabaseUid, userEmail) {
         status: 'unused',
         used: false,
         short_id: generateShortTicketId(),
-        supabase_uid: supabaseUid,
+        supabase_uid: authUserId, // Database field stores Supabase Auth UID
         event_snapshot: eventSnapshot || null,
         price_snapshot: priceSnapshot || null
       })
@@ -242,10 +244,10 @@ function buildTicketQr(ticket, event) {
 
 export async function GET(request) {
   try {
-    // Try to get user, but don't require authentication
-    const user = await getServerUser()
-    const userId = user?.id || null
-    const userEmail = user?.email || null
+    // Get user identity (optional - for ownership verification)
+    const authIdentity = await getServerAuthIdentity()
+    const authUserId = authIdentity?.id || null
+    const userEmail = authIdentity?.email || null
 
     if (!stripe) {
       return buildConfigError('Stripe not configured')
@@ -309,13 +311,13 @@ export async function GET(request) {
     // If order exists, verify ownership
     if (order) {
       // If user is logged in, check ownership
-      if (user && userId) {
-        if (!ownsOrder(order, userId, user.email)) {
+      if (authIdentity && authUserId) {
+        if (!ownsOrder(order, authUserId, userEmail)) {
           // Check if customer email matches
           if (customerEmail && order.customer_email === customerEmail) {
             // Allow access if email matches, and try to link user if logged in
-            if (userId && !order.supabase_uid) {
-              order = await ensureOrderOwnedByUser(order, userId)
+            if (authUserId && !order.supabase_uid) {
+              order = await ensureOrderOwnedByUser(order, authUserId)
             }
           } else {
             return NextResponse.json({ 
@@ -325,18 +327,22 @@ export async function GET(request) {
             }, { status: 404 })
           }
         } else {
-          order = await ensureOrderOwnedByUser(order, userId)
+          order = await ensureOrderOwnedByUser(order, authUserId)
         }
       } else {
         // If not logged in, check if customer email matches
         if (customerEmail && order.customer_email !== customerEmail) {
-          return NextResponse.json({ ok: false, message: 'Order not found' }, { status: 404 })
+          return NextResponse.json({ 
+            success: false,
+            error: 'NOT_FOUND',
+            message: 'Order not found' 
+          }, { status: 404 })
         }
       }
     } else {
       // Order doesn't exist, create it from Stripe session
       try {
-        order = await createOrderFromStripe(sessionId, userId, customerEmail)
+        order = await createOrderFromStripe(sessionId, authUserId, customerEmail)
       } catch (createError) {
         console.error('Error creating order from Stripe:', createError)
         return NextResponse.json({ 
@@ -409,8 +415,9 @@ export async function GET(request) {
         }
       }
 
-      // 从 metadata 获取 supabase_uid（优先），如果没有则使用 userId
-      const supabaseUidFromMetadata = stripeSession.metadata?.supabase_uid || userId || null
+      // 从 metadata 获取身份标识（优先），如果没有则使用 authUserId
+      // 支持新字段名 auth_user_id 和旧字段名 supabase_uid（向后兼容）
+      const authUserIdFromMetadata = stripeSession.metadata?.auth_user_id || stripeSession.metadata?.supabase_uid || authUserId || null
 
       // Create tickets
       const ticketRows = []
@@ -424,7 +431,7 @@ export async function GET(request) {
           status: 'unused',
           used: false,
           short_id: generateShortTicketId(),
-          supabase_uid: supabaseUidFromMetadata,
+          supabase_uid: authUserIdFromMetadata, // Database field stores Supabase Auth UID
           event_snapshot: eventSnapshot || null,
           price_snapshot: priceSnapshot || null
         })
@@ -466,19 +473,19 @@ export async function GET(request) {
       }
     }
 
-    // Filter tickets based on supabase_uid only
+    // Filter tickets based on auth identity only
     let ownedTickets = tickets
-    if (user && userId) {
-      // 只使用 supabase_uid 匹配
-      ownedTickets = tickets.filter((ticket) => ticket.supabase_uid === userId)
+    if (authIdentity && authUserId) {
+      // 只使用 supabase_uid 匹配（数据库字段存储 Supabase Auth UID）
+      ownedTickets = tickets.filter((ticket) => ticket.supabase_uid === authUserId)
 
-      // Ensure ticket ownership is set for future queries (使用 supabase_uid)
+      // Ensure ticket ownership is set for future queries
       const ticketsToClaim = ownedTickets.filter((ticket) => !ticket.supabase_uid)
-      if (ticketsToClaim.length > 0 && userId) {
+      if (ticketsToClaim.length > 0 && authUserId) {
         const ticketIds = ticketsToClaim.map((ticket) => ticket.id)
         await admin
           .from('tickets')
-          .update({ supabase_uid: userId })
+          .update({ supabase_uid: authUserId })
           .in('id', ticketIds)
       }
     } else {

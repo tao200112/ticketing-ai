@@ -96,17 +96,25 @@ export async function POST(request) {
     const defaultExpiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString()
     const expires_at = expiresAt || defaultExpiresAt
 
+    // 准备插入数据（只包含表结构中存在的字段）
+    const insertData = {
+      code,
+      expires_at,
+      is_active: true, // 新邀请码默认为活跃状态
+      used_by: null, // 未使用
+      used_at: null // 未使用
+    }
+
+    // 只有在 maxEvents 有值时才添加 max_events 字段
+    // 如果表中没有这个字段，不传也不会报错
+    if (maxEvents !== undefined && maxEvents !== null) {
+      insertData.max_events = maxEvents
+    }
+
     // 插入数据库（新邀请码默认为未使用状态）
     const { data: newInviteCode, error } = await supabaseAdmin
       .from('admin_invite_codes')
-      .insert({
-        code,
-        expires_at,
-        max_events: maxEvents || 10, // 默认 max_events 为 10（与表结构一致）
-        is_active: true, // 新邀请码默认为活跃状态
-        used_by: null, // 未使用
-        used_at: null // 未使用
-      })
+      .insert(insertData)
       .select()
       .single()
 

@@ -11,8 +11,9 @@ export async function getRouteHandlerSupabase() {
   }
 
   try {
-    // In Next.js App Router API routes, cookies() needs to be awaited
-    const cookieStore = await cookies()
+    // cookies() is synchronous in Next.js App Router Route Handlers
+    // DO NOT await it - this breaks cookie reading
+    const cookieStore = cookies()
     
     return createServerClient(
       supabaseUrl,

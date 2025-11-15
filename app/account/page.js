@@ -71,23 +71,27 @@ export default function AccountPage() {
         
         // Get session separately for session object
         client.auth.getSession().then(({ data: { session } }) => {
-        
-        if (!session || !session.user) {
-          console.log('No active session found')
+          if (!session || !session.user) {
+            console.log('No active session found')
+            setLoading(false)
+            setShowLogin(true)
+            return
+          }
+          
+          console.log('✅ Active session found:', session.user.id)
+          
+          // Load user data (force refresh if returning from password update)
+          // Note: Session is managed by Supabase Auth, no localStorage needed
+          const urlParams = new URLSearchParams(window.location.search)
+          const forceRefresh = urlParams.get('password_updated') === 'true'
+          loadUserData(client, session.user.id, forceRefresh)
+        }).catch((error) => {
+          console.error('❌ Error getting session:', error)
           setLoading(false)
           setShowLogin(true)
-          return
-        }
-        
-        console.log('✅ Active session found:', session.user.id)
-        
-        // Load user data (force refresh if returning from password update)
-        // Note: Session is managed by Supabase Auth, no localStorage needed
-        const urlParams = new URLSearchParams(window.location.search)
-        const forceRefresh = urlParams.get('password_updated') === 'true'
-        loadUserData(client, session.user.id, forceRefresh)
+        })
       }).catch((error) => {
-        console.error('❌ Error getting session:', error)
+        console.error('❌ Error getting user:', error)
         setLoading(false)
         setShowLogin(true)
       })

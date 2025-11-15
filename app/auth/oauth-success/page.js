@@ -57,17 +57,18 @@ function OAuthSuccessContent() {
             const { data: { session: currentSession } } = await supabase.auth.getSession()
             
             if (currentSession) {
-            clearInterval(checkInterval)
-            const role = currentSession.user.user_metadata?.role
-            const destination =
-              role === 'merchant'
-                ? '/merchant'
-                : role === 'admin'
-                ? '/account/merchant/admin'
-                : '/account'
+              clearInterval(checkInterval)
+              const role = currentSession.user.user_metadata?.role
+              const destination =
+                role === 'merchant'
+                  ? '/merchant'
+                  : role === 'admin'
+                  ? '/account/merchant/admin'
+                  : '/account'
 
-            setStatusMessage('Login successful, redirecting...')
-            router.replace(destination)
+              setStatusMessage('Login successful, redirecting...')
+              router.replace(destination)
+            }
           }
         } catch (error) {
           console.error('[OAuth] Error checking session:', error)

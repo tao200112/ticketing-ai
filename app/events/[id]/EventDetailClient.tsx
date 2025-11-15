@@ -28,14 +28,11 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
     // 检查是否在客户端环境
     if (typeof window === 'undefined') return
     
-    // Get user info from Supabase Auth session
+    // Get user info from Supabase Auth session - use browser singleton
     try {
-      const { createClient } = await import('@supabase/supabase-js')
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-      
-      if (supabaseUrl && supabaseAnonKey) {
-        const supabaseClient = createClient(supabaseUrl, supabaseAnonKey)
+      if (typeof window !== 'undefined') {
+        const { getSupabaseBrowser } = await import('@/lib/supabase-browser')
+        const supabaseClient = getSupabaseBrowser()
         const { data: { session } } = await supabaseClient.auth.getSession()
         
         if (session?.user) {
@@ -89,14 +86,11 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
       return
     }
 
-    // Verify user is logged in via Supabase Auth
+    // Verify user is logged in via Supabase Auth - use browser singleton
     try {
-      const { createClient } = await import('@supabase/supabase-js')
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-      
-      if (supabaseUrl && supabaseAnonKey) {
-        const supabaseClient = createClient(supabaseUrl, supabaseAnonKey)
+      if (typeof window !== 'undefined') {
+        const { getSupabaseBrowser } = await import('@/lib/supabase-browser')
+        const supabaseClient = getSupabaseBrowser()
         const { data: { session }, error: sessionError } = await supabaseClient.auth.getSession()
         
         if (sessionError || !session?.user) {
@@ -146,20 +140,16 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
     setPaymentError('')
 
     try {
-      // Get user info from Supabase Auth session
+      // Get user info from Supabase Auth session - use browser singleton
       // Use Supabase Auth as the ONLY source of identity
       let supabaseUid = null
       
       if (typeof window !== 'undefined') {
         try {
-          // Get current user from Supabase Auth
-          const { createClient } = await import('@supabase/supabase-js')
-          const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-          const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-          
-          if (supabaseUrl && supabaseAnonKey) {
-            const supabaseClient = createClient(supabaseUrl, supabaseAnonKey)
-            const { data: { user: authUser }, error: authError } = await supabaseClient.auth.getUser()
+          // Get current user from Supabase Auth - use browser singleton
+          const { getSupabaseBrowser } = await import('@/lib/supabase-browser')
+          const supabaseClient = getSupabaseBrowser()
+          const { data: { user: authUser }, error: authError } = await supabaseClient.auth.getUser()
             
             if (!authError && authUser) {
               supabaseUid = authUser.id

@@ -51,13 +51,10 @@ export default function EventDetailPage() {
 
   const loadUserData = async () => {
     try {
-      // Get user info from Supabase Auth session
-      const { createClient } = await import('@supabase/supabase-js')
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-      
-      if (supabaseUrl && supabaseAnonKey) {
-        const supabaseClient = createClient(supabaseUrl, supabaseAnonKey)
+      // Get user info from Supabase Auth session - use browser singleton
+      if (typeof window !== 'undefined') {
+        const { getSupabaseBrowser } = await import('@/lib/supabase-browser')
+        const supabaseClient = getSupabaseBrowser()
         const { data: { session } } = await supabaseClient.auth.getSession()
         
         if (session?.user) {
@@ -71,6 +68,8 @@ export default function EventDetailPage() {
     } catch (error) {
       console.warn('Failed to load user session:', error)
     }
+  } else {
+    // Server-side: do nothing
   }
 
   const handleBuyTickets = async () => {

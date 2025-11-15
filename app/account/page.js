@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation'
 import NavbarPartyTix from '../../components/NavbarPartyTix'
 import LoginForm from '../../components/LoginForm'
 import RegisterForm from '../../components/RegisterForm'
-import { createClient } from '@supabase/supabase-js'
+// Removed: import { createClient } from '@supabase/supabase-js'
+// Now using getSupabaseBrowser() singleton from '@/lib/supabase-browser'
 import { QRCodeSVG } from 'qrcode.react'
 import { getTicketKindDisplayName, getTicketKindCategoryName, getTicketRedemptionLocation, isTicketActive } from '@/lib/ticket-helpers'
 import { requiresPasswordSetup } from '@/lib/auth/password-placeholder'
@@ -39,8 +40,10 @@ export default function AccountPage() {
 
   useEffect(() => {
     // Initialize Supabase client and check session
-    if (supabaseUrl && supabaseKey) {
-      const client = createClient(supabaseUrl, supabaseKey)
+    // Use browser singleton to avoid multiple GoTrueClient instances
+    if (typeof window !== 'undefined') {
+      const { getSupabaseBrowser } = require('@/lib/supabase-browser')
+      const client = getSupabaseBrowser()
       setSupabase(client)
       
       // Check if returning from update-password page (refresh user data)
@@ -90,9 +93,10 @@ export default function AccountPage() {
     setUser(userData)
     setShowLogin(false)
     setShowRegister(false)
-    // Reload user data
-    if (supabaseUrl && supabaseKey && userData && userData.id) {
-      const client = createClient(supabaseUrl, supabaseKey)
+    // Reload user data - use browser singleton
+    if (typeof window !== 'undefined' && userData && userData.id) {
+      const { getSupabaseBrowser } = require('@/lib/supabase-browser')
+      const client = getSupabaseBrowser()
       loadUserData(client, userData.id)
     }
   }
@@ -101,9 +105,10 @@ export default function AccountPage() {
     setUser(userData)
     setShowLogin(false)
     setShowRegister(false)
-      // Reload user data
-    if (supabaseUrl && supabaseKey && userData && userData.id) {
-      const client = createClient(supabaseUrl, supabaseKey)
+      // Reload user data - use browser singleton
+    if (typeof window !== 'undefined' && userData && userData.id) {
+      const { getSupabaseBrowser } = require('@/lib/supabase-browser')
+      const client = getSupabaseBrowser()
       loadUserData(client, userData.id)
     }
   }

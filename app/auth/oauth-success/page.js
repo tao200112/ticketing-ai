@@ -39,10 +39,11 @@ function OAuthSuccessContent() {
           const { getSupabaseClient } = await import('@/lib/supabase-client')
           const supabase = getSupabaseClient()
           
-          const { data: { session: currentSession }, error } = await supabase.auth.getSession()
+          // Use getUser() for security - authenticates user by contacting Supabase Auth server
+          const { data: { user }, error } = await supabase.auth.getUser()
           
           if (error) {
-            console.error('[OAuth] Session error:', error)
+            console.error('[OAuth] User error:', error)
             clearInterval(checkInterval)
             setStatusMessage('Login failed. Please try again.')
             setTimeout(() => {
@@ -50,8 +51,12 @@ function OAuthSuccessContent() {
             }, 2000)
             return
           }
-
-          if (currentSession?.user) {
+          
+          if (user) {
+            // Get session separately for session object
+            const { data: { session: currentSession } } = await supabase.auth.getSession()
+            
+            if (currentSession) {
             clearInterval(checkInterval)
             const role = currentSession.user.user_metadata?.role
             const destination =

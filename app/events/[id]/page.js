@@ -55,13 +55,14 @@ export default function EventDetailPage() {
       if (typeof window !== 'undefined') {
         const { getSupabaseBrowser } = await import('@/lib/supabase-browser')
         const supabaseClient = getSupabaseBrowser()
-        const { data: { session } } = await supabaseClient.auth.getSession()
+        // Use getUser() for security - authenticates user by contacting Supabase Auth server
+        const { data: { user }, error } = await supabaseClient.auth.getUser()
         
-        if (session?.user) {
-          setCustomerEmail(session.user.email || '')
-          setCustomerName(session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.email || '')
-          if (session.user.user_metadata?.age) {
-            setCustomerAge(String(session.user.user_metadata.age))
+        if (user && !error) {
+          setCustomerEmail(user.email || '')
+          setCustomerName(user.user_metadata?.full_name || user.user_metadata?.name || user.email || '')
+          if (user.user_metadata?.age) {
+            setCustomerAge(String(user.user_metadata.age))
           }
         }
       }

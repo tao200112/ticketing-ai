@@ -76,37 +76,24 @@ export async function getSupabaseUser() {
   }
 
   try {
-    // 优先使用 getSession() - 直接从 cookies 读取
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-    
-    if (sessionError) {
-      console.warn('[getSupabaseUser] Error getting session:', sessionError.message)
-    }
-    
-    if (session?.user) {
-      console.log('[getSupabaseUser] Found user from session:', { 
-        id: session.user.id, 
-        email: session.user.email 
-      })
-      return session.user
-    }
-
-    // 回退到 getUser() - 会尝试使用 refresh token 刷新会话
+    // Use getUser() for security - authenticates user by contacting Supabase Auth server
+    // This is more secure than getSession() which reads from cookies directly
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     
     if (userError) {
       console.warn('[getSupabaseUser] Error getting user:', userError.message)
+      return null
     }
     
     if (user) {
-      console.log('[getSupabaseUser] Found user from getUser():', { 
+      console.log('[getSupabaseUser] Found authenticated user:', { 
         id: user.id, 
         email: user.email 
       })
       return user
     }
     
-    console.warn('[getSupabaseUser] No user found in Supabase session')
+    console.warn('[getSupabaseUser] No user found - user not authenticated')
     return null
   } catch (error) {
     console.error('[getSupabaseUser] Exception:', error)

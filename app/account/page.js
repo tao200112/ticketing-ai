@@ -53,14 +53,24 @@ export default function AccountPage() {
         window.history.replaceState({}, '', '/account')
       }
       
-      // Get session from Supabase (this also sets cookies for server-side access)
-      client.auth.getSession().then(({ data: { session }, error }) => {
+      // Get user from Supabase using getUser() for security
+      // getUser() authenticates the user by contacting Supabase Auth server
+      client.auth.getUser().then(({ data: { user }, error }) => {
         if (error) {
-          console.error('❌ Failed to get session:', error)
+          console.error('❌ Failed to get user:', error)
           setLoading(false)
           setShowLogin(true)
           return
         }
+        
+        if (!user) {
+          setLoading(false)
+          setShowLogin(true)
+          return
+        }
+        
+        // Get session separately for session object
+        client.auth.getSession().then(({ data: { session } }) => {
         
         if (!session || !session.user) {
           console.log('No active session found')

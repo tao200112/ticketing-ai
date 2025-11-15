@@ -12,25 +12,30 @@ export default function MerchantOverviewPage() {
   const [userRole, setUserRole] = useState(null) // 'boss' or 'staff'
 
   useEffect(() => {
-    // 检查商家登录状态
-    const checkMerchantAuth = () => {
-      const token = localStorage.getItem('merchantToken')
-      const user = localStorage.getItem('merchantUser')
-      
-      if (!token || !user) {
+    // 检查商家登录状态 - 从 API 获取商家信息
+    const checkMerchantAuth = async () => {
+      try {
+        const response = await fetch('/api/merchant/profile')
+        const data = await response.json()
+        
+        if (response.ok && data.success) {
+          // 认证成功，设置商家信息
+          setMerchantUser({
+            id: data.merchant.id,
+            email: data.merchant.email,
+            name: data.merchant.name,
+            merchant: data.merchant,
+            merchant_id: data.merchant.id
+          })
+          setUserRole('boss') // 设置为boss，但仅用于显示，不影响页面访问
+        } else {
+          // 认证失败，重定向到登录页
+          router.push('/merchant/auth/login')
+        }
+      } catch (error) {
+        console.error('Error checking merchant auth:', error)
         router.push('/merchant/auth/login')
-        return
       }
-      
-      const parsedUser = JSON.parse(user)
-      setMerchantUser(parsedUser)
-      
-      // 所有商家用户都可以访问两个页面，不需要区分角色
-      // Boss页面通过第二重密码验证
-      setUserRole('boss') // 设置为boss，但仅用于显示，不影响页面访问
-      
-      // 登录后不再自动跳转，显示导航栏和选择界面
-      // 主页面只显示Staff/Boss选择，不进行验证
     }
     
     checkMerchantAuth()

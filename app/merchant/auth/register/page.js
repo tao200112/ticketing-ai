@@ -91,47 +91,26 @@ export default function MerchantRegisterPage() {
     setErrors({})
 
     try {
-      const response = await fetch('/api/merchant/create', {
+      const response = await fetch('/api/merchant/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          email: formData.email,
+          password: formData.password,
+          inviteCode: formData.inviteCode,
+          name: formData.businessName
+        }),
       })
 
       const data = await response.json()
 
       if (data.ok || data.success) {
-        // 注册成功，保存登录信息并跳转到商家页面
-        if (data.merchant) {
-          // 如果有用户信息，保存完整的用户和商家信息
-          if (data.user) {
-            const merchantUser = {
-              id: data.user.id,
-              email: data.user.email,
-              name: data.user.name,
-              merchant: data.merchant,
-              merchant_id: data.merchant.id
-            }
-            localStorage.setItem('merchantUser', JSON.stringify(merchantUser))
-            console.log('✅ 商家注册成功，已保存用户和商家信息，跳转到商家页面')
-            router.push('/merchant')
-          } else {
-            // 如果只有商家信息（独立商家），也保存并跳转
-            const merchantUser = {
-              email: data.merchant.contact_email,
-              merchant: data.merchant,
-              merchant_id: data.merchant.id
-            }
-            localStorage.setItem('merchantUser', JSON.stringify(merchantUser))
-            console.log('✅ 商家注册成功（独立商家），跳转到登录页面')
-            router.push('/merchant/auth/login?success=registered')
-          }
-        } else {
-          // 如果注册成功但没有商家信息，跳转到登录页面
-          console.log('⚠️ 注册成功但缺少商家信息，跳转到登录页面')
-          router.push('/merchant/auth/login?success=registered')
-        }
+        // 注册成功 - token is stored in httpOnly cookie automatically
+        // No need to store in localStorage anymore
+        console.log('✅ 商家注册成功，跳转到商家页面')
+        router.push('/merchant')
       } else {
         // 处理错误响应
         const errorCode = data.error || data.code

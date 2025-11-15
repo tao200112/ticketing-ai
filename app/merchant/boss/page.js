@@ -17,26 +17,36 @@ export default function MerchantBossPage() {
   const [passwordError, setPasswordError] = useState('')
 
   useEffect(() => {
-    const checkMerchantAuth = () => {
-      const token = localStorage.getItem('merchantToken')
-      const user = localStorage.getItem('merchantUser')
-      
-      if (!token || !user) {
+    const checkMerchantAuth = async () => {
+      try {
+        const response = await fetch('/api/merchant/profile', {
+          credentials: 'include'
+        })
+        const data = await response.json()
+        
+        if (response.ok && data.success) {
+          const merchantInfo = {
+            id: data.merchant.id,
+            email: data.merchant.email,
+            name: data.merchant.name,
+            merchant: data.merchant,
+            merchant_id: data.merchant.id
+          }
+          setMerchantUser(merchantInfo)
+          setUserRole('boss')
+          
+          // 检查是否已经通过Boss验证
+          const bossVerified = sessionStorage.getItem('bossVerified') === 'true'
+          if (bossVerified) {
+            setIsBossVerified(true)
+            loadStats()
+          }
+        } else {
+          router.push('/merchant/auth/login')
+        }
+      } catch (error) {
+        console.error('Error checking merchant auth:', error)
         router.push('/merchant/auth/login')
-        return
-      }
-      
-      const parsedUser = JSON.parse(user)
-      setMerchantUser(parsedUser)
-      
-      // 所有商家用户都可以访问Boss页面，通过密码验证
-      setUserRole('boss') // 设置为boss，但仅用于导航栏显示
-      
-      // 检查是否已经通过Boss验证
-      const bossVerified = sessionStorage.getItem('bossVerified') === 'true'
-      if (bossVerified) {
-        setIsBossVerified(true)
-        loadStats()
       }
     }
     
@@ -63,7 +73,7 @@ export default function MerchantBossPage() {
     try {
       setLoading(true)
       
-      const currentMerchant = JSON.parse(localStorage.getItem('merchantUser') || '{}')
+      const currentMerchant = merchantUser || {}
       const merchantId = currentMerchant.merchant_id || currentMerchant.merchant?.id
       
       const ordersResponse = await fetch('/api/admin/tickets')

@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
+import NavLinkItem from './NavLinkItem'
 
 export default function NavbarPartyTix() {
   const router = useRouter()
@@ -50,7 +51,7 @@ export default function NavbarPartyTix() {
     if (user) {
       return (
         <>
-          <Link
+          <NavLinkItem
             href="/account"
             style={{
               ...baseStyle,
@@ -62,7 +63,7 @@ export default function NavbarPartyTix() {
             onClick={variant === 'mobile' ? closeMobileMenu : undefined}
           >
             Account
-          </Link>
+          </NavLinkItem>
           <button
             onClick={handleLogout}
             disabled={isSigningOut}
@@ -83,14 +84,14 @@ export default function NavbarPartyTix() {
 
     return (
       <>
-        <Link
+        <NavLinkItem
           href="/auth/login"
           style={baseStyle}
           onClick={variant === 'mobile' ? closeMobileMenu : undefined}
         >
           Login
-        </Link>
-        <Link
+        </NavLinkItem>
+        <NavLinkItem
           href="/auth/register"
           style={{
             ...baseStyle,
@@ -102,7 +103,7 @@ export default function NavbarPartyTix() {
           onClick={variant === 'mobile' ? closeMobileMenu : undefined}
         >
           Sign Up
-        </Link>
+        </NavLinkItem>
       </>
     )
   }
@@ -168,36 +169,36 @@ export default function NavbarPartyTix() {
               gap: '24px'
             }}
           >
-            <Link
-              href="/events"
-              style={{
-                color: 'white',
-                textDecoration: 'none',
-                transition: 'color 0.3s ease'
-              }}
-            >
-              Events
-            </Link>
-            <Link
-              href="/activity"
-              style={{
-                color: 'white',
-                textDecoration: 'none',
-                transition: 'color 0.3s ease'
-              }}
-            >
-              Activity
-            </Link>
-            <Link
-              href="/contact"
-              style={{
-                color: 'white',
-                textDecoration: 'none',
-                transition: 'color 0.3s ease'
-              }}
-            >
-              Contact Us
-            </Link>
+          <NavLinkItem
+            href="/events"
+            style={{
+              color: 'white',
+              textDecoration: 'none',
+              transition: 'color 0.3s ease'
+            }}
+          >
+            Events
+          </NavLinkItem>
+          <NavLinkItem
+            href="/activity"
+            style={{
+              color: 'white',
+              textDecoration: 'none',
+              transition: 'color 0.3s ease'
+            }}
+          >
+            Activity
+          </NavLinkItem>
+          <NavLinkItem
+            href="/contact"
+            style={{
+              color: 'white',
+              textDecoration: 'none',
+              transition: 'color 0.3s ease'
+            }}
+          >
+            Contact Us
+          </NavLinkItem>
             {renderAuthLinks('desktop')}
           </div>
         )}
@@ -235,7 +236,7 @@ export default function NavbarPartyTix() {
             gap: '16px'
           }}
         >
-          <Link
+          <NavLinkItem
             href="/events"
             style={{
               color: 'white',
@@ -247,8 +248,8 @@ export default function NavbarPartyTix() {
             onClick={closeMobileMenu}
           >
             Events
-          </Link>
-          <Link
+          </NavLinkItem>
+          <NavLinkItem
             href="/activity"
             style={{
               color: 'white',
@@ -260,8 +261,8 @@ export default function NavbarPartyTix() {
             onClick={closeMobileMenu}
           >
             Activity
-          </Link>
-          <Link
+          </NavLinkItem>
+          <NavLinkItem
             href="/contact"
             style={{
               color: 'white',
@@ -273,7 +274,7 @@ export default function NavbarPartyTix() {
             onClick={closeMobileMenu}
           >
             Contact Us
-          </Link>
+          </NavLinkItem>
           {renderAuthLinks('mobile')}
         </div>
       )}

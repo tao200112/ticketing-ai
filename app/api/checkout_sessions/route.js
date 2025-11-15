@@ -146,7 +146,12 @@ export async function POST(request) {
       url: session.url
     })
 
-  } catch (error) {
-    return handleApiError(error, request, logger)
+} catch (error) {
+  console.error('[checkout-sessions-api] RAW ERROR OBJECT:', error)
+  if (error instanceof Error) {
+    console.error('[checkout-sessions-api] error.message:', error.message)
+    console.error('[checkout-sessions-api] error.stack:', error.stack)
   }
+  return handleApiError(error, request, logger)
+}
 }

@@ -183,7 +183,13 @@ export default function AdminDashboard() {
     router.push('/admin')
   }
 
+  const [generatingInviteCode, setGeneratingInviteCode] = useState(false)
+  const [inviteCodeMessage, setInviteCodeMessage] = useState({ type: '', text: '' })
+
   const generateInviteCode = async () => {
+    setGeneratingInviteCode(true)
+    setInviteCodeMessage({ type: '', text: '' })
+
     try {
       const response = await fetch('/api/admin/invite-codes', {
         method: 'POST',
@@ -195,14 +201,45 @@ export default function AdminDashboard() {
         })
       })
 
-      if (response.ok) {
+      const result = await response.json()
+
+      if (response.ok && result) {
+        // 成功：重新加载数据并显示成功提示
+        setInviteCodeMessage({ 
+          type: 'success', 
+          text: `Invite code "${result.code}" created successfully!` 
+        })
+        // 清除提示（3秒后）
+        setTimeout(() => setInviteCodeMessage({ type: '', text: '' }), 3000)
+        // 重新加载邀请码列表
         loadData()
       } else {
-        alert('Failed to generate invite code')
+        // 失败：显示错误信息
+        const errorMessage = result.error || result.message || 'Failed to generate invite code'
+        const errorDetails = result.details ? ` (${result.details})` : ''
+        console.error('❌ Failed to generate invite code:', {
+          status: response.status,
+          error: errorMessage,
+          details: result.details,
+          fullResponse: result
+        })
+        setInviteCodeMessage({ 
+          type: 'error', 
+          text: errorMessage + errorDetails
+        })
+        // 清除错误提示（5秒后）
+        setTimeout(() => setInviteCodeMessage({ type: '', text: '' }), 5000)
       }
     } catch (error) {
-      console.error('Generate invite code error:', error)
-      alert('Failed to generate invite code, please try again')
+      console.error('❌ Generate invite code error:', error)
+      setInviteCodeMessage({ 
+        type: 'error', 
+        text: 'Network error. Please try again.' 
+      })
+      // 清除错误提示（5秒后）
+      setTimeout(() => setInviteCodeMessage({ type: '', text: '' }), 5000)
+    } finally {
+      setGeneratingInviteCode(false)
     }
   }
 
@@ -1676,19 +1713,40 @@ export default function AdminDashboard() {
                 </h2>
                 <button
                   onClick={generateInviteCode}
+                  disabled={generatingInviteCode}
                   className="btn-partytix-gradient"
                   style={{
                     padding: '12px 24px',
                     borderRadius: '8px',
                     border: 'none',
-                    cursor: 'pointer',
+                    cursor: generatingInviteCode ? 'wait' : 'pointer',
                     fontSize: '14px',
-                    fontWeight: '600'
+                    fontWeight: '600',
+                    opacity: generatingInviteCode ? 0.6 : 1
                   }}
                 >
-                  Generate New Code
+                  {generatingInviteCode ? 'Generating...' : 'Generate New Code'}
                 </button>
               </div>
+
+              {/* Message display */}
+              {inviteCodeMessage.text && (
+                <div
+                  style={{
+                    padding: '12px 16px',
+                    borderRadius: '8px',
+                    marginBottom: '20px',
+                    backgroundColor: inviteCodeMessage.type === 'success'
+                      ? 'rgba(16, 185, 129, 0.2)'
+                      : 'rgba(239, 68, 68, 0.2)',
+                    border: `1px solid ${inviteCodeMessage.type === 'success' ? '#10b981' : '#ef4444'}`,
+                    color: 'white',
+                    fontSize: '14px'
+                  }}
+                >
+                  {inviteCodeMessage.text}
+                </div>
+              )}
 
               <div
                 style={{

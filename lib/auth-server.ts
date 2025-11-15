@@ -10,33 +10,45 @@ export function getRouteHandlerSupabase() {
     return null
   }
 
-  const cookieStore = cookies()
-  
-  return createServerClient(
-    supabaseUrl,
-    supabaseAnonKey,
-    {
-      cookies: {
-        get: (name: string) => {
-          return cookieStore.get(name)?.value
+  try {
+    const cookieStore = cookies()
+    
+    return createServerClient(
+      supabaseUrl,
+      supabaseAnonKey,
+      {
+        cookies: {
+          get: (name: string) => {
+            try {
+              return cookieStore.get(name)?.value
+            } catch (error) {
+              console.warn('[getRouteHandlerSupabase] Error getting cookie:', name, error)
+              return undefined
+            }
+          },
+          set: (name: string, value: string, options: any) => {
+            try {
+              cookieStore.set({ name, value, ...options })
+            } catch (error) {
+              // 在某些场景下可能无法设置 cookie（如 middleware）
+              console.warn('[getRouteHandlerSupabase] Error setting cookie:', name, error)
+            }
+          },
+          remove: (name: string, options: any) => {
+            try {
+              cookieStore.set({ name, value: '', ...options })
+            } catch (error) {
+              // 在某些场景下可能无法删除 cookie
+              console.warn('[getRouteHandlerSupabase] Error removing cookie:', name, error)
+            }
+          },
         },
-        set: (name: string, value: string, options: any) => {
-          try {
-            cookieStore.set({ name, value, ...options })
-          } catch (error) {
-            // 在某些场景下可能无法设置 cookie
-          }
-        },
-        remove: (name: string, options: any) => {
-          try {
-            cookieStore.set({ name, value: '', ...options })
-          } catch (error) {
-            // 在某些场景下可能无法删除 cookie
-          }
-        },
-      },
-    }
-  )
+      }
+    )
+  } catch (error) {
+    console.error('[getRouteHandlerSupabase] Failed to create Supabase client:', error)
+    return null
+  }
 }
 
 export async function getServerUser() {

@@ -293,7 +293,7 @@ export default function AdminDashboard() {
     const search = merchantSearch.toLowerCase()
     return (
       merchant.name?.toLowerCase().includes(search) ||
-      merchant.contact_email?.toLowerCase().includes(search) ||
+      merchant.email?.toLowerCase().includes(search) ||
       merchant.contact_phone?.toLowerCase().includes(search)
     )
   })
@@ -801,7 +801,7 @@ export default function AdminDashboard() {
                             marginBottom: '8px'
                           }}
                         >
-                          {merchant.contact_email}
+                          {merchant.email}
                         </p>
                         <div
                           style={{

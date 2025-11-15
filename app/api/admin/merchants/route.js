@@ -21,13 +21,11 @@ export async function GET() {
       .select(`
         id,
         name,
-        contact_email,
+        email,
         contact_phone,
         status,
         verified,
         max_events,
-        owner_supabase_uid,
-        owner_user_id,
         created_at,
         updated_at
       `)

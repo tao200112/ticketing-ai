@@ -261,18 +261,31 @@ export async function POST(request) {
       }
     } else {
       // 旧表：使用 used_by 和 is_active 字段
+      // 注意：used_by 是 UUID 引用 users(id)，但商家不在 users 表中
+      // 所以设置为 NULL，只更新 is_active 和 used_at
       const { error: updateInviteError } = await supabase
         .from('admin_invite_codes')
         .update({
-          used_by: newMerchant.id, // 使用商家 ID
+          used_by: null, // 商家不在 users 表中，所以设为 NULL
           used_at: new Date().toISOString(),
           is_active: false
         })
         .eq('id', inviteCodeData.id)
 
       if (updateInviteError) {
-        logger.warn('Failed to update invite code', { error: updateInviteError })
-        // 非阻塞性错误，商家已创建成功
+        logger.error('Failed to update invite code', { 
+          error: updateInviteError,
+          errorCode: updateInviteError.code,
+          errorMessage: updateInviteError.message,
+          errorDetails: updateInviteError.details,
+          inviteCodeId: inviteCodeData.id
+        })
+        // 非阻塞性错误，商家已创建成功，但记录详细错误
+      } else {
+        logger.info('Successfully updated invite code', { 
+          inviteCodeId: inviteCodeData.id,
+          code: normalizedInviteCode
+        })
       }
     }
 

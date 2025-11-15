@@ -441,7 +441,7 @@ export default function AdminNewEventPage() {
                         <option value="">选择商家（可选）</option>
                         {merchants.map(merchant => (
                           <option key={merchant.id} value={merchant.id} style={{ color: '#111827' }}>
-                            {merchant.name} ({merchant.contact_email})
+                            {merchant.name} ({merchant.email})
                           </option>
                         ))}
                       </select>

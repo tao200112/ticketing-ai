@@ -23,7 +23,7 @@ export async function GET() {
         merchants (
           id,
           name,
-          contact_email
+          email
         ),
         prices (
           id,

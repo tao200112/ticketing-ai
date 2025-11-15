@@ -210,7 +210,7 @@ export async function POST(request) {
       }
     }
 
-    // 检查邮箱是否已注册为商家（通过 contact_email 检查，不依赖 users 表）
+    // 检查邮箱是否已注册为商家（通过 email 检查，不依赖 users 表）
     // 使用 maybeSingle() 避免 406 错误
     const normalizedEmail = email ? email.trim().toLowerCase() : null
     let existingMerchant = null
@@ -220,8 +220,8 @@ export async function POST(request) {
       logger.info('Checking for existing merchant by email', { email: normalizedEmail })
       const { data: merchantByEmail, error: merchantEmailError } = await supabase
         .from('merchants')
-        .select('id, name, contact_email, owner_supabase_uid, owner_user_id')
-        .eq('contact_email', normalizedEmail)
+        .select('id, name, email, owner_supabase_uid, owner_user_id')
+        .eq('email', normalizedEmail)
         .maybeSingle()
 
       if (merchantEmailError && merchantEmailError.code !== 'PGRST116') {
@@ -250,7 +250,7 @@ export async function POST(request) {
       // 优先检查 owner_supabase_uid（新字段）
       const { data: merchantByAuthId, error: merchantAuthIdError } = await supabase
         .from('merchants')
-        .select('id, name, contact_email, owner_supabase_uid, owner_user_id')
+        .select('id, name, email, owner_supabase_uid, owner_user_id')
         .eq('owner_supabase_uid', finalAuthUserId)
         .maybeSingle()
 
@@ -268,7 +268,7 @@ export async function POST(request) {
         logger.warn('Found existing merchant by owner_supabase_uid', { 
           merchantId: merchantByAuthId.id, 
           authUserId: finalAuthUserId,
-          contact_email: merchantByAuthId.contact_email
+          email: merchantByAuthId.email
         })
       } else {
         logger.info('No existing merchant found by owner_supabase_uid', { authUserId: finalAuthUserId })
@@ -276,7 +276,7 @@ export async function POST(request) {
         // 回退：检查 owner_user_id（向后兼容）
         const { data: merchantByUserId, error: merchantUserIdError } = await supabase
           .from('merchants')
-          .select('id, name, contact_email, owner_supabase_uid, owner_user_id')
+          .select('id, name, email, owner_supabase_uid, owner_user_id')
           .eq('owner_user_id', finalAuthUserId)
           .maybeSingle()
 
@@ -294,7 +294,7 @@ export async function POST(request) {
           logger.warn('Found existing merchant by owner_user_id', { 
             merchantId: merchantByUserId.id, 
             authUserId: finalAuthUserId,
-            contact_email: merchantByUserId.contact_email
+            email: merchantByUserId.email
           })
         } else {
           logger.info('No existing merchant found by owner_user_id', { authUserId: finalAuthUserId })
@@ -304,23 +304,23 @@ export async function POST(request) {
 
     if (existingMerchant) {
       // 如果通过 owner_supabase_uid 找到商家，但邮箱不匹配，更新邮箱
-      if (checkReason?.includes('owner_supabase_uid') && normalizedEmail && existingMerchant.contact_email !== normalizedEmail) {
-        logger.info('Updating merchant contact_email to match current email', {
+      if (checkReason?.includes('owner_supabase_uid') && normalizedEmail && existingMerchant.email !== normalizedEmail) {
+        logger.info('Updating merchant email to match current email', {
           merchantId: existingMerchant.id,
-          oldEmail: existingMerchant.contact_email,
+          oldEmail: existingMerchant.email,
           newEmail: normalizedEmail
         })
         
         const { error: updateError } = await supabase
           .from('merchants')
-          .update({ contact_email: normalizedEmail })
+          .update({ email: normalizedEmail })
           .eq('id', existingMerchant.id)
         
         if (updateError) {
-          logger.error('Failed to update merchant contact_email', { error: updateError })
+          logger.error('Failed to update merchant email', { error: updateError })
         } else {
-          existingMerchant.contact_email = normalizedEmail
-          logger.info('Successfully updated merchant contact_email')
+          existingMerchant.email = normalizedEmail
+          logger.info('Successfully updated merchant email')
         }
       }
       
@@ -328,7 +328,7 @@ export async function POST(request) {
       logger.error('Merchant already exists', { 
         merchantId: existingMerchant.id,
         checkReason,
-        contact_email: existingMerchant.contact_email,
+        email: existingMerchant.email,
         owner_supabase_uid: existingMerchant.owner_supabase_uid,
         owner_user_id: existingMerchant.owner_user_id,
         requestedEmail: normalizedEmail,
@@ -349,7 +349,7 @@ export async function POST(request) {
     // merchants 表现在可以独立存在，owner_supabase_uid 是可选的
     const merchantData = {
       name: businessName.trim(),
-      contact_email: normalizedEmail || email?.trim().toLowerCase() || null,
+      email: normalizedEmail || email?.trim().toLowerCase() || null,
       contact_phone: phone ? phone.trim() : null,
       verified: false,
       status: 'active'

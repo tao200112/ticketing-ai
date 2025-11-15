@@ -86,7 +86,7 @@ export async function GET(request, { params }) {
       .from('events')
       .select(`
         *,
-        merchants (id, name, contact_email),
+        merchants (id, name, email),
         prices (id, name, amount_cents, inventory)
       `)
       .eq('id', finalId)
@@ -139,7 +139,7 @@ export async function GET(request, { params }) {
             .from('events')
             .select(`
               *,
-              merchants (id, name, contact_email),
+              merchants (id, name, email),
               prices (id, name, amount_cents, inventory)
             `)
             .eq('id', finalId)

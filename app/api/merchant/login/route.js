@@ -34,7 +34,24 @@ export async function POST(request) {
       )
     }
 
-    const supabase = createSupabaseClient()
+    // 使用 Service Role Key 创建客户端，绕过 RLS 策略
+    const { createClient } = await import('@supabase/supabase-js')
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+    if (!supabaseUrl || !supabaseServiceKey) {
+      throw ErrorHandler.configurationError(
+        'CONFIG_ERROR',
+        'Supabase Service Role Key 未配置'
+      )
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    })
 
     // 规范化邮箱
     const normalizedEmail = email.trim().toLowerCase()

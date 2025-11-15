@@ -185,8 +185,8 @@ export default function AccountPage() {
             }
           } else {
             const syncData = await syncResponse.json()
-            if (syncData.ok && syncData.user) {
-              userData = syncData.user
+            if ((syncData.success || syncData.ok) && (syncData.data?.user || syncData.user)) {
+              userData = syncData.data?.user || syncData.user
               console.log('✅ Successfully synced user record from auth')
             } else {
               console.error('❌ Sync API returned error:', syncData)
@@ -306,13 +306,13 @@ export default function AccountPage() {
         })
       }
 
-      // 获取当前登录用户的 Supabase Auth UID
-      let supabaseUid = null
+      // 获取当前登录用户的统一身份标识（Supabase Auth UID）
+      let authUserId = null
       try {
         const { data: { user: authUser }, error: authError } = await client.auth.getUser()
         if (!authError && authUser) {
-          supabaseUid = authUser.id
-          console.log('🔍 Account Page - Auth UID:', supabaseUid)
+          authUserId = authUser.id // Supabase Auth UID - unified identity
+          console.log('🔍 Account Page - Auth UID:', authUserId)
         } else {
           console.error('❌ Failed to get Auth UID:', authError)
         }
@@ -320,8 +320,8 @@ export default function AccountPage() {
         console.error('❌ Error getting Auth UID:', authErr)
       }
 
-      if (!supabaseUid) {
-        console.error('❌ No Supabase UID available, cannot query tickets/orders')
+      if (!authUserId) {
+        console.error('❌ No Auth UID available, cannot query tickets/orders')
         setTickets([])
         setOrders([])
         return
@@ -532,8 +532,8 @@ export default function AccountPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          ticket_id: ticketId,
-          userId: user.id
+          ticket_id: ticketId
+          // userId removed - API now gets identity from session
         })
       })
 

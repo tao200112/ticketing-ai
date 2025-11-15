@@ -348,7 +348,7 @@ export default function AccountPage() {
             address
           )
         `)
-        .eq('supabase_uid', supabaseUid)
+        .eq('supabase_uid', authUserId) // Database field stores Supabase Auth UID
         .order('created_at', { ascending: false })
 
       if (ticketsError) {
@@ -363,7 +363,7 @@ export default function AccountPage() {
       const { data: ordersData, error: ordersError } = await client
         .from('orders')
         .select('*')
-        .eq('supabase_uid', supabaseUid)
+        .eq('supabase_uid', authUserId) // Database field stores Supabase Auth UID
         .order('created_at', { ascending: false })
 
       if (ordersError) {
@@ -378,7 +378,7 @@ export default function AccountPage() {
       console.log('👤 Account Page - Current User Info:', {
         id: userData.id,
         email: userData.email,
-        supabase_uid: supabaseUid,
+          supabase_uid: authUserId, // Database field stores Supabase Auth UID
         has_tickets: ticketsData?.length > 0,
         has_orders: ordersData?.length > 0
       })
@@ -2689,7 +2689,7 @@ export default function AccountPage() {
                             email: profileData.email,
                             age: profileData.age ? parseInt(profileData.age) : null
                           })
-                          .eq('id', user.id)
+                          .eq('id', user.id) // user.id is Supabase Auth UID
                         
                         if (error) {
                           alert('Failed to update profile: ' + error.message)

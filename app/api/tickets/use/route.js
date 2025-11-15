@@ -32,7 +32,7 @@ export async function POST(request) {
     const authIdentity = await getServerAuthIdentity()
 
     if (!authIdentity || !authIdentity.id) {
-      throw ErrorHandler.unauthorizedError(
+      throw ErrorHandler.authenticationError(
         'AUTHENTICATION_REQUIRED',
         'User must be logged in to redeem tickets'
       )
@@ -106,7 +106,7 @@ export async function POST(request) {
     })
 
     if (!isOwner) {
-      throw ErrorHandler.unauthorizedError(
+      throw ErrorHandler.authenticationError(
         'TICKET_NOT_OWNED',
         'You can only use your own tickets'
       )

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import Stripe from 'stripe'
-import { getServerAuthIdentity } from '@/lib/auth-identity'
+import { getSupabaseUser } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { generateShortTicketId } from '@/lib/ticket-utils'
 import { isComboTicket, getComboTicketKinds } from '@/lib/ticket-helpers'
@@ -245,9 +245,10 @@ function buildTicketQr(ticket, event) {
 export async function GET(request) {
   try {
     // Get user identity (optional - for ownership verification)
-    const authIdentity = await getServerAuthIdentity()
-    const authUserId = authIdentity?.id || null
-    const userEmail = authIdentity?.email || null
+    // This endpoint allows unauthenticated access (for Stripe session verification)
+    const user = await getSupabaseUser()
+    const authUserId = user?.id || null
+    const userEmail = user?.email || null
 
     if (!stripe) {
       return buildConfigError('Stripe not configured')
@@ -311,7 +312,7 @@ export async function GET(request) {
     // If order exists, verify ownership
     if (order) {
       // If user is logged in, check ownership
-      if (authIdentity && authUserId) {
+      if (user && authUserId) {
         if (!ownsOrder(order, authUserId, userEmail)) {
           // Check if customer email matches
           if (customerEmail && order.customer_email === customerEmail) {
@@ -504,7 +505,7 @@ export async function GET(request) {
 
     // Filter tickets based on auth identity only
     let ownedTickets = tickets
-    if (authIdentity && authUserId) {
+    if (user && authUserId) {
       // 只使用 supabase_uid 匹配（数据库字段存储 Supabase Auth UID）
       ownedTickets = tickets.filter((ticket) => ticket.supabase_uid === authUserId)
 

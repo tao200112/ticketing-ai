@@ -2679,6 +2679,7 @@ export default function AccountPage() {
                         }
                         
                         // Update local user state
+                        // Note: Authentication state is managed by Supabase, not localStorage
                         setUser({
                           ...user,
                           name: profileData.name,
@@ -2686,12 +2687,8 @@ export default function AccountPage() {
                           age: profileData.age ? parseInt(profileData.age) : null
                         })
                         
-                        // Update session
-                        const sessionData = JSON.parse(localStorage.getItem('userSession') || '{}')
-                        sessionData.name = profileData.name
-                        sessionData.email = profileData.email
-                        sessionData.age = profileData.age ? parseInt(profileData.age) : null
-                        localStorage.setItem('userSession', JSON.stringify(sessionData))
+                        // No need to update localStorage - Supabase manages session
+                        // User profile is stored in database, not in localStorage
                         
                         setEditingProfile(false)
                         alert('Profile updated successfully!')

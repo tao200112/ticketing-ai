@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase-api'
 import { ErrorHandler, handleApiError } from '@/lib/error-handler'
 import { createLogger } from '@/lib/logger'
-import { getServerAuthIdentity } from '@/lib/auth-identity'
+import { getSupabaseUser } from '@/lib/supabase/server'
 import bcrypt from 'bcryptjs'
 
 const logger = createLogger('merchant-create-api')
@@ -13,8 +13,8 @@ export async function POST(request) {
     const { businessName, phone, inviteCode, email, password, name, age } = body
 
     // Try to get authenticated user identity (optional - merchant creation can work without auth)
-    const authIdentity = await getServerAuthIdentity()
-    const authUserId = authIdentity?.id || null
+    const user = await getSupabaseUser()
+    const authUserId = user?.id || null
 
     logger.info('Received merchant registration request', { 
       businessName, 

@@ -1,28 +1,11 @@
 import { NextResponse } from 'next/server'
-import { getServerAuthIdentity } from '@/lib/auth-identity'
+import { requireSupabaseUser } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
 export async function POST(request) {
   try {
-    const authIdentity = await getServerAuthIdentity()
-    if (!authIdentity || !authIdentity.id) {
-      return NextResponse.json({ 
-        success: false,
-        error: 'AUTHENTICATION_REQUIRED',
-        message: 'Authentication required' 
-      }, { status: 401 })
-    }
-
-    // Get full user object from Supabase Auth
-    const { getServerUser } = await import('@/lib/auth-server')
-    const user = await getServerUser()
-    if (!user) {
-      return NextResponse.json({ 
-        success: false,
-        error: 'AUTHENTICATION_REQUIRED',
-        message: 'Authentication required' 
-      }, { status: 401 })
-    }
+    // Get current user from Supabase Auth (server-side)
+    const user = await requireSupabaseUser()
 
     const admin = supabaseAdmin
     if (!admin) {

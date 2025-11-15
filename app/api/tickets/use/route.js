@@ -3,7 +3,7 @@ import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase-api'
 import { ErrorHandler, handleApiError } from '@/lib/error-handler'
 import { createLogger } from '@/lib/logger'
 import { getTicketRedemptionLocation } from '@/lib/ticket-helpers'
-import { getServerAuthIdentity } from '@/lib/auth-identity'
+import { requireSupabaseUser } from '@/lib/supabase/server'
 
 const logger = createLogger('ticket-use-api')
 
@@ -28,18 +28,10 @@ export async function POST(request) {
 
     const supabase = createSupabaseClient()
 
-    // Get current user identity from AuthContext
-    const authIdentity = await getServerAuthIdentity()
-
-    if (!authIdentity || !authIdentity.id) {
-      throw ErrorHandler.authenticationError(
-        'AUTHENTICATION_REQUIRED',
-        'User must be logged in to redeem tickets'
-      )
-    }
-
-    const authUserId = authIdentity.id // Unified identity: Supabase Auth UID
-    const userEmail = authIdentity.email
+    // Get current user from Supabase Auth (server-side)
+    const user = await requireSupabaseUser()
+    const authUserId = user.id // Unified identity: Supabase Auth UID
+    const userEmail = user.email
 
     logger.info('Ticket redemption request', { 
       ticket_id, 

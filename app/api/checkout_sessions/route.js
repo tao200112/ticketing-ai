@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { ErrorHandler, handleApiError } from '@/lib/error-handler'
 import { createLogger } from '@/lib/logger'
-import { requireServerUser } from '@/lib/auth-server'
+import { requireSupabaseUser } from '@/lib/supabase/server'
 
 const logger = createLogger('checkout-sessions-api')
 
@@ -43,8 +43,8 @@ export async function POST(request) {
     const { event_id, price_id, quantity = 1, customer_email, customer_name, customer_age, customerAge } = body
 
     // 获取当前登录用户（基于 Supabase server auth）
-    // requireServerUser() 会抛出 AUTHENTICATION_ERROR 如果用户未登录
-    const user = await requireServerUser()
+    // requireSupabaseUser() 会抛出 AUTHENTICATION_ERROR 如果用户未登录
+    const user = await requireSupabaseUser()
     
     logger.info('[CHECKOUT_SESSIONS] Authenticated user:', {
       id: user.id,

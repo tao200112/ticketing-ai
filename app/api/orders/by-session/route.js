@@ -526,13 +526,12 @@ export async function GET(request) {
     // Build QR codes for tickets
     const ticketsWithQR = ownedTickets.map((ticket) => buildTicketQr(ticket, event))
 
+    // Return flat structure for SuccessPage compatibility
     return NextResponse.json({
       success: true,
-      data: {
-        order,
-        tickets: ticketsWithQR,
-        event,
-      }
+      order,
+      tickets: ticketsWithQR,
+      event,
     })
   } catch (error) {
     console.error('orders/by-session error', error)

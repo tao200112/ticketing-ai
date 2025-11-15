@@ -28,16 +28,21 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
     // 检查是否在客户端环境
     if (typeof window === 'undefined') return
     
+    // Get user info from Supabase Auth session
     try {
-      const userSession = localStorage.getItem('userSession')
-      if (userSession) {
-        const user = JSON.parse(userSession)
-        if (user?.id) {
-          setCustomerEmail(user.email ?? '')
-          setCustomerName(user.name ?? '')
-          // 自动填写年龄，如果用户信息中有年龄字段
-          if (user.age) {
-            setCustomerAge(String(user.age))
+      const { createClient } = await import('@supabase/supabase-js')
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+      
+      if (supabaseUrl && supabaseAnonKey) {
+        const supabaseClient = createClient(supabaseUrl, supabaseAnonKey)
+        const { data: { session } } = await supabaseClient.auth.getSession()
+        
+        if (session?.user) {
+          setCustomerEmail(session.user.email ?? '')
+          setCustomerName(session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.email ?? '')
+          if (session.user.user_metadata?.age) {
+            setCustomerAge(String(session.user.user_metadata.age))
           }
         }
       }
@@ -84,15 +89,21 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
       return
     }
 
+    // Verify user is logged in via Supabase Auth
     try {
-      const userSession = localStorage.getItem('userSession')
-      if (!userSession) {
-        setPaymentError('Please login first to purchase tickets')
-        return
-      }
-
-      const user = JSON.parse(userSession)
-      if (!user?.id) {
+      const { createClient } = await import('@supabase/supabase-js')
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+      
+      if (supabaseUrl && supabaseAnonKey) {
+        const supabaseClient = createClient(supabaseUrl, supabaseAnonKey)
+        const { data: { session }, error: sessionError } = await supabaseClient.auth.getSession()
+        
+        if (sessionError || !session?.user) {
+          setPaymentError('Please login first to purchase tickets')
+          return
+        }
+      } else {
         setPaymentError('Please login first to purchase tickets')
         return
       }
@@ -135,14 +146,13 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
     setPaymentError('')
 
     try {
-      // 获取用户信息 - 确保只在客户端执行
-      // 优先从 Supabase client 获取 Auth UID，回退到 localStorage
+      // Get user info from Supabase Auth session
+      // Use Supabase Auth as the ONLY source of identity
       let supabaseUid = null
-      let user = null
       
       if (typeof window !== 'undefined') {
         try {
-          // 尝试从 Supabase client 获取当前用户（最可靠的方式）
+          // Get current user from Supabase Auth
           const { createClient } = await import('@supabase/supabase-js')
           const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
           const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -153,30 +163,34 @@ export default function EventDetailClient({ event }: EventDetailClientProps) {
             
             if (!authError && authUser) {
               supabaseUid = authUser.id
-              console.log('[EventDetailClient] Got Supabase Auth UID from client:', supabaseUid)
+              console.log('[EventDetailClient] Got Supabase Auth UID:', supabaseUid)
             } else {
-              console.warn('[EventDetailClient] Could not get user from Supabase client:', authError)
+              console.warn('[EventDetailClient] Could not get user from Supabase:', authError)
+              setPaymentError('Please login first to purchase tickets')
+              setPaymentLoading(false)
+              return
             }
           }
           
-          // 回退：从 localStorage 获取
-          if (!supabaseUid) {
-            const userSession = localStorage.getItem('userSession')
-            user = userSession ? JSON.parse(userSession) : null
-            // userSession 中的 id 应该是 Supabase Auth UID（如果是从 account page 存储的）
-            if (user?.id) {
-              // 验证是否是 UUID 格式（Supabase Auth UID）
-              const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-              if (uuidRegex.test(user.id)) {
-                supabaseUid = user.id
-                console.log('[EventDetailClient] Using Supabase Auth UID from localStorage:', supabaseUid)
-              } else {
-                console.warn('[EventDetailClient] user.id from localStorage is not a valid UUID:', user.id)
-              }
+          // Verify UUID format (Supabase Auth UID)
+          if (supabaseUid) {
+            const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+            if (!uuidRegex.test(supabaseUid)) {
+              console.warn('[EventDetailClient] Invalid Supabase Auth UID format:', supabaseUid)
+              setPaymentError('Invalid user session. Please login again.')
+              setPaymentLoading(false)
+              return
             }
+          } else {
+            setPaymentError('Please login first to purchase tickets')
+            setPaymentLoading(false)
+            return
           }
         } catch (error) {
           console.error('[EventDetailClient] Failed to get user information:', error)
+          setPaymentError('Failed to verify user session. Please login again.')
+          setPaymentLoading(false)
+          return
         }
       }
 

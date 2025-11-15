@@ -13,36 +13,27 @@ export function getRouteHandlerSupabase() {
   try {
     // cookies() is synchronous in Next.js App Router Route Handlers
     // DO NOT await it - this breaks cookie reading
-    // Making function non-async prevents TypeScript from inferring Promise
-    const cookieStore = cookies()
+    // TypeScript may infer it as Promise, but runtime it's synchronous
+    const cookieStore = cookies() as any as { get: (name: string) => { value?: string } | undefined, set: (name: string, value: string, options?: any) => void }
     
     return createServerClient(
       supabaseUrl,
       supabaseAnonKey,
       {
         cookies: {
-          get: (name: string) => {
-            try {
-              return cookieStore.get(name)?.value
-            } catch (error) {
-              console.warn('[getRouteHandlerSupabase] Error getting cookie:', name, error)
-              return undefined
-            }
-          },
+          get: (name: string) => cookieStore.get(name)?.value,
           set: (name: string, value: string, options: any) => {
             try {
               cookieStore.set({ name, value, ...options })
             } catch (error) {
-              // 在某些场景下可能无法设置 cookie（如 middleware）
-              console.warn('[getRouteHandlerSupabase] Error setting cookie:', name, error)
+              // In middleware context, setting cookies may fail - this is expected
             }
           },
           remove: (name: string, options: any) => {
             try {
               cookieStore.set({ name, value: '', ...options })
             } catch (error) {
-              // 在某些场景下可能无法删除 cookie
-              console.warn('[getRouteHandlerSupabase] Error removing cookie:', name, error)
+              // In middleware context, removing cookies may fail - this is expected
             }
           },
         },
@@ -55,57 +46,18 @@ export function getRouteHandlerSupabase() {
 }
 
 export async function getServerUser() {
-  try {
-    const supabase = getRouteHandlerSupabase()
-    if (!supabase) {
-      console.warn('[getServerUser] Supabase client not available')
-      return null
-    }
-
-    // First try to get session (which reads from cookies)
-    // This is more reliable in API routes than getUser()
-    const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
-    
-    if (sessionError) {
-      console.warn('[getServerUser] Error getting session:', sessionError.message)
-      // Fallback to getUser() if getSession() fails
-      const { data: userData, error: userError } = await supabase.auth.getUser()
-      if (userError) {
-        console.warn('[getServerUser] Error getting user:', userError.message)
-        return null
-      }
-      if (!userData?.user) {
-        console.warn('[getServerUser] No user found')
-        return null
-      }
-      return userData.user
-    }
-
-    // If we have a session, return the user from session
-    if (sessionData?.session?.user) {
-      return sessionData.session.user
-    }
-
-    // If no session, try getUser() as fallback
-    const { data: userData, error: userError } = await supabase.auth.getUser()
-    if (userError) {
-      console.warn('[getServerUser] Error getting user:', userError.message)
-      return null
-    }
-
-    if (!userData?.user) {
-      console.warn('[getServerUser] No user found in session')
-      return null
-    }
-
-    return userData.user
-  } catch (error) {
-    console.error('[getServerUser] Exception:', error)
-    // Log full error details for debugging
-    if (error instanceof Error) {
-      console.error('[getServerUser] Error message:', error.message)
-      console.error('[getServerUser] Error stack:', error.stack)
-    }
+  const supabase = getRouteHandlerSupabase()
+  if (!supabase) {
     return null
   }
+
+  // First try getSession() - reads from cookies (sb-access-token, sb-refresh-token)
+  const { data: { session } } = await supabase.auth.getSession()
+  if (session?.user) {
+    return session.user
+  }
+
+  // Fallback to getUser() if no session
+  const { data: { user } } = await supabase.auth.getUser()
+  return user ?? null
 }

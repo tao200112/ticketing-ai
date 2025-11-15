@@ -49,38 +49,27 @@ export default function EventDetailPage() {
     }
   }
 
-  const loadUserData = () => {
+  const loadUserData = async () => {
     try {
-      // 优先使用 userSession（与登录系统一致）
-      const userSession = localStorage.getItem('userSession')
-      if (userSession) {
-        const user = JSON.parse(userSession)
-        if (user?.id) {
-          setCustomerEmail(user.email || '')
-          setCustomerName(user.name || '')
-          // 自动填写年龄，如果用户信息中有年龄字段
-          if (user.age) {
-            setCustomerAge(String(user.age))
-          }
-          return
-        }
-      }
+      // Get user info from Supabase Auth session
+      const { createClient } = await import('@supabase/supabase-js')
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
       
-      // 回退到 userData（兼容旧版本）
-      const userData = localStorage.getItem('userData')
-      if (userData) {
-        const user = JSON.parse(userData)
-        if (user.isLoggedIn) {
-          setCustomerEmail(user.email || '')
-          setCustomerName(user.name || '')
-          // 自动填写年龄，如果用户信息中有年龄字段
-          if (user.age) {
-            setCustomerAge(String(user.age))
+      if (supabaseUrl && supabaseAnonKey) {
+        const supabaseClient = createClient(supabaseUrl, supabaseAnonKey)
+        const { data: { session } } = await supabaseClient.auth.getSession()
+        
+        if (session?.user) {
+          setCustomerEmail(session.user.email || '')
+          setCustomerName(session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.email || '')
+          if (session.user.user_metadata?.age) {
+            setCustomerAge(String(session.user.user_metadata.age))
           }
         }
       }
     } catch (error) {
-      console.error('加载用户数据失败:', error)
+      console.warn('Failed to load user session:', error)
     }
   }
 
@@ -125,6 +114,22 @@ export default function EventDetailPage() {
       })
 
       const result = await response.json()
+
+      // 检查响应状态码
+      if (response.status === 401) {
+        // 用户未登录，重定向到登录页面
+        setError('Please log in to purchase tickets')
+        setTimeout(() => {
+          router.push('/auth/login?redirect=' + encodeURIComponent(window.location.pathname))
+        }, 2000)
+        return
+      }
+
+      if (!response.ok) {
+        // 其他错误
+        setError(result.message || result.error || 'Failed to create payment session')
+        return
+      }
 
       if (result.success && result.url) {
         window.location.href = result.url

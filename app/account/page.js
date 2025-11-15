@@ -68,21 +68,8 @@ export default function AccountPage() {
         
         console.log('✅ Active session found:', session.user.id)
         
-        // Store session in localStorage for backward compatibility
-        try {
-          const sessionData = {
-            id: session.user.id,
-            email: session.user.email,
-            name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.user_metadata?.display_name || session.user.email,
-            role: session.user.user_metadata?.role || 'user',
-            age: session.user.user_metadata?.age || null,
-          }
-          localStorage.setItem('userSession', JSON.stringify(sessionData))
-        } catch (storageError) {
-          console.warn('⚠️ Failed to store session in localStorage:', storageError)
-        }
-        
         // Load user data (force refresh if returning from password update)
+        // Note: Session is managed by Supabase Auth, no localStorage needed
         const urlParams = new URLSearchParams(window.location.search)
         const forceRefresh = urlParams.get('password_updated') === 'true'
         loadUserData(client, session.user.id, forceRefresh)
@@ -266,18 +253,8 @@ export default function AccountPage() {
           userData.auth_user = authUser
         }
 
-        // Persist password status in local session (if available)
-        try {
-          const existingSession = localStorage.getItem('userSession')
-          if (existingSession) {
-            const parsedSession = JSON.parse(existingSession)
-            parsedSession.has_password = hasPassword
-            parsedSession.requires_password_setup = requiresPassword
-            localStorage.setItem('userSession', JSON.stringify(parsedSession))
-          }
-        } catch (error) {
-          console.warn('⚠️ Failed to persist password status to session storage:', error)
-        }
+        // Password status is managed by Supabase Auth user_metadata
+        // No localStorage needed - session is managed by Supabase
 
         // Allow access even if email is not verified
         // Email verification is optional unless REQUIRE_EMAIL_VERIFICATION=true

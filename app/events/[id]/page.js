@@ -68,8 +68,6 @@ export default function EventDetailPage() {
     } catch (error) {
       console.warn('Failed to load user session:', error)
     }
-  } else {
-    // Server-side: do nothing
   }
 
   const handleBuyTickets = async () => {

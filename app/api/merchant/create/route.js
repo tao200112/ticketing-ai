@@ -214,62 +214,114 @@ export async function POST(request) {
     // 使用 maybeSingle() 避免 406 错误
     const normalizedEmail = email ? email.trim().toLowerCase() : null
     let existingMerchant = null
+    let checkReason = null
     
     if (normalizedEmail) {
+      logger.info('Checking for existing merchant by email', { email: normalizedEmail })
       const { data: merchantByEmail, error: merchantEmailError } = await supabase
         .from('merchants')
-        .select('*')
+        .select('id, name, contact_email, owner_supabase_uid, owner_user_id')
         .eq('contact_email', normalizedEmail)
         .maybeSingle()
 
       if (merchantEmailError && merchantEmailError.code !== 'PGRST116') {
+        logger.error('Error checking merchant by email', { error: merchantEmailError, email: normalizedEmail })
         throw ErrorHandler.fromSupabaseError(merchantEmailError, 'MERCHANT_CHECK_FAILED')
       }
 
       if (merchantByEmail) {
         existingMerchant = merchantByEmail
+        checkReason = `email: ${normalizedEmail}`
+        logger.warn('Found existing merchant by email', { 
+          merchantId: merchantByEmail.id, 
+          email: normalizedEmail,
+          owner_supabase_uid: merchantByEmail.owner_supabase_uid,
+          owner_user_id: merchantByEmail.owner_user_id
+        })
+      } else {
+        logger.info('No existing merchant found by email', { email: normalizedEmail })
       }
     }
 
     // 如果已登录，也检查该用户是否已有商家账户
     if (finalAuthUserId && !existingMerchant) {
+      logger.info('Checking for existing merchant by auth user ID', { authUserId: finalAuthUserId })
+      
       // 优先检查 owner_supabase_uid（新字段）
       const { data: merchantByAuthId, error: merchantAuthIdError } = await supabase
         .from('merchants')
-        .select('*')
+        .select('id, name, contact_email, owner_supabase_uid, owner_user_id')
         .eq('owner_supabase_uid', finalAuthUserId)
         .maybeSingle()
 
       if (merchantAuthIdError && merchantAuthIdError.code !== 'PGRST116') {
+        logger.error('Error checking merchant by owner_supabase_uid', { 
+          error: merchantAuthIdError, 
+          authUserId: finalAuthUserId 
+        })
         throw ErrorHandler.fromSupabaseError(merchantAuthIdError, 'MERCHANT_CHECK_FAILED')
       }
 
       if (merchantByAuthId) {
         existingMerchant = merchantByAuthId
+        checkReason = `owner_supabase_uid: ${finalAuthUserId}`
+        logger.warn('Found existing merchant by owner_supabase_uid', { 
+          merchantId: merchantByAuthId.id, 
+          authUserId: finalAuthUserId,
+          contact_email: merchantByAuthId.contact_email
+        })
       } else {
+        logger.info('No existing merchant found by owner_supabase_uid', { authUserId: finalAuthUserId })
+        
         // 回退：检查 owner_user_id（向后兼容）
         const { data: merchantByUserId, error: merchantUserIdError } = await supabase
           .from('merchants')
-          .select('*')
+          .select('id, name, contact_email, owner_supabase_uid, owner_user_id')
           .eq('owner_user_id', finalAuthUserId)
           .maybeSingle()
 
         if (merchantUserIdError && merchantUserIdError.code !== 'PGRST116') {
+          logger.error('Error checking merchant by owner_user_id', { 
+            error: merchantUserIdError, 
+            authUserId: finalAuthUserId 
+          })
           throw ErrorHandler.fromSupabaseError(merchantUserIdError, 'MERCHANT_CHECK_FAILED')
         }
 
         if (merchantByUserId) {
           existingMerchant = merchantByUserId
+          checkReason = `owner_user_id: ${finalAuthUserId}`
+          logger.warn('Found existing merchant by owner_user_id', { 
+            merchantId: merchantByUserId.id, 
+            authUserId: finalAuthUserId,
+            contact_email: merchantByUserId.contact_email
+          })
+        } else {
+          logger.info('No existing merchant found by owner_user_id', { authUserId: finalAuthUserId })
         }
       }
     }
 
     if (existingMerchant) {
+      logger.error('Merchant already exists', { 
+        merchantId: existingMerchant.id,
+        checkReason,
+        contact_email: existingMerchant.contact_email,
+        owner_supabase_uid: existingMerchant.owner_supabase_uid,
+        owner_user_id: existingMerchant.owner_user_id,
+        requestedEmail: normalizedEmail,
+        requestedAuthUserId: finalAuthUserId
+      })
       throw ErrorHandler.conflictError(
         'MERCHANT_EXISTS',
         '该邮箱或账户已经注册为商家，请直接登录'
       )
     }
+
+    logger.info('No existing merchant found, proceeding with creation', { 
+      email: normalizedEmail, 
+      authUserId: finalAuthUserId 
+    })
 
     // 创建商家记录
     // merchants 表现在可以独立存在，owner_supabase_uid 是可选的

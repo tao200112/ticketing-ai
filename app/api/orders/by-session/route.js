@@ -419,22 +419,51 @@ export async function GET(request) {
       // 支持新字段名 auth_user_id 和旧字段名 supabase_uid（向后兼容）
       const authUserIdFromMetadata = stripeSession.metadata?.auth_user_id || stripeSession.metadata?.supabase_uid || authUserId || null
 
-      // Create tickets
+      // Check if this is a combo ticket and determine ticket kinds to create
+      const ticketKindFromPrice = priceSnapshot?.ticket_kind || null
+      const isCombo = isComboTicket(priceName, ticketKindFromPrice)
+      
+      let ticketKindsToCreate = []
+      if (isCombo) {
+        // Combo tickets MUST create two separate tickets: ENTRY_COMBO and DRINK_COMBO
+        ticketKindsToCreate = getComboTicketKinds(priceName, ticketKindFromPrice)
+        
+        // Safety check: ensure we have exactly 2 tickets for combo
+        if (ticketKindsToCreate.length !== 2) {
+          console.error('[OrdersBySession] ERROR: Combo ticket should create 2 tickets, but got', ticketKindsToCreate.length)
+          ticketKindsToCreate = ['ENTRY_COMBO', 'DRINK_COMBO']
+        }
+        
+        // Verify both ticket kinds are present
+        if (!ticketKindsToCreate.includes('ENTRY_COMBO') || !ticketKindsToCreate.includes('DRINK_COMBO')) {
+          console.error('[OrdersBySession] ERROR: Combo ticket missing required kinds. Got:', ticketKindsToCreate)
+          ticketKindsToCreate = ['ENTRY_COMBO', 'DRINK_COMBO']
+        }
+      } else {
+        // Single ticket - determine kind from price or metadata
+        const singleKind = ticketKindFromPrice || null
+        ticketKindsToCreate = singleKind ? [singleKind] : [null]
+      }
+
+      // Create tickets: for combo tickets, create multiple tickets per quantity
+      // Each quantity unit creates all ticket kinds (e.g., 1 combo = 2 tickets, 2 combos = 4 tickets)
       const ticketRows = []
-      for (let i = 0; i < quantity; i += 1) {
-        ticketRows.push({
-          order_id: order.id,
-          event_id: eventId,
-          tier: priceName,
-          ticket_kind: priceSnapshot?.ticket_kind || null,
-          holder_email: customerEmail,
-          status: 'unused',
-          used: false,
-          short_id: generateShortTicketId(),
-          supabase_uid: authUserIdFromMetadata, // Database field stores Supabase Auth UID
-          event_snapshot: eventSnapshot || null,
-          price_snapshot: priceSnapshot || null
-        })
+      for (let i = 0; i < quantity; i++) {
+        for (const ticketKind of ticketKindsToCreate) {
+          ticketRows.push({
+            order_id: order.id,
+            event_id: eventId,
+            tier: priceName,
+            ticket_kind: ticketKind,
+            holder_email: customerEmail,
+            status: 'unused',
+            used: false,
+            short_id: generateShortTicketId(),
+            supabase_uid: authUserIdFromMetadata, // Database field stores Supabase Auth UID
+            event_snapshot: eventSnapshot || null,
+            price_snapshot: priceSnapshot || null
+          })
+        }
       }
 
       if (ticketRows.length > 0) {

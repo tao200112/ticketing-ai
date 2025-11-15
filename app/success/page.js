@@ -50,24 +50,66 @@ export default function SuccessPage() {
       
       clearTimeout(timeoutRef.current)
       
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.message || `HTTP ${response.status}`)
+      // Parse response payload
+      let payload
+      try {
+        payload = await response.json()
+      } catch (parseError) {
+        console.error(`[SuccessPage] Failed to parse response JSON (attempt ${attempt}):`, parseError)
+        console.error(`[SuccessPage] Response status:`, response.status)
+        console.error(`[SuccessPage] Response text:`, await response.text().catch(() => 'N/A'))
+        throw new Error(`Invalid response format: ${parseError.message}`)
       }
       
-      const data = await response.json()
-      
-      if (!data.ok) {
-        throw new Error(data.message || 'Failed to load order data')
-      }
-      
-      console.log(`[SuccessPage] Successfully loaded order data:`, {
-        orderId: data.order.id,
-        ticketCount: data.tickets.length,
-        attempt
+      // Log full payload for debugging
+      console.log(`[SuccessPage] Response payload (attempt ${attempt}):`, {
+        status: response.status,
+        ok: response.ok,
+        payload: payload
       })
       
-      return data
+      // Check HTTP response status
+      if (!response.ok) {
+        console.error(`[SuccessPage] HTTP error (attempt ${attempt}):`, {
+          status: response.status,
+          payload: payload
+        })
+        throw new Error(payload.message || `HTTP ${response.status}`)
+      }
+      
+      // Parse data with backward compatibility
+      // Support both flat structure { success, order, tickets, event }
+      // and nested structure { success, data: { order, tickets, event } }
+      const success = payload.success ?? true
+      const order = payload.order ?? payload.data?.order ?? null
+      const tickets = payload.tickets ?? payload.data?.tickets ?? []
+      const event = payload.event ?? payload.data?.event ?? null
+      
+      // Validate required data
+      if (!success) {
+        console.error(`[SuccessPage] API returned success=false (attempt ${attempt}):`, payload)
+        throw new Error(payload.message || 'Failed to load order data')
+      }
+      
+      if (!order) {
+        console.error(`[SuccessPage] Missing order in response (attempt ${attempt}):`, payload)
+        throw new Error('Failed to load order data: order not found')
+      }
+      
+      if (!tickets || tickets.length === 0) {
+        console.warn(`[SuccessPage] No tickets in response (attempt ${attempt}):`, payload)
+        // Don't throw error if order exists but no tickets - this might be valid
+        // Just log a warning
+      }
+      
+      console.log(`[SuccessPage] Successfully loaded order data (attempt ${attempt}):`, {
+        orderId: order.id,
+        ticketCount: tickets.length,
+        hasEvent: !!event
+      })
+      
+      // Return normalized structure
+      return { order, tickets, event }
       
     } catch (error) {
       clearTimeout(timeoutRef.current)
@@ -77,7 +119,11 @@ export default function SuccessPage() {
         throw new Error('Request timeout')
       }
       
-      console.error(`[SuccessPage] Fetch error (attempt ${attempt}):`, error.message)
+      console.error(`[SuccessPage] Fetch error (attempt ${attempt}):`, {
+        message: error.message,
+        name: error.name,
+        stack: error.stack
+      })
       
       if (attempt < maxRetries) {
         // 退避重试：5s, 10s, 15s
@@ -127,21 +173,21 @@ export default function SuccessPage() {
     setRetryCount(prev => prev + 1)
     
     try {
-      const data = await fetchOrderData(sessionId)
+      const { order, tickets, event } = await fetchOrderData(sessionId)
       
       // 为每个票据生成二维码
       const ticketsWithQR = await Promise.all(
-        data.tickets.map(async (ticket) => {
+        tickets.map(async (ticket) => {
           const qrDataURL = await generateQRCodeFromPayload(ticket.qrPayload)
           return { ...ticket, qrDataURL }
         })
       )
       
-      setOrder(data.order)
+      setOrder(order)
       setTickets(ticketsWithQR)
       setUiState(UI_STATES.SUCCESS)
       
-          } catch (error) {
+    } catch (error) {
       console.error('[SuccessPage] Retry failed:', error)
       setUiState(UI_STATES.ERROR)
       setErrorMessage(error.message)
@@ -161,17 +207,17 @@ export default function SuccessPage() {
       }
       
       try {
-        const data = await fetchOrderData(sessionId)
+        const { order, tickets, event } = await fetchOrderData(sessionId)
         
         // 为每个票据生成二维码
         const ticketsWithQR = await Promise.all(
-          data.tickets.map(async (ticket) => {
+          tickets.map(async (ticket) => {
             const qrDataURL = await generateQRCodeFromPayload(ticket.qrPayload)
             return { ...ticket, qrDataURL }
           })
         )
         
-        setOrder(data.order)
+        setOrder(order)
         setTickets(ticketsWithQR)
         setUiState(UI_STATES.SUCCESS)
         
@@ -180,7 +226,7 @@ export default function SuccessPage() {
         
         if (error.message.includes('timeout')) {
           setUiState(UI_STATES.TIMEOUT)
-            } else {
+        } else {
           setUiState(UI_STATES.ERROR)
           setErrorMessage(error.message)
         }

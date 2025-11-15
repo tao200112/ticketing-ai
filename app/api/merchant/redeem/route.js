@@ -139,7 +139,7 @@ export async function POST(request) {
     // Get merchant to check owner
     const { data: merchant, error: merchantError } = await supabase
       .from('merchants')
-      .select('id, owner_user_id, owner_supabase_uid')
+      .select('id, owner_supabase_uid')
       .eq('id', ticketMerchantId)
       .single()
 

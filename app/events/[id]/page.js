@@ -114,17 +114,17 @@ export default function EventDetailPage() {
 
       // 检查响应状态码
       if (response.status === 401) {
-        // 用户未登录，重定向到登录页面
-        setError('Please log in to purchase tickets')
-        setTimeout(() => {
-          router.push('/auth/login?redirect=' + encodeURIComponent(window.location.pathname))
-        }, 2000)
+        // 用户未登录，立即重定向到登录页面（不延迟）
+        console.warn('[handleBuyTickets] Authentication required, redirecting to login')
+        router.push('/auth/login?redirect=' + encodeURIComponent(window.location.pathname))
         return
       }
 
       if (!response.ok) {
         // 其他错误
-        setError(result.message || result.error || 'Failed to create payment session')
+        const errorMessage = result.message || result.error || 'Failed to create payment session'
+        console.error('[handleBuyTickets] API error:', errorMessage, result)
+        setError(errorMessage)
         return
       }
 

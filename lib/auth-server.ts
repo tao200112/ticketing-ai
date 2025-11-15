@@ -51,16 +51,39 @@ export function getRouteHandlerSupabase() {
 export async function getServerUser() {
   const supabase = getRouteHandlerSupabase()
   if (!supabase) {
+    console.warn('[getServerUser] Supabase client not available')
     return null
   }
 
-  // First try getSession() - reads from cookies (sb-access-token, sb-refresh-token)
-  const { data: { session } } = await supabase.auth.getSession()
-  if (session?.user) {
-    return session.user
-  }
+  try {
+    // First try getSession() - reads from cookies (sb-access-token, sb-refresh-token)
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+    
+    if (sessionError) {
+      console.warn('[getServerUser] Error getting session:', sessionError.message)
+    }
+    
+    if (session?.user) {
+      console.log('[getServerUser] Found user from session:', session.user.id)
+      return session.user
+    }
 
-  // Fallback to getUser() if no session
-  const { data: { user } } = await supabase.auth.getUser()
-  return user ?? null
+    // Fallback to getUser() if no session
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    
+    if (userError) {
+      console.warn('[getServerUser] Error getting user:', userError.message)
+    }
+    
+    if (user) {
+      console.log('[getServerUser] Found user from getUser():', user.id)
+      return user
+    }
+    
+    console.warn('[getServerUser] No user found in session or getUser()')
+    return null
+  } catch (error) {
+    console.error('[getServerUser] Exception:', error)
+    return null
+  }
 }

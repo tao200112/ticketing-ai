@@ -127,7 +127,7 @@ export async function getSupabaseUser() {
  * @throws {AppError} AUTHENTICATION_ERROR 如果用户未登录
  */
 export async function requireSupabaseUser() {
-  const { ErrorHandler } = await import('./error-handler')
+  const { ErrorHandler } = await import('../error-handler')
   const user = await getSupabaseUser()
   
   if (!user) {

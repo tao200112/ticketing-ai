@@ -24,14 +24,14 @@ export function getRouteHandlerSupabase() {
           get: (name: string) => cookieStore.get(name)?.value,
           set: (name: string, value: string, options: any) => {
             try {
-              cookieStore.set({ name, value, ...options })
+              cookieStore.set(name, value, options)
             } catch (error) {
               // In middleware context, setting cookies may fail - this is expected
             }
           },
           remove: (name: string, options: any) => {
             try {
-              cookieStore.set({ name, value: '', ...options })
+              cookieStore.set(name, '', options)
             } catch (error) {
               // In middleware context, removing cookies may fail - this is expected
             }

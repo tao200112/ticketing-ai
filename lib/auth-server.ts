@@ -4,7 +4,7 @@ import { createServerClient } from '@supabase/ssr'
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-export async function getRouteHandlerSupabase() {
+export function getRouteHandlerSupabase() {
   if (!supabaseUrl || !supabaseAnonKey) {
     console.warn('⚠️ Supabase environment variables missing')
     return null
@@ -13,6 +13,7 @@ export async function getRouteHandlerSupabase() {
   try {
     // cookies() is synchronous in Next.js App Router Route Handlers
     // DO NOT await it - this breaks cookie reading
+    // Making function non-async prevents TypeScript from inferring Promise
     const cookieStore = cookies()
     
     return createServerClient(
@@ -55,7 +56,7 @@ export async function getRouteHandlerSupabase() {
 
 export async function getServerUser() {
   try {
-    const supabase = await getRouteHandlerSupabase()
+    const supabase = getRouteHandlerSupabase()
     if (!supabase) {
       console.warn('[getServerUser] Supabase client not available')
       return null

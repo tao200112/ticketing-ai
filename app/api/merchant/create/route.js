@@ -303,6 +303,28 @@ export async function POST(request) {
     }
 
     if (existingMerchant) {
+      // 如果通过 owner_supabase_uid 找到商家，但邮箱不匹配，更新邮箱
+      if (checkReason?.includes('owner_supabase_uid') && normalizedEmail && existingMerchant.contact_email !== normalizedEmail) {
+        logger.info('Updating merchant contact_email to match current email', {
+          merchantId: existingMerchant.id,
+          oldEmail: existingMerchant.contact_email,
+          newEmail: normalizedEmail
+        })
+        
+        const { error: updateError } = await supabase
+          .from('merchants')
+          .update({ contact_email: normalizedEmail })
+          .eq('id', existingMerchant.id)
+        
+        if (updateError) {
+          logger.error('Failed to update merchant contact_email', { error: updateError })
+        } else {
+          existingMerchant.contact_email = normalizedEmail
+          logger.info('Successfully updated merchant contact_email')
+        }
+      }
+      
+      // 如果商家已存在，返回错误（除非是邮箱更新场景，但这种情况应该让用户登录）
       logger.error('Merchant already exists', { 
         merchantId: existingMerchant.id,
         checkReason,
@@ -314,7 +336,7 @@ export async function POST(request) {
       })
       throw ErrorHandler.conflictError(
         'MERCHANT_EXISTS',
-        '该邮箱或账户已经注册为商家，请直接登录'
+        '该账户已经注册为商家，请直接登录'
       )
     }
 

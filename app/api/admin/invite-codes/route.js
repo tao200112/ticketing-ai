@@ -96,20 +96,28 @@ export async function POST(request) {
     const defaultExpiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString()
     const expires_at = expiresAt || defaultExpiresAt
 
-    // 准备插入数据（只包含表结构中存在的字段）
+    // 准备插入数据（只包含必需字段和确定存在的字段）
+    // 根据实际表结构，只插入以下字段：
+    // - code (必需)
+    // - expires_at (必需)
+    // - is_active (如果表中有此字段，默认为 true)
+    // 不插入 used_by 和 used_at，因为：
+    // 1. 这些字段可能不存在于某些表结构中
+    // 2. 如果存在，数据库会使用默认值 (NULL)
     const insertData = {
       code,
       expires_at,
-      is_active: true, // 新邀请码默认为活跃状态
-      used_by: null, // 未使用
-      used_at: null // 未使用
+      is_active: true // 大多数表结构都有此字段，如果不存在会报错，但我们可以捕获错误
     }
 
-    // 只有在 maxEvents 有值时才添加 max_events 字段
-    // 如果表中没有这个字段，不传也不会报错
+    // max_events 字段（可选，只在提供值且表中有此字段时添加）
     if (maxEvents !== undefined && maxEvents !== null) {
       insertData.max_events = maxEvents
     }
+
+    // 注意：不设置 used_by 和 used_at
+    // 如果表中没有这些字段，不传也不会报错
+    // 如果表中有这些字段，数据库会使用默认值 (NULL)
 
     // 插入数据库（新邀请码默认为未使用状态）
     const { data: newInviteCode, error } = await supabaseAdmin

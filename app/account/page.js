@@ -1082,7 +1082,7 @@ export default function AccountPage() {
             {/* Settings */}
             <button
               onClick={() => {
-                alert('Settings feature coming soon!')
+                router.push('/account/settings')
               }}
               style={{
                 background: 'rgba(15, 23, 42, 0.8)',
@@ -1361,7 +1361,7 @@ export default function AccountPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <button
               onClick={() => {
-                router.push('/contact')
+                router.push('/support/contact')
               }}
               style={{
                 background: 'transparent',
@@ -1388,7 +1388,7 @@ export default function AccountPage() {
             </button>
             <button
               onClick={() => {
-                alert('Terms of Service - Coming soon!')
+                router.push('/support/terms')
               }}
               style={{
                 background: 'transparent',
@@ -1415,7 +1415,7 @@ export default function AccountPage() {
             </button>
             <button
               onClick={() => {
-                alert('Privacy Policy - Coming soon!')
+                router.push('/support/privacy')
               }}
               style={{
                 background: 'transparent',
@@ -1442,7 +1442,7 @@ export default function AccountPage() {
             </button>
             <button
               onClick={() => {
-                alert('Help / FAQ - Coming soon!')
+                router.push('/support/help')
               }}
               style={{
                 background: 'transparent',

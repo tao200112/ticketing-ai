@@ -3,7 +3,7 @@ import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase-api'
 import { ErrorHandler, handleApiError } from '@/lib/error-handler'
 import { createLogger } from '@/lib/logger'
 import { verifyTicketQRPayload } from '@/lib/qr-crypto'
-import { getServerUser } from '@/lib/auth-server'
+import { getServerAuthIdentity } from '@/lib/auth-identity'
 
 const logger = createLogger('merchant-redeem-api')
 
@@ -30,32 +30,20 @@ export async function POST(request) {
 
     const supabase = createSupabaseClient()
 
-    // Get current user from Supabase Auth (supabase_uid)
-    const authUser = await getServerUser()
-    const supabaseUid = authUser?.id || null
+    // Get current user identity from AuthContext
+    const authIdentity = await getServerAuthIdentity()
 
-    if (!supabaseUid) {
+    if (!authIdentity || !authIdentity.id) {
       throw ErrorHandler.unauthorizedError(
         'AUTHENTICATION_REQUIRED',
         'User must be logged in to redeem tickets'
       )
     }
 
-    // 兼容旧代码：如果 body 中有 user_id，也支持（但优先使用 supabaseUid）
-    const { user_id: bodyUserId } = body
-    const userId = supabaseUid || bodyUserId
-
-    if (!userId) {
-      throw ErrorHandler.authenticationError(
-        'AUTH_REQUIRED',
-        'User authentication required'
-      )
-    }
+    const authUserId = authIdentity.id // Unified identity: Supabase Auth UID
 
     logger.info('Merchant redemption request', { 
-      supabaseUid,
-      bodyUserId,
-      finalUserId: userId
+      authUserId
     })
 
     // Parse QR payload to get ticket ID
@@ -164,22 +152,21 @@ export async function POST(request) {
     }
 
     // Check if user is a member of this merchant OR is the owner
-    // 优先使用 supabase_uid 查询
+    // 使用 supabase_uid 查询（数据库字段存储 Supabase Auth UID）
     const { data: member, error: memberError } = await supabase
       .from('merchant_members')
       .select('merchant_id, role')
-      .eq('supabase_uid', supabaseUid)
+      .eq('supabase_uid', authUserId)
       .eq('merchant_id', ticketMerchantId)
       .single()
 
-    // 验证所有权：优先使用 owner_supabase_uid，回退到 owner_user_id
-    const isOwner = (merchant.owner_supabase_uid && merchant.owner_supabase_uid === supabaseUid) ||
-                    (merchant.owner_user_id && merchant.owner_user_id === userId)
+    // 验证所有权：优先使用 owner_supabase_uid（数据库字段存储 Supabase Auth UID）
+    const isOwner = merchant.owner_supabase_uid && merchant.owner_supabase_uid === authUserId
     const isMember = !memberError && member && member.merchant_id === ticketMerchantId
 
     if (!isOwner && !isMember) {
       logger.warn('User tried to redeem ticket from different merchant', {
-        userId,
+        authUserId,
         ticketMerchantId,
         ticketId
       })
@@ -212,7 +199,7 @@ export async function POST(request) {
         status: 'used',
         used: true,
         used_at: now.toISOString(),
-        redeemed_by_supabase_uid: supabaseUid,  // 使用 Supabase Auth UID
+        redeemed_by_supabase_uid: authUserId,  // Database field stores Supabase Auth UID
         redeemed_at: now.toISOString(),
         last_verified_at: now.toISOString()
       })
@@ -229,7 +216,7 @@ export async function POST(request) {
       .insert({
         ticket_id: ticketId,
         supabase_uid: ticket.supabase_uid || null,  // 票务所有者的 supabase_uid
-        redeemed_by_supabase_uid: supabaseUid,  // 操作人（商家员工）的 supabase_uid
+        redeemed_by_supabase_uid: authUserId,  // Operator (merchant staff) Supabase Auth UID
         ticket_kind: ticket.ticket_kind,
         redeemed_at: now.toISOString(),
         redeem_source: 'merchant_scan',
@@ -238,7 +225,7 @@ export async function POST(request) {
           method: 'merchant_scan',
           ticket_id: ticketId,
           merchant_id: ticketMerchantId,
-          redeemed_by: supabaseUid
+          auth_user_id: authUserId // Unified identity in metadata
         }
       })
 
@@ -249,12 +236,12 @@ export async function POST(request) {
         ticketId 
       })
     } else {
-      logger.info('Redemption log created', { ticketId, supabaseUid })
+      logger.info('Redemption log created', { ticketId, authUserId })
     }
 
     logger.info('Ticket redeemed successfully', {
       ticketId,
-      redeemedBy: supabaseUid,
+      redeemedBy: authUserId,
       merchantId: ticketMerchantId
     })
 
@@ -265,7 +252,7 @@ export async function POST(request) {
         ticket_id: ticket.short_id || ticket.id,
         status: 'used',
         redeemed_at: now.toISOString(),
-        redeemed_by_supabase_uid: supabaseUid
+        redeemed_by_supabase_uid: authUserId
       }
     })
 

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase-api'
 import { ErrorHandler, handleApiError } from '@/lib/error-handler'
 import { createLogger } from '@/lib/logger'
+import { getServerAuthIdentity } from '@/lib/auth-identity'
 import bcrypt from 'bcryptjs'
 
 const logger = createLogger('merchant-create-api')
@@ -9,9 +10,17 @@ const logger = createLogger('merchant-create-api')
 export async function POST(request) {
   try {
     const body = await request.json()
-    const { businessName, phone, inviteCode, userId, email, password, name, age } = body
+    const { businessName, phone, inviteCode, email, password, name, age } = body
 
-    logger.info('Received merchant registration request', { businessName, inviteCode, userId: userId ? 'provided' : 'missing' })
+    // Try to get authenticated user identity (optional - merchant creation can work without auth)
+    const authIdentity = await getServerAuthIdentity()
+    const authUserId = authIdentity?.id || null
+
+    logger.info('Received merchant registration request', { 
+      businessName, 
+      inviteCode, 
+      hasAuth: !!authUserId 
+    })
 
     // 验证必需字段
     if (!businessName || !inviteCode) {
@@ -90,11 +99,12 @@ export async function POST(request) {
     }
 
     let userRecord = null
-    let finalUserId = userId || null
+    let finalAuthUserId = authUserId || null
 
     // 如果提供了用户信息，尝试创建或查找用户（可选）
     // merchants 表现在可以独立存在，不强制依赖 users 表
-    if (!userId && email && password && name && age) {
+    // 如果已登录，优先使用登录用户的身份
+    if (!finalAuthUserId && email && password && name && age) {
       // 检查邮箱是否已在 users 表中存在
       const { data: existingUser, error: existingUserError } = await supabase
         .from('users')
@@ -111,8 +121,8 @@ export async function POST(request) {
         // 如果用户已存在，使用现有用户（不强制要求是 merchant 角色）
         // 允许普通用户同时拥有商家账户
         userRecord = existingUser
-        finalUserId = existingUser.id
-        logger.info('Using existing user for merchant registration', { userId: finalUserId })
+        finalAuthUserId = existingUser.id
+        logger.info('Using existing user for merchant registration', { userId: finalAuthUserId })
       } else {
         // 用户不存在，创建新用户（可选，用于关联）
         // 验证密码长度
@@ -195,24 +205,8 @@ export async function POST(request) {
           logger.warn('User creation failed, but will continue with merchant creation', { error: userError })
         } else {
           userRecord = newUser
-          finalUserId = newUser.id
+          finalAuthUserId = newUser.id
         }
-      }
-    } else if (userId) {
-      // 如果提供了 userId，查找用户
-      const { data: existingUser, error: userError } = await supabase
-        .from('users')
-        .select('id, role, email, name')
-        .eq('id', userId)
-        .maybeSingle()
-
-      if (userError && userError.code !== 'PGRST116') {
-        throw ErrorHandler.fromSupabaseError(userError, 'USER_CHECK_FAILED')
-      }
-
-      if (existingUser) {
-        userRecord = existingUser
-        finalUserId = userId
       }
     }
 
@@ -237,20 +231,36 @@ export async function POST(request) {
       }
     }
 
-    // 如果提供了 userId，也检查该用户是否已有商家账户
-    if (finalUserId && !existingMerchant) {
-      const { data: merchantByUserId, error: merchantUserIdError } = await supabase
+    // 如果已登录，也检查该用户是否已有商家账户
+    if (finalAuthUserId && !existingMerchant) {
+      // 优先检查 owner_supabase_uid（新字段）
+      const { data: merchantByAuthId, error: merchantAuthIdError } = await supabase
         .from('merchants')
         .select('*')
-        .eq('owner_user_id', finalUserId)
+        .eq('owner_supabase_uid', finalAuthUserId)
         .maybeSingle()
 
-      if (merchantUserIdError && merchantUserIdError.code !== 'PGRST116') {
-        throw ErrorHandler.fromSupabaseError(merchantUserIdError, 'MERCHANT_CHECK_FAILED')
+      if (merchantAuthIdError && merchantAuthIdError.code !== 'PGRST116') {
+        throw ErrorHandler.fromSupabaseError(merchantAuthIdError, 'MERCHANT_CHECK_FAILED')
       }
 
-      if (merchantByUserId) {
-        existingMerchant = merchantByUserId
+      if (merchantByAuthId) {
+        existingMerchant = merchantByAuthId
+      } else {
+        // 回退：检查 owner_user_id（向后兼容）
+        const { data: merchantByUserId, error: merchantUserIdError } = await supabase
+          .from('merchants')
+          .select('*')
+          .eq('owner_user_id', finalAuthUserId)
+          .maybeSingle()
+
+        if (merchantUserIdError && merchantUserIdError.code !== 'PGRST116') {
+          throw ErrorHandler.fromSupabaseError(merchantUserIdError, 'MERCHANT_CHECK_FAILED')
+        }
+
+        if (merchantByUserId) {
+          existingMerchant = merchantByUserId
+        }
       }
     }
 
@@ -262,7 +272,7 @@ export async function POST(request) {
     }
 
     // 创建商家记录
-    // merchants 表现在可以独立存在，owner_user_id 是可选的
+    // merchants 表现在可以独立存在，owner_supabase_uid 是可选的
     const merchantData = {
       name: businessName.trim(),
       contact_email: normalizedEmail || email?.trim().toLowerCase() || null,
@@ -271,9 +281,9 @@ export async function POST(request) {
       status: 'active'
     }
 
-    // 如果有关联的用户，添加 owner_user_id（可选）
-    if (finalUserId) {
-      merchantData.owner_user_id = finalUserId
+    // 如果有关联的用户，添加 owner_supabase_uid（优先）
+    if (finalAuthUserId) {
+      merchantData.owner_supabase_uid = finalAuthUserId
     }
 
     const { data: newMerchant, error: merchantError } = await supabase
@@ -294,8 +304,8 @@ export async function POST(request) {
     }
     
     // 如果有关联的用户，记录 used_by
-    if (finalUserId) {
-      inviteUpdateData.used_by = finalUserId
+    if (finalAuthUserId) {
+      inviteUpdateData.used_by = finalAuthUserId
     }
 
     const { error: updateInviteError } = await supabase
@@ -308,7 +318,7 @@ export async function POST(request) {
       // 非阻塞性错误，商家已创建成功
     }
 
-    logger.success('Merchant created successfully', { merchantId: newMerchant.id, userId: finalUserId || 'none' })
+    logger.success('Merchant created successfully', { merchantId: newMerchant.id, authUserId: finalAuthUserId || 'none' })
 
     // 准备返回数据
     const responseData = {

@@ -122,11 +122,40 @@ export async function POST(request) {
     }
 
     // 查找关联的商家信息
-    const { data: merchant, error: merchantError } = await supabase
+    // 首先尝试通过 Supabase Auth UID 查找（新方式）
+    // 如果 users 表有 supabase_uid 字段，使用它；否则回退到 user.id
+    let merchant = null
+    let merchantError = null
+    
+    // 尝试通过 owner_supabase_uid 查找（优先）
+    const { data: merchantBySupabaseUid, error: merchantError1 } = await supabase
       .from('merchants')
       .select('*')
-      .eq('owner_user_id', user.id)
+      .eq('owner_supabase_uid', user.id)
       .maybeSingle()
+    
+    if (merchantBySupabaseUid) {
+      merchant = merchantBySupabaseUid
+    } else {
+      // 回退：尝试通过 owner_user_id 查找（向后兼容）
+      const { data: merchantByUserId, error: merchantError2 } = await supabase
+        .from('merchants')
+        .select('*')
+        .eq('owner_user_id', user.id)
+        .maybeSingle()
+      
+      if (merchantByUserId) {
+        merchant = merchantByUserId
+        // 如果找到但使用的是旧字段，尝试更新到新字段
+        if (!merchant.owner_supabase_uid) {
+          await supabase
+            .from('merchants')
+            .update({ owner_supabase_uid: user.id })
+            .eq('id', merchant.id)
+        }
+      }
+      merchantError = merchantError2
+    }
 
     if (merchantError && merchantError.code !== 'PGRST116') {
       console.warn('⚠️ 查询商家信息失败:', merchantError)

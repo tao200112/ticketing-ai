@@ -1,17 +1,36 @@
 import { NextResponse } from 'next/server'
-import { getServerUser } from '@/lib/auth-server'
+import { getServerAuthIdentity } from '@/lib/auth-identity'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
 export async function POST(request) {
   try {
+    const authIdentity = await getServerAuthIdentity()
+    if (!authIdentity || !authIdentity.id) {
+      return NextResponse.json({ 
+        success: false,
+        error: 'AUTHENTICATION_REQUIRED',
+        message: 'Authentication required' 
+      }, { status: 401 })
+    }
+
+    // Get full user object from Supabase Auth
+    const { getServerUser } = await import('@/lib/auth-server')
     const user = await getServerUser()
     if (!user) {
-      return NextResponse.json({ ok: false, message: 'Authentication required' }, { status: 401 })
+      return NextResponse.json({ 
+        success: false,
+        error: 'AUTHENTICATION_REQUIRED',
+        message: 'Authentication required' 
+      }, { status: 401 })
     }
 
     const admin = supabaseAdmin
     if (!admin) {
-      return NextResponse.json({ ok: false, message: 'Supabase Service Role not configured' }, { status: 500 })
+      return NextResponse.json({ 
+        success: false,
+        error: 'CONFIGURATION_ERROR',
+        message: 'Supabase Service Role not configured' 
+      }, { status: 500 })
     }
 
     // Check if user already exists in users table
@@ -23,7 +42,11 @@ export async function POST(request) {
 
     if (checkError && checkError.code !== 'PGRST116') {
       console.error('Error checking user:', checkError)
-      return NextResponse.json({ ok: false, message: 'Failed to check user' }, { status: 500 })
+      return NextResponse.json({ 
+        success: false,
+        error: 'DATABASE_ERROR',
+        message: 'Failed to check user' 
+      }, { status: 500 })
     }
 
     // If user exists, return it
@@ -52,10 +75,16 @@ export async function POST(request) {
       if (updateError) {
         console.error('Error updating user:', updateError)
         // Return existing user even if update fails
-        return NextResponse.json({ ok: true, user: existingUser })
+        return NextResponse.json({ 
+          success: true,
+          data: { user: existingUser }
+        })
       }
 
-      return NextResponse.json({ ok: true, user: updatedUser })
+      return NextResponse.json({ 
+        success: true,
+        data: { user: updatedUser }
+      })
     }
 
     // Create new user record
@@ -92,19 +121,34 @@ export async function POST(request) {
           .single()
 
         if (getError) {
-          return NextResponse.json({ ok: false, message: 'Failed to create or retrieve user' }, { status: 500 })
+          return NextResponse.json({ 
+          success: false,
+          error: 'DATABASE_ERROR',
+          message: 'Failed to create or retrieve user' 
+        }, { status: 500 })
         }
 
         return NextResponse.json({ ok: true, user: conflictUser })
       }
 
-      return NextResponse.json({ ok: false, message: 'Failed to create user' }, { status: 500 })
+      return NextResponse.json({ 
+        success: false,
+        error: 'DATABASE_ERROR',
+        message: 'Failed to create user' 
+      }, { status: 500 })
     }
 
-    return NextResponse.json({ ok: true, user: newUser })
+    return NextResponse.json({ 
+      success: true,
+      data: { user: newUser }
+    })
   } catch (error) {
     console.error('users/sync error:', error)
-    return NextResponse.json({ ok: false, message: error.message || 'Internal Server Error' }, { status: 500 })
+    return NextResponse.json({ 
+      success: false,
+      error: 'INTERNAL_ERROR',
+      message: error.message || 'Internal Server Error' 
+    }, { status: 500 })
   }
 }
 

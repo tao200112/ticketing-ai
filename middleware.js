@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server'
 import { generateRequestId } from './lib/logger'
 import { getPortalFromHostname, DOMAINS } from './lib/domain-detector'
+import { createServerClient } from '@supabase/ssr'
 
 /**
  * Middleware - Handle path-based and domain-based routing, redirects, and request ID
+ * Also refreshes Supabase session cookies
  */
-export function middleware(request) {
+export async function middleware(request) {
   const { pathname } = request.nextUrl
 
   // Generate or get request ID
@@ -14,8 +16,44 @@ export function middleware(request) {
   // Detect portal based on pathname (priority) or hostname
   const portal = getPortalFromHostname(request)
   
+  // Create response early for Supabase session refresh
+  let response = NextResponse.next({
+    request: {
+      headers: request.headers,
+    },
+  })
+
+  // Refresh Supabase session in middleware
+  // This ensures cookies are available for API routes
+  try {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+    if (supabaseUrl && supabaseAnonKey) {
+      const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+        cookies: {
+          getAll() {
+            return request.cookies.getAll()
+          },
+          setAll(cookiesToSet) {
+            cookiesToSet.forEach(({ name, value, options }) => {
+              request.cookies.set(name, value)
+              response.cookies.set(name, value, options)
+            })
+          },
+        },
+      })
+
+      // Refresh session - this updates cookies if needed
+      await supabase.auth.getUser()
+    }
+  } catch (error) {
+    // If session refresh fails, continue with request
+    // This is expected for unauthenticated requests
+    console.warn('[middleware] Session refresh failed:', error.message)
+  }
+  
   // Add portal info to headers for API routes
-  const response = NextResponse.next()
   response.headers.set('x-request-id', requestId)
   response.headers.set('x-portal', portal)
   

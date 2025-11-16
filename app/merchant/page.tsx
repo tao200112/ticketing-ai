@@ -31,6 +31,22 @@ export default function MerchantDashboardPage() {
         const res = await fetch('/api/merchant/profile', { credentials: 'include' })
         const data = await res.json()
         if (!res.ok || !data.success) {
+          // 根据状态码进行智能跳转
+          if (res.status === 401 || data.error === 'UNAUTHENTICATED') {
+            // 未登录 → 去商家登录页
+            router.push('/merchant/auth/login?next=/merchant')
+            return
+          }
+          if (res.status === 404 || data.error === 'MERCHANT_NOT_FOUND') {
+            // 已登录但不是商家 → 去商家注册页
+            router.push('/merchant/auth/register?reason=not_found')
+            return
+          }
+          if (res.status === 403 || data.error === 'MERCHANT_INACTIVE') {
+            // 商家未激活 → 引导注册页或提示联系管理员
+            router.push('/merchant/auth/register?reason=inactive')
+            return
+          }
           throw new Error(data.error || data.message || `Failed to load profile (${res.status})`)
         }
         setMerchant(data.merchant)

@@ -1,5 +1,8 @@
-'use client'
-export const dynamic = 'force-dynamic'
+// Moved to app/merchant/(protected)/page.js
+// This file is intentionally left empty to avoid route conflicts.
+export default function MerchantLegacyPlaceholder() {
+  return null
+}
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'

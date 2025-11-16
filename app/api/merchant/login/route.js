@@ -115,6 +115,11 @@ export async function POST(request) {
       name: merchant.name
     })
 
+    logger.info('Generated merchant JWT token', { 
+      merchantId: merchant.id,
+      tokenLength: token.length
+    })
+
     // 创建响应并设置 cookie
     const response = NextResponse.json({
       success: true,
@@ -126,7 +131,13 @@ export async function POST(request) {
       }
     })
 
+    // 设置 cookie
     setMerchantTokenCookie(response, token)
+    
+    logger.info('Set merchant token cookie', {
+      cookieName: 'ptx_merchant_token',
+      cookieSet: true
+    })
 
     logger.success('Merchant logged in successfully', { 
       merchantId: merchant.id, 

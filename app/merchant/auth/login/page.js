@@ -54,6 +54,7 @@ export default function MerchantLoginPage() {
     }
 
     setIsLoading(true)
+    setErrors({}) // 清除之前的错误
 
     try {
       console.log('🔍 开始商家登录请求...', { email: formData.email })
@@ -64,48 +65,37 @@ export default function MerchantLoginPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({ email: formData.email, password: formData.password }),
         credentials: 'include', // 确保发送和接收 cookies
       })
 
       const data = await response.json()
 
-      console.log('🔍 商家登录响应:', { 
+      console.log('商家登录响应:', { 
         status: response.status, 
         ok: response.ok,
-        data,
-        headers: {
-          'set-cookie': response.headers.get('set-cookie')
-        }
+        data
       })
       
-      if (response.ok && data.success) {
-        // Login successful - token is stored in httpOnly cookie automatically
-        console.log('✅ 商家登录成功')
-        console.log('🔍 Cookie 信息 (仅调试):', document.cookie)
-        
-        // 等待一小段时间确保 cookie 已设置
-        await new Promise(resolve => setTimeout(resolve, 100))
-        
-        console.log('🔍 准备跳转到 /merchant')
-        console.log('🔍 跳转前路径:', window.location.pathname)
-        
-        // Navigate to merchant dashboard
-        router.push('/merchant')
-        
-        // 强制刷新以确保 middleware 看到新的 cookie
-        // 如果 router.push 没有立即生效，使用 window.location 作为后备
-        setTimeout(() => {
-          if (window.location.pathname === '/merchant/auth/login') {
-            console.warn('⚠️ router.push 未生效，使用 window.location 重定向')
-            window.location.href = '/merchant'
-          }
-        }, 500)
-      } else {
+      if (!response.ok || !data.success) {
         console.error('❌ 商家登录失败:', data)
-        setErrors({ general: data.error || data.message || 'Login failed' })
+        setErrors({ general: data.error || data.message || '登录失败' })
         setIsLoading(false)
+        return
       }
+
+      // Login successful - token is stored in httpOnly cookie automatically
+      console.log('✅ 商家登录成功')
+      
+      // 调试：检查 cookie（httpOnly cookie 不会出现在 document.cookie 中，这是正常的）
+      console.log('document.cookie after login:', document.cookie)
+      console.log('注意: httpOnly cookie 不会出现在 document.cookie 中，这是正常的安全行为')
+      
+      // 使用 window.location.href 进行完整页面导航，确保 middleware 能看到新的 cookie
+      // 这比 router.push 更可靠，因为它会触发完整的页面加载和 middleware 检查
+      console.log('🔍 准备跳转到 /merchant')
+      window.location.href = '/merchant'
+      
     } catch (error) {
       console.error('❌ Login error:', error)
       setErrors({ general: 'Network error, please try again' })

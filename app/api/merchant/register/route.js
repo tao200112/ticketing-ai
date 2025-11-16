@@ -247,44 +247,89 @@ export async function POST(request) {
     // 5. 标记邀请码为已使用
     if (inviteTableName === 'invite_codes') {
       // 新表：使用 used 和 used_at 字段
-      const { error: updateInviteError } = await supabase
-        .from('invite_codes')
-        .update({
-          used: true,
-          used_at: new Date().toISOString()
-        })
-        .eq('id', inviteCodeData.id)
-
-      if (updateInviteError) {
-        logger.warn('Failed to update invite code', { error: updateInviteError })
-        // 非阻塞性错误，商家已创建成功
+      const updatePayload = {
+        used: true,
+        used_at: new Date().toISOString()
       }
-    } else {
-      // 旧表：使用 used_by 和 is_active 字段
-      // 注意：used_by 是 UUID 引用 users(id)，但商家不在 users 表中
-      // 所以设置为 NULL，只更新 is_active 和 used_at
-      const { error: updateInviteError } = await supabase
-        .from('admin_invite_codes')
-        .update({
-          used_by: null, // 商家不在 users 表中，所以设为 NULL
-          used_at: new Date().toISOString(),
-          is_active: false
-        })
+      
+      logger.info('Updating invite code (new table) with payload', { 
+        inviteCodeId: inviteCodeData.id,
+        payload: updatePayload
+      })
+      
+      const { data: updatedInvite, error: updateInviteError } = await supabase
+        .from('invite_codes')
+        .update(updatePayload)
         .eq('id', inviteCodeData.id)
+        .select()
+        .maybeSingle()
 
       if (updateInviteError) {
-        logger.error('Failed to update invite code', { 
+        logger.warn('Failed to update invite code (new table)', { 
           error: updateInviteError,
           errorCode: updateInviteError.code,
           errorMessage: updateInviteError.message,
           errorDetails: updateInviteError.details,
+          errorHint: updateInviteError.hint,
+          payload: updatePayload,
           inviteCodeId: inviteCodeData.id
         })
-        // 非阻塞性错误，商家已创建成功，但记录详细错误
+        // 非阻塞性错误，商家已创建成功
       } else {
-        logger.info('Successfully updated invite code', { 
+        logger.info('Successfully updated invite code (new table)', { 
+          inviteCodeId: inviteCodeData.id,
+          code: normalizedInviteCode,
+          updatedData: updatedInvite
+        })
+      }
+    } else {
+      // 旧表 admin_invite_codes：根据实际表结构更新
+      // 表结构：id, code, max_events, is_active, used_by (UUID), used_at, expires_at, created_at, created_by
+      // 注意：used_by 是 UUID 引用 users(id)，但商家不在 users 表中
+      // 只更新 is_active 和 used_at，不更新 used_by（保持原值或 NULL）
+      const updatePayload = {
+        is_active: false,
+        used_at: new Date().toISOString()
+        // 不更新 used_by，因为它是外键引用 users(id)，商家不在 users 表中
+      }
+      
+      logger.info('Updating invite code (admin_invite_codes) with payload', { 
+        inviteCodeId: inviteCodeData.id,
+        code: normalizedInviteCode,
+        payload: updatePayload,
+        currentInviteCodeData: {
+          id: inviteCodeData.id,
+          code: inviteCodeData.code,
+          is_active: inviteCodeData.is_active,
+          used_by: inviteCodeData.used_by,
+          used_at: inviteCodeData.used_at
+        }
+      })
+      
+      const { data: updatedInvite, error: updateInviteError } = await supabase
+        .from('admin_invite_codes')
+        .update(updatePayload)
+        .eq('id', inviteCodeData.id)
+        .select()
+        .maybeSingle()
+
+      if (updateInviteError) {
+        logger.warn('Invite code update failed after merchant created', { 
+          error: updateInviteError,
+          errorCode: updateInviteError.code,
+          errorMessage: updateInviteError.message,
+          errorDetails: updateInviteError.details,
+          errorHint: updateInviteError.hint,
+          payload: updatePayload,
           inviteCodeId: inviteCodeData.id,
           code: normalizedInviteCode
+        })
+        // 非阻塞性错误，商家已创建成功，只记录警告
+      } else {
+        logger.info('Successfully updated invite code (admin_invite_codes)', { 
+          inviteCodeId: inviteCodeData.id,
+          code: normalizedInviteCode,
+          updatedData: updatedInvite
         })
       }
     }

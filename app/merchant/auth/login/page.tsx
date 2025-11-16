@@ -6,100 +6,41 @@ import Link from 'next/link'
 
 export default function MerchantLoginPage() {
   const router = useRouter()
-  const [formData, setFormData] = useState({
-    email: '',
-    password: ''
-  })
-  const [errors, setErrors] = useState({})
-  const [isLoading, setIsLoading] = useState(false)
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
 
-  const handleChange = (e) => {
-    const { name, value } = e.target
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }))
-    
-    // Clear error for corresponding field
-    if (errors[name]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }))
-    }
-  }
-
-  const validateForm = () => {
-    const newErrors = {}
-
-    if (!formData.email) {
-      newErrors.email = 'Please enter email address'
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Please enter a valid email address'
-    }
-
-    if (!formData.password) {
-      newErrors.password = 'Please enter password'
-    }
-
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
-  }
-
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    
-    if (!validateForm()) {
-      return
-    }
-
-    setIsLoading(true)
-    setErrors({}) // 清除之前的错误
+    setError(null)
+    setLoading(true)
 
     try {
-      console.log('🔍 开始商家登录请求...', { email: formData.email })
-      console.log('🔍 当前路径:', window.location.pathname)
-
-      const response = await fetch('/api/merchant/login', {
+      const res = await fetch('/api/merchant/login', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email: formData.email, password: formData.password }),
-        credentials: 'include', // 确保发送和接收 cookies
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+        credentials: 'include',
       })
 
-      const data = await response.json()
+      const data = await res.json()
+      console.log('商家登录响应:', { status: res.status, data })
 
-      console.log('商家登录响应:', { 
-        status: response.status, 
-        ok: response.ok,
-        data
-      })
-      
-      if (!response.ok || !data.success) {
-        console.error('❌ 商家登录失败:', data)
-        setErrors({ general: data.error || data.message || '登录失败' })
-        setIsLoading(false)
+      if (!res.ok || !data.success) {
+        setError(data.error || data.message || '登录失败')
+        setLoading(false)
         return
       }
 
-      // Login successful - token is stored in httpOnly cookie automatically
-      console.log('✅ 商家登录成功')
-      
-      // 调试：检查 cookie（httpOnly cookie 不会出现在 document.cookie 中，这是正常的）
-      console.log('document.cookie after login:', document.cookie)
-      console.log('注意: httpOnly cookie 不会出现在 document.cookie 中，这是正常的安全行为')
-      
-      // 使用 window.location.href 进行完整页面导航，确保 middleware 能看到新的 cookie
-      // 这比 router.push 更可靠，因为它会触发完整的页面加载和 middleware 检查
-      console.log('🔍 准备跳转到 /merchant')
-      window.location.href = '/merchant'
-      
+      // Login successful
+      console.log('✅ 商家登录成功，跳转到商家页面')
+      router.push('/merchant')
+      // Note: setLoading(false) is not needed here as we're navigating away
     } catch (error) {
       console.error('❌ Login error:', error)
-      setErrors({ general: 'Network error, please try again' })
-      setIsLoading(false)
+      setError('Network error, please try again')
+      setLoading(false)
     }
   }
 
@@ -165,35 +106,31 @@ export default function MerchantLoginPage() {
             </label>
             <input
               type="email"
-              name="email"
-              value={formData.email}
-              onChange={handleChange}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               placeholder="Enter your email address"
+              required
               style={{
                 width: '100%',
                 padding: '0.75rem 1rem',
                 backgroundColor: 'rgba(55, 65, 81, 0.5)',
-                border: errors.email ? '1px solid #ef4444' : '1px solid rgba(255, 255, 255, 0.1)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
                 borderRadius: '0.5rem',
                 color: 'white',
                 fontSize: '1rem',
                 outline: 'none',
-                transition: 'all 0.3s'
+                transition: 'all 0.3s',
+                boxSizing: 'border-box'
               }}
               onFocus={(e) => {
                 e.target.style.borderColor = '#7c3aed'
                 e.target.style.boxShadow = '0 0 0 3px rgba(124, 58, 237, 0.1)'
               }}
               onBlur={(e) => {
-                e.target.style.borderColor = errors.email ? '#ef4444' : 'rgba(255, 255, 255, 0.1)'
+                e.target.style.borderColor = 'rgba(255, 255, 255, 0.1)'
                 e.target.style.boxShadow = 'none'
               }}
             />
-            {errors.email && (
-              <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>
-                {errors.email}
-              </p>
-            )}
           </div>
 
           {/* Password */}
@@ -209,39 +146,35 @@ export default function MerchantLoginPage() {
             </label>
             <input
               type="password"
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter your password"
+              required
               style={{
                 width: '100%',
                 padding: '0.75rem 1rem',
                 backgroundColor: 'rgba(55, 65, 81, 0.5)',
-                border: errors.password ? '1px solid #ef4444' : '1px solid rgba(255, 255, 255, 0.1)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
                 borderRadius: '0.5rem',
                 color: 'white',
                 fontSize: '1rem',
                 outline: 'none',
-                transition: 'all 0.3s'
+                transition: 'all 0.3s',
+                boxSizing: 'border-box'
               }}
               onFocus={(e) => {
                 e.target.style.borderColor = '#7c3aed'
                 e.target.style.boxShadow = '0 0 0 3px rgba(124, 58, 237, 0.1)'
               }}
               onBlur={(e) => {
-                e.target.style.borderColor = errors.password ? '#ef4444' : 'rgba(255, 255, 255, 0.1)'
+                e.target.style.borderColor = 'rgba(255, 255, 255, 0.1)'
                 e.target.style.boxShadow = 'none'
               }}
             />
-            {errors.password && (
-              <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>
-                {errors.password}
-              </p>
-            )}
           </div>
 
           {/* Error Message */}
-          {errors.general && (
+          {error && (
             <div style={{
               backgroundColor: 'rgba(239, 68, 68, 0.1)',
               border: '1px solid #ef4444',
@@ -250,18 +183,18 @@ export default function MerchantLoginPage() {
               color: '#fca5a5',
               fontSize: '0.875rem'
             }}>
-              {errors.general}
+              {error}
             </div>
           )}
 
           {/* Login Button */}
           <button
             type="submit"
-            disabled={isLoading}
+            disabled={loading}
             style={{
               width: '100%',
               padding: '0.75rem 1rem',
-              background: isLoading 
+              background: loading 
                 ? 'rgba(55, 65, 81, 0.5)' 
                 : 'linear-gradient(135deg, #7C3AED 0%, #22D3EE 100%)',
               color: 'white',
@@ -269,7 +202,7 @@ export default function MerchantLoginPage() {
               borderRadius: '0.5rem',
               fontSize: '1rem',
               fontWeight: '600',
-              cursor: isLoading ? 'not-allowed' : 'pointer',
+              cursor: loading ? 'not-allowed' : 'pointer',
               transition: 'all 0.3s',
               display: 'flex',
               alignItems: 'center',
@@ -277,19 +210,19 @@ export default function MerchantLoginPage() {
               gap: '0.5rem'
             }}
             onMouseEnter={(e) => {
-              if (!isLoading) {
-                e.target.style.transform = 'scale(1.02)'
-                e.target.style.boxShadow = '0 10px 25px rgba(124, 58, 237, 0.3)'
+              if (!loading) {
+                e.currentTarget.style.transform = 'scale(1.02)'
+                e.currentTarget.style.boxShadow = '0 10px 25px rgba(124, 58, 237, 0.3)'
               }
             }}
             onMouseLeave={(e) => {
-              if (!isLoading) {
-                e.target.style.transform = 'scale(1)'
-                e.target.style.boxShadow = 'none'
+              if (!loading) {
+                e.currentTarget.style.transform = 'scale(1)'
+                e.currentTarget.style.boxShadow = 'none'
               }
             }}
           >
-            {isLoading ? (
+            {loading ? (
               <>
                 <div style={{
                   width: '1rem',
@@ -321,8 +254,8 @@ export default function MerchantLoginPage() {
               fontWeight: '500',
               transition: 'color 0.3s'
             }}
-            onMouseEnter={(e) => e.target.style.color = '#06b6d4'}
-            onMouseLeave={(e) => e.target.style.color = '#22D3EE'}
+            onMouseEnter={(e) => e.currentTarget.style.color = '#06b6d4'}
+            onMouseLeave={(e) => e.currentTarget.style.color = '#22D3EE'}
           >
             Register Merchant Account Now
           </Link>
@@ -338,13 +271,21 @@ export default function MerchantLoginPage() {
               fontSize: '0.75rem',
               transition: 'color 0.3s'
             }}
-            onMouseEnter={(e) => e.target.style.color = '#9ca3af'}
-            onMouseLeave={(e) => e.target.style.color = '#6b7280'}
+            onMouseEnter={(e) => e.currentTarget.style.color = '#9ca3af'}
+            onMouseLeave={(e) => e.currentTarget.style.color = '#6b7280'}
           >
             ← Back to Home
           </Link>
         </div>
       </div>
+
+      {/* CSS for spinner animation */}
+      <style jsx>{`
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   )
 }

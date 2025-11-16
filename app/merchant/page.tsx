@@ -2,14 +2,13 @@
 
 /**
  * 商家受保护的 Dashboard 页面（/merchant）
- * 由上层 /merchant/(protected)/layout.tsx 做服务端鉴权
+ * 注意：为确保部署稳定性，暂时直接在 /merchant 下渲染客户端页面逻辑
  */
 
 export const dynamic = 'force-dynamic'
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import MerchantNavbar from '@/components/MerchantNavbar'
 
 type MerchantProfile = {
@@ -110,6 +109,4 @@ export default function MerchantDashboardPage() {
     </div>
   )
 }
-
-
 

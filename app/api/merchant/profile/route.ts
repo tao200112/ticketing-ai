@@ -69,5 +69,4 @@ export async function GET() {
     return NextResponse.json(handled.response, { status: handled.statusCode })
   }
 }
-*** End Patch*** }]]:
 

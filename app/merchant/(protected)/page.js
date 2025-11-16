@@ -5,6 +5,8 @@
  * 由上层 /merchant/(protected)/layout.tsx 做服务端鉴权
  */
 
+export const dynamic = 'force-dynamic'
+
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'

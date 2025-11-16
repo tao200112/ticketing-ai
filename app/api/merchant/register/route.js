@@ -291,7 +291,9 @@ export async function POST(request) {
       const { data: updatedInvite, error: updateInviteError } = await admin
         .from('invite_codes')
         .update(updatePayload)
-        .eq('id', inviteCodeData.id)
+        -- 按 code 精确更新，确保与当前查到的 code 一致
+        .eq('code', normalizedInviteCode)
+        .eq('used', false)
         .select()
         .maybeSingle()
 
@@ -340,7 +342,9 @@ export async function POST(request) {
       const { data: updatedInvite, error: updateInviteError } = await admin
         .from('admin_invite_codes')
         .update(updatePayload)
-        .eq('id', inviteCodeData.id)
+        -- 旧表根据 code 更新（该表 code 为唯一约束）
+        .eq('code', normalizedInviteCode)
+        .eq('is_active', true)
         .select()
         .maybeSingle()
 

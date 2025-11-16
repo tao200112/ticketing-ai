@@ -5,6 +5,8 @@
  * 基于 Supabase 会话 + merchants.email 判断是否为商家，非商家跳转到注册页
  */
 
+export const dynamic = 'force-dynamic'
+
 import { redirect } from 'next/navigation'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 

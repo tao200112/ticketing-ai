@@ -186,7 +186,7 @@ export async function POST(request) {
     // 创建 Supabase 客户端
     const supabase = createSupabaseClient()
 
-    // 获取请求体
+    // 验证商家身份（如果提供了merchant_id）
     const body = await request.json()
     const {
       title,
@@ -199,6 +199,49 @@ export async function POST(request) {
       prices,
       status = 'published'
     } = body
+
+    // 如果提供了merchant_id，验证当前用户是否有权限为该商家创建活动
+    if (merchant_id) {
+      try {
+        const { getSupabaseUser } = await import('@/lib/supabase/server')
+        const user = await getSupabaseUser()
+        
+        if (user) {
+          // 检查用户是否是该商家的所有者
+          const { data: merchant, error: merchantError } = await supabase
+            .from('merchants')
+            .select('id, owner_supabase_uid, email')
+            .eq('id', merchant_id)
+            .maybeSingle()
+          
+          if (merchantError) {
+            logger.warn('Error checking merchant ownership', { error: merchantError, merchant_id })
+          } else if (merchant) {
+            // 验证所有权：通过 owner_supabase_uid 或 email
+            const isOwner = merchant.owner_supabase_uid === user.id || 
+                           merchant.email?.toLowerCase() === user.email?.toLowerCase()
+            
+            if (!isOwner) {
+              throw ErrorHandler.authenticationError(
+                'UNAUTHORIZED',
+                'You do not have permission to create events for this merchant'
+              )
+            }
+            
+            logger.info('Merchant ownership verified', { 
+              merchant_id, 
+              userId: user.id 
+            })
+          }
+        }
+      } catch (authError) {
+        // 如果认证检查失败，记录但不阻止（允许管理员创建活动）
+        logger.warn('Merchant authentication check failed', { 
+          error: authError.message,
+          merchant_id 
+        })
+      }
+    }
 
     // 验证必需字段
     if (!title || !description || !startTime || !endTime || !location) {

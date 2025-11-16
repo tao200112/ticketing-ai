@@ -14,21 +14,40 @@ export default function EditEventPage() {
   const [merchantUser, setMerchantUser] = useState(null)
 
   useEffect(() => {
-    // 检查商家登录状态
-    const checkMerchantAuth = () => {
-      const token = localStorage.getItem('merchantToken')
-      const user = localStorage.getItem('merchantUser')
-      
-      if (!token || !user) {
-        router.push('/merchant/auth/login')
-        return
+    // 检查商家登录状态 - 使用 Supabase Auth
+    const checkMerchantAuth = async () => {
+      try {
+        // 检查 Supabase Auth 会话
+        const response = await fetch('/api/merchant/profile', {
+          credentials: 'include'
+        })
+        
+        if (!response.ok) {
+          // 未登录或不是商家，跳转到登录页
+          router.push(`/merchant/auth/login?next=/merchant/events/edit/${params.id}`)
+          return
+        }
+        
+        const data = await response.json()
+        if (data.success && data.merchant) {
+          // 设置商家信息
+          const merchantData = {
+            id: data.merchant.id,
+            email: data.merchant.email,
+            name: data.merchant.name,
+            merchant_id: data.merchant.id
+          }
+          setMerchantUser(merchantData)
+          
+          // 从API加载事件数据
+          loadEventData(params.id, merchantData)
+        } else {
+          router.push(`/merchant/auth/login?next=/merchant/events/edit/${params.id}`)
+        }
+      } catch (err) {
+        console.error('Error checking merchant auth:', err)
+        router.push(`/merchant/auth/login?next=/merchant/events/edit/${params.id}`)
       }
-      
-      const userData = JSON.parse(user)
-      setMerchantUser(userData)
-      
-      // 从API加载事件数据
-      loadEventData(params.id, userData)
     }
     
     checkMerchantAuth()
@@ -52,7 +71,7 @@ export default function EditEventPage() {
       const event = result.data
       
       // 检查权限：只能编辑自己的事件
-      const merchantId = user.merchant_id || user.merchant?.id
+      const merchantId = user.merchant_id || user.id
       if (merchantId && event.merchant_id !== merchantId) {
         setError('You do not have permission to edit this event')
         setLoading(false)

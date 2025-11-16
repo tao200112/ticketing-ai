@@ -45,11 +45,12 @@ export default function NewEventWizardPage() {
         
         const data = await response.json()
         if (data.success && data.merchant) {
-          // 设置商家信息
+          // 设置商家信息（包含merchant_id用于创建活动）
           setMerchantUser({
             id: data.merchant.id,
             email: data.merchant.email,
-            name: data.merchant.name
+            name: data.merchant.name,
+            merchant_id: data.merchant.id
           })
         } else {
           router.push('/merchant/auth/login?next=/merchant/events/new')
@@ -156,8 +157,8 @@ export default function NewEventWizardPage() {
         return
       }
 
-      // 获取 merchant_id，支持多种可能的字段名
-      const merchantId = merchantUser.merchant_id || merchantUser.merchant?.id || null
+      // 获取 merchant_id
+      const merchantId = merchantUser.merchant_id || merchantUser.id || null
       
       if (!merchantId) {
         setError('Merchant ID is required. Please ensure you are logged in as a merchant.')

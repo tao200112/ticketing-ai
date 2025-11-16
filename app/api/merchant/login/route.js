@@ -47,6 +47,12 @@ export async function POST(request) {
 
     const normalizedEmail = email.trim().toLowerCase()
 
+    // 记录登录尝试
+    logger.info('Merchant login attempt', {
+      email: normalizedEmail,
+      timestamp: new Date().toISOString()
+    })
+
     const { data, error } = await supabase.auth.signInWithPassword({
       email: normalizedEmail,
       password,
@@ -63,10 +69,56 @@ export async function POST(request) {
       })
       
       // 提供更详细的错误信息
+      // 注意：商家账号不应该遇到邮箱未验证的错误，因为注册时已自动确认
       if (error.message?.includes('Email not confirmed') || error.message?.includes('email_not_confirmed')) {
+        logger.error('Merchant login failed due to unconfirmed email - this should not happen', {
+          email: normalizedEmail,
+          error: error.message
+        })
+        // 对于商家账号，如果遇到邮箱未验证错误，尝试自动确认
+        // 这可能是注册时自动确认失败的情况
+        try {
+          const { createClient } = await import('@supabase/supabase-js')
+          const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+          if (supabaseServiceKey) {
+            const admin = createClient(
+              process.env.NEXT_PUBLIC_SUPABASE_URL,
+              supabaseServiceKey,
+              { auth: { autoRefreshToken: false, persistSession: false } }
+            )
+            // 查找用户并确认邮箱
+            const { data: { users } } = await admin.auth.admin.listUsers()
+            const user = users.find(u => u.email?.toLowerCase() === normalizedEmail)
+            if (user) {
+              await admin.auth.admin.updateUserById(user.id, { email_confirm: true })
+              logger.info('Auto-confirmed merchant email during login retry', { email: normalizedEmail })
+              // 重试登录
+              const { data: retryData, error: retryError } = await supabase.auth.signInWithPassword({
+                email: normalizedEmail,
+                password,
+              })
+              if (!retryError && retryData?.user) {
+                logger.info('Merchant login successful after auto-confirm', {
+                  userId: retryData.user.id,
+                  email: retryData.user.email,
+                })
+                return NextResponse.json({
+                  success: true,
+                  message: '登录成功',
+                })
+              }
+            }
+          }
+        } catch (autoConfirmError) {
+          logger.error('Failed to auto-confirm email during login', {
+            email: normalizedEmail,
+            error: autoConfirmError.message
+          })
+        }
+        
         throw ErrorHandler.authenticationError(
           'EMAIL_NOT_CONFIRMED', 
-          '请先验证您的邮箱。请检查您的邮箱收件箱并点击验证链接。'
+          '商家账号邮箱未确认。请联系管理员或使用调试工具确认邮箱。'
         )
       }
       

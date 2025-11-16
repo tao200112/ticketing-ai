@@ -75,7 +75,7 @@ export default function MerchantBossPage() {
       setLoading(true)
       
       const currentMerchant = merchantUser || {}
-      const merchantId = currentMerchant.merchant_id || currentMerchant.merchant?.id
+      const merchantId = currentMerchant.merchant_id || currentMerchant.merchant?.id || currentMerchant.id
       
       const ordersResponse = await fetch('/api/admin/tickets')
       const ordersData = await ordersResponse.json()

@@ -13,17 +13,36 @@ export default function MerchantPurchasesPage() {
   const [searchTerm, setSearchTerm] = useState('')
 
   useEffect(() => {
-    // 检查商家登录状态
-    const checkMerchantAuth = () => {
-      const token = localStorage.getItem('merchantToken')
-      const user = localStorage.getItem('merchantUser')
-      
-      if (!token || !user) {
-        router.push('/merchant/auth/login')
-        return
+    // 检查商家登录状态 - 使用 Supabase Auth
+    const checkMerchantAuth = async () => {
+      try {
+        // 检查 Supabase Auth 会话
+        const response = await fetch('/api/merchant/profile', {
+          credentials: 'include'
+        })
+        
+        if (!response.ok) {
+          // 未登录或不是商家，跳转到登录页
+          router.push('/merchant/auth/login?next=/merchant/purchases')
+          return
+        }
+        
+        const data = await response.json()
+        if (data.success && data.merchant) {
+          // 设置商家信息
+          setMerchantUser({
+            id: data.merchant.id,
+            email: data.merchant.email,
+            name: data.merchant.name,
+            merchant_id: data.merchant.id
+          })
+        } else {
+          router.push('/merchant/auth/login?next=/merchant/purchases')
+        }
+      } catch (err) {
+        console.error('Error checking merchant auth:', err)
+        router.push('/merchant/auth/login?next=/merchant/purchases')
       }
-      
-      setMerchantUser(JSON.parse(user))
     }
     
     checkMerchantAuth()
@@ -59,7 +78,8 @@ export default function MerchantPurchasesPage() {
         const eventsResponse = await fetch('/api/events')
         const eventsResult = await eventsResponse.json()
         const allEvents = eventsResult.success ? eventsResult.data : []
-        const merchantEvents = allEvents.filter(event => event.merchant_id === merchantUser.merchant_id)
+        const merchantId = merchantUser.merchant_id || merchantUser.id
+        const merchantEvents = allEvents.filter(event => event.merchant_id === merchantId)
         const merchantEventIds = merchantEvents.map(event => event.id)
         
         console.log('🔍 Purchase Records - 商家活动ID:', merchantEventIds)
@@ -72,6 +92,14 @@ export default function MerchantPurchasesPage() {
         console.log('🔍 Purchase Records - 商家票据:', merchantTickets)
         
         // 转换为购买记录格式
+        // 首先按订单分组，计算每个订单的票数，以便平均分配金额
+        const orderTicketCounts = {}
+        merchantTickets.forEach(ticket => {
+          if (ticket.order_id) {
+            orderTicketCounts[ticket.order_id] = (orderTicketCounts[ticket.order_id] || 0) + 1
+          }
+        })
+        
         const purchases = merchantTickets.map(ticket => {
           // 查找对应的活动信息
           const event = merchantEvents.find(e => e.id === ticket.event_id)
@@ -79,17 +107,23 @@ export default function MerchantPurchasesPage() {
           
           // 查找对应的订单信息
           const order = orders.find(o => o.id === ticket.order_id)
-          const amount = order?.total_amount_cents || 0
           const customerEmail = ticket.holder_email || order?.customer_email || ''
           const purchaseDate = order?.created_at || ticket.created_at || new Date().toISOString()
+          
+          // 计算单张票的金额：如果订单有多张票，平均分配
+          let ticketAmount = 0
+          if (order && order.total_amount_cents) {
+            const ticketCount = orderTicketCounts[ticket.order_id] || 1
+            ticketAmount = Math.round(order.total_amount_cents / ticketCount)
+          }
           
           return {
             id: ticket.id,
             eventName: eventName,
             ticketType: ticket.tier || 'General',
             quantity: 1,
-            amount: amount,
-            totalAmount: amount,
+            amount: ticketAmount,
+            totalAmount: ticketAmount,
             customerName: customerEmail.split('@')[0],
             customerEmail: customerEmail,
             purchaseDate: purchaseDate,
@@ -112,9 +146,16 @@ export default function MerchantPurchasesPage() {
     }
   }
 
-  const handleLogout = () => {
-    localStorage.removeItem('merchantToken')
-    localStorage.removeItem('merchantUser')
+  const handleLogout = async () => {
+    try {
+      // 调用登出API
+      await fetch('/api/merchant/logout', {
+        method: 'POST',
+        credentials: 'include'
+      })
+    } catch (err) {
+      console.error('Logout error:', err)
+    }
     router.push('/merchant/auth/login')
   }
 

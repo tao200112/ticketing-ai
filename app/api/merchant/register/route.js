@@ -197,15 +197,16 @@ export async function POST(request) {
     }
 
     // 2. 使用 Supabase Auth 创建用户账户
-    // 注意：如果 Supabase 配置要求邮箱验证，注册后可能无法立即登录
-    // 这里禁用邮箱验证要求，允许商家注册后立即登录
+    // 商家账号不需要邮箱验证，注册后立即确认邮箱以允许立即登录
     const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
       email: normalizedEmail,
       password,
       options: {
-        emailRedirectTo: undefined, // 不设置重定向，允许立即登录
+        // 不设置 emailRedirectTo，避免发送验证邮件
+        emailRedirectTo: undefined,
         data: {
           role: 'merchant', // 在用户元数据中标记为商家
+          skip_email_verification: true // 标记为跳过邮箱验证
         }
       }
     })
@@ -237,7 +238,58 @@ export async function POST(request) {
       userId: signUpData.user.id,
       email: signUpData.user.email,
       emailConfirmed: signUpData.user.email_confirmed_at !== null,
+      emailConfirmedAt: signUpData.user.email_confirmed_at,
+      confirmedAt: signUpData.user.confirmed_at,
     })
+
+    // 商家账号不需要邮箱验证，立即使用 Service Role 确认邮箱
+    // 这样注册后可以立即登录，无需等待邮箱验证
+    logger.info('Merchant account - auto-confirming email (no verification required)', {
+      userId: signUpData.user.id,
+      email: normalizedEmail
+    })
+    
+    try {
+      const admin = createServiceRoleClient()
+      // 使用 admin API 立即确认邮箱
+      // 商家账号不需要邮箱验证，直接确认
+      const { data: updateData, error: updateError } = await admin.auth.admin.updateUserById(
+        signUpData.user.id,
+        {
+          email_confirm: true, // 确认邮箱，设置 email_confirmed_at
+          user_metadata: {
+            ...signUpData.user.user_metadata,
+            role: 'merchant',
+            skip_email_verification: true,
+            email_confirmed: true
+          }
+        }
+      )
+      
+      if (updateError) {
+        logger.error('Failed to auto-confirm merchant email - this will prevent login', {
+          userId: signUpData.user.id,
+          error: updateError.message,
+          errorCode: updateError.status
+        })
+        // 这是一个严重错误，但继续注册流程，让管理员可以手动修复
+      } else {
+        logger.info('Successfully auto-confirmed merchant email', {
+          userId: signUpData.user.id,
+          email: normalizedEmail,
+          emailConfirmedAt: updateData?.user?.email_confirmed_at,
+          confirmedAt: updateData?.user?.confirmed_at
+        })
+      }
+    } catch (confirmError) {
+      logger.error('Critical error during auto-confirm merchant email', {
+        userId: signUpData.user.id,
+        error: confirmError.message,
+        errorStack: confirmError.stack
+      })
+      // 这是一个严重错误，记录但不阻止注册流程
+      // 管理员可以使用调试工具手动确认邮箱
+    }
 
     // 3. 使用 Service Role 操作业务表，避免 RLS 阻断
     const admin = createServiceRoleClient()

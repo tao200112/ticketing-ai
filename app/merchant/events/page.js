@@ -13,17 +13,36 @@ export default function MerchantEventsPage() {
   const [merchantUser, setMerchantUser] = useState(null)
 
   useEffect(() => {
-    // 检查商家登录状态
-    const checkMerchantAuth = () => {
-      const token = localStorage.getItem('merchantToken')
-      const user = localStorage.getItem('merchantUser')
-      
-      if (!token || !user) {
-        router.push('/merchant/auth/login')
-        return
+    // 检查商家登录状态 - 使用 Supabase Auth
+    const checkMerchantAuth = async () => {
+      try {
+        // 检查 Supabase Auth 会话
+        const response = await fetch('/api/merchant/profile', {
+          credentials: 'include'
+        })
+        
+        if (!response.ok) {
+          // 未登录或不是商家，跳转到登录页
+          router.push('/merchant/auth/login?next=/merchant/events')
+          return
+        }
+        
+        const data = await response.json()
+        if (data.success && data.merchant) {
+          // 设置商家信息
+          setMerchantUser({
+            id: data.merchant.id,
+            email: data.merchant.email,
+            name: data.merchant.name,
+            merchant_id: data.merchant.id
+          })
+        } else {
+          router.push('/merchant/auth/login?next=/merchant/events')
+        }
+      } catch (err) {
+        console.error('Error checking merchant auth:', err)
+        router.push('/merchant/auth/login?next=/merchant/events')
       }
-      
-      setMerchantUser(JSON.parse(user))
     }
     
     checkMerchantAuth()
@@ -50,9 +69,9 @@ export default function MerchantEventsPage() {
 
       if (result.success && result.data) {
         // 过滤出当前商家的活动
-        const merchantId = merchantUser.merchant_id || merchantUser.merchant?.id
+        const merchantId = merchantUser.merchant_id || merchantUser.id
         console.log('🔍 商家 ID:', merchantId)
-        console.log('🔍 商家用户数据:', { id: merchantUser.id, merchant_id: merchantUser.merchant_id, merchant: merchantUser.merchant })
+        console.log('🔍 商家用户数据:', { id: merchantUser.id, merchant_id: merchantUser.merchant_id })
         console.log('🔍 所有活动数量:', result.data.length)
         
         let merchantEvents = []

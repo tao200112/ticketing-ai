@@ -1,42 +1,16 @@
 /**
- * 商家注册 API
+ * 商家注册 API（基于 Supabase Auth）
  * 
- * 完全独立于 Supabase Auth 的商家注册系统
- * 使用 bcrypt 加密密码，JWT token 用于会话管理
+ * 使用 Supabase Auth 创建用户账户，然后在 merchants 表中插入记录
  */
 
 import { NextResponse } from 'next/server'
-import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase-api'
 import { ErrorHandler, handleApiError } from '@/lib/error-handler'
 import { createLogger } from '@/lib/logger'
-import bcrypt from 'bcryptjs'
-import { generateMerchantToken, setMerchantTokenCookie } from '@/lib/auth/merchant-jwt'
-import { createClient } from '@supabase/supabase-js'
+import { cookies } from 'next/headers'
+import { createServerClient } from '@supabase/ssr'
 
 const logger = createLogger('merchant-register-api')
-
-/**
- * 创建使用 Service Role Key 的 Supabase 客户端
- * 绕过 RLS 策略，用于商家注册等操作
- */
-function createServiceRoleClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-  if (!supabaseUrl || !supabaseServiceKey) {
-    throw ErrorHandler.configurationError(
-      'CONFIG_ERROR',
-      'Supabase Service Role Key 未配置'
-    )
-  }
-
-  return createClient(supabaseUrl, supabaseServiceKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false
-    }
-  })
-}
 
 export async function POST(request) {
   try {
@@ -51,15 +25,25 @@ export async function POST(request) {
       )
     }
 
-    if (!isSupabaseConfigured()) {
-      throw ErrorHandler.configurationError(
-        'CONFIG_ERROR',
-        'Supabase 未配置'
-      )
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    if (!supabaseUrl || !supabaseAnonKey) {
+      throw ErrorHandler.configurationError('CONFIG_ERROR', 'Supabase 未配置')
     }
 
-    // 使用 Service Role Key 创建客户端，绕过 RLS 策略
-    const supabase = createServiceRoleClient()
+    const cookieStore = cookies()
+    const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll()
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            cookieStore.set(name, value, options)
+          })
+        },
+      },
+    })
 
     // 验证邮箱格式
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -199,7 +183,27 @@ export async function POST(request) {
       )
     }
 
-    // 2. 检查商家邮箱是否已注册
+    // 2. 使用 Supabase Auth 创建用户账户
+    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+      email: normalizedEmail,
+      password,
+    })
+
+    if (signUpError) {
+      logger.warn('Supabase Auth signUp failed for merchant', { email: normalizedEmail, error: signUpError })
+      // 如果是邮箱已存在，返回友好错误
+      throw ErrorHandler.conflictError(
+        'SUPABASE_USER_EXISTS',
+        '该邮箱已存在用户，请直接登录或联系管理员'
+      )
+    }
+
+    logger.info('Supabase Auth signUp success for merchant', {
+      userId: signUpData.user?.id,
+      email: signUpData.user?.email,
+    })
+
+    // 3. 检查 merchants 表中是否已存在记录（理论上不应该）
     const { data: existingMerchant, error: merchantCheckError } = await supabase
       .from('merchants')
       .select('id, email')
@@ -216,22 +220,18 @@ export async function POST(request) {
     }
 
     if (existingMerchant) {
+      logger.warn('Merchant already exists for email after signUp', { email: normalizedEmail, merchantId: existingMerchant.id })
       throw ErrorHandler.conflictError(
         'MERCHANT_EMAIL_EXISTS',
-        '该邮箱已被注册，请使用其他邮箱或直接登录'
+        '该邮箱已经注册为商家，请直接登录'
       )
     }
 
-    // 3. 加密密码
-    const passwordHash = await bcrypt.hash(password, 12)
-    logger.info('Password hashed successfully', { email: normalizedEmail })
-
-    // 4. 创建商家记录
+    // 4. 在 merchants 表中创建商家记录（不再存储 password_hash）
     const { data: newMerchant, error: merchantError } = await supabase
       .from('merchants')
       .insert([{
         email: normalizedEmail,
-        password_hash: passwordHash,
         name: name.trim(),
         verified: false,
         status: 'active'
@@ -334,14 +334,7 @@ export async function POST(request) {
       }
     }
 
-    // 6. 生成 JWT token
-    const token = generateMerchantToken({
-      id: newMerchant.id,
-      email: newMerchant.email,
-      name: newMerchant.name
-    })
-
-    // 7. 创建响应并设置 cookie
+    // 6. 返回成功响应（Supabase 会话 cookie 已由 auth.signUp 写入）
     const response = NextResponse.json({
       success: true,
       message: '商家注册成功',
@@ -351,8 +344,6 @@ export async function POST(request) {
         name: newMerchant.name
       }
     })
-
-    setMerchantTokenCookie(response, token)
 
     logger.success('Merchant registered successfully', { 
       merchantId: newMerchant.id, 

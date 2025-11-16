@@ -56,32 +56,59 @@ export default function MerchantLoginPage() {
     setIsLoading(true)
 
     try {
+      console.log('🔍 开始商家登录请求...', { email: formData.email })
+      console.log('🔍 当前路径:', window.location.pathname)
+
       const response = await fetch('/api/merchant/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(formData),
+        credentials: 'include', // 确保发送和接收 cookies
       })
 
       const data = await response.json()
 
-      console.log('🔍 商家登录响应:', { status: response.status, data })
+      console.log('🔍 商家登录响应:', { 
+        status: response.status, 
+        ok: response.ok,
+        data,
+        headers: {
+          'set-cookie': response.headers.get('set-cookie')
+        }
+      })
       
       if (response.ok && data.success) {
         // Login successful - token is stored in httpOnly cookie automatically
-        // No need to store in localStorage anymore
-        console.log('✅ 商家登录成功，跳转到商家页面')
+        console.log('✅ 商家登录成功')
+        console.log('🔍 Cookie 信息 (仅调试):', document.cookie)
+        
+        // 等待一小段时间确保 cookie 已设置
+        await new Promise(resolve => setTimeout(resolve, 100))
+        
+        console.log('🔍 准备跳转到 /merchant')
+        console.log('🔍 跳转前路径:', window.location.pathname)
+        
         // Navigate to merchant dashboard
         router.push('/merchant')
+        
+        // 强制刷新以确保 middleware 看到新的 cookie
+        // 如果 router.push 没有立即生效，使用 window.location 作为后备
+        setTimeout(() => {
+          if (window.location.pathname === '/merchant/auth/login') {
+            console.warn('⚠️ router.push 未生效，使用 window.location 重定向')
+            window.location.href = '/merchant'
+          }
+        }, 500)
       } else {
         console.error('❌ 商家登录失败:', data)
         setErrors({ general: data.error || data.message || 'Login failed' })
+        setIsLoading(false)
       }
     } catch (error) {
-      console.error('Login error:', error)
+      console.error('❌ Login error:', error)
       setErrors({ general: 'Network error, please try again' })
-    } finally {
       setIsLoading(false)
     }
   }

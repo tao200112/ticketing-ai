@@ -9,8 +9,21 @@ import { ErrorHandler, handleApiError } from '@/lib/error-handler'
 import { createLogger } from '@/lib/logger'
 import { cookies } from 'next/headers'
 import { createServerClient } from '@supabase/ssr'
+import { createClient } from '@supabase/supabase-js'
 
 const logger = createLogger('merchant-register-api')
+
+// 使用 Service Role 进行受 RLS 保护的数据写入（仅服务端）
+function createServiceRoleClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!supabaseUrl || !supabaseServiceKey) {
+    throw ErrorHandler.configurationError('CONFIG_ERROR', 'Supabase Service Role Key 未配置')
+  }
+  return createClient(supabaseUrl, supabaseServiceKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  })
+}
 
 export async function POST(request) {
   try {
@@ -203,8 +216,11 @@ export async function POST(request) {
       email: signUpData.user?.email,
     })
 
-    // 3. 检查 merchants 表中是否已存在记录（理论上不应该）
-    const { data: existingMerchant, error: merchantCheckError } = await supabase
+    // 3. 使用 Service Role 操作业务表，避免 RLS 阻断
+    const admin = createServiceRoleClient()
+
+    // 检查 merchants 表中是否已存在记录（理论上不应该）
+    const { data: existingMerchant, error: merchantCheckError } = await admin
       .from('merchants')
       .select('id, email')
       .eq('email', normalizedEmail)
@@ -228,15 +244,30 @@ export async function POST(request) {
     }
 
     // 4. 在 merchants 表中创建商家记录（不再存储 password_hash）
-    const { data: newMerchant, error: merchantError } = await supabase
+    // 可选写入 auth_user_id（如果列存在）
+    let merchantPayload = {
+      email: normalizedEmail,
+      name: name.trim(),
+      verified: false,
+      status: 'active'
+    }
+    try {
+      // 探测是否存在 auth_user_id 列（不存在会抛出 42703: undefined column）
+      const { error: columnCheckError } = await admin
+        .from('merchants')
+        .select('auth_user_id')
+        .limit(0)
+      if (!columnCheckError && signUpData?.user?.id) {
+        merchantPayload = { ...merchantPayload, auth_user_id: signUpData.user.id }
+      }
+    } catch (_) {
+      // 忽略列探测异常，按无该列处理
+    }
+
+    const { data: newMerchant, error: merchantError } = await admin
       .from('merchants')
-      .insert([{
-        email: normalizedEmail,
-        name: name.trim(),
-        verified: false,
-        status: 'active'
-      }])
-      .select('id, email, name, created_at')
+      .insert([merchantPayload])
+      .select('*')
       .single()
 
     if (merchantError) {
@@ -257,7 +288,7 @@ export async function POST(request) {
         payload: updatePayload
       })
       
-      const { data: updatedInvite, error: updateInviteError } = await supabase
+      const { data: updatedInvite, error: updateInviteError } = await admin
         .from('invite_codes')
         .update(updatePayload)
         .eq('id', inviteCodeData.id)
@@ -306,7 +337,7 @@ export async function POST(request) {
         }
       })
       
-      const { data: updatedInvite, error: updateInviteError } = await supabase
+      const { data: updatedInvite, error: updateInviteError } = await admin
         .from('admin_invite_codes')
         .update(updatePayload)
         .eq('id', inviteCodeData.id)

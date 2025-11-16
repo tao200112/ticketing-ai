@@ -197,23 +197,46 @@ export async function POST(request) {
     }
 
     // 2. 使用 Supabase Auth 创建用户账户
+    // 注意：如果 Supabase 配置要求邮箱验证，注册后可能无法立即登录
+    // 这里禁用邮箱验证要求，允许商家注册后立即登录
     const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
       email: normalizedEmail,
       password,
+      options: {
+        emailRedirectTo: undefined, // 不设置重定向，允许立即登录
+        data: {
+          role: 'merchant', // 在用户元数据中标记为商家
+        }
+      }
     })
 
     if (signUpError) {
       logger.warn('Supabase Auth signUp failed for merchant', { email: normalizedEmail, error: signUpError })
       // 如果是邮箱已存在，返回友好错误
-      throw ErrorHandler.conflictError(
-        'SUPABASE_USER_EXISTS',
-        '该邮箱已存在用户，请直接登录或联系管理员'
+      if (signUpError.message?.includes('already registered') || signUpError.message?.includes('already exists')) {
+        throw ErrorHandler.conflictError(
+          'SUPABASE_USER_EXISTS',
+          '该邮箱已存在用户，请直接登录或联系管理员'
+        )
+      }
+      throw ErrorHandler.authenticationError(
+        'SIGNUP_FAILED',
+        signUpError.message || '注册失败，请重试'
+      )
+    }
+
+    if (!signUpData?.user) {
+      logger.error('Supabase Auth signUp returned no user', { email: normalizedEmail, signUpData })
+      throw ErrorHandler.authenticationError(
+        'SIGNUP_FAILED',
+        '注册失败，未创建用户账户'
       )
     }
 
     logger.info('Supabase Auth signUp success for merchant', {
-      userId: signUpData.user?.id,
-      email: signUpData.user?.email,
+      userId: signUpData.user.id,
+      email: signUpData.user.email,
+      emailConfirmed: signUpData.user.email_confirmed_at !== null,
     })
 
     // 3. 使用 Service Role 操作业务表，避免 RLS 阻断
@@ -244,24 +267,50 @@ export async function POST(request) {
     }
 
     // 4. 在 merchants 表中创建商家记录（不再存储 password_hash）
-    // 可选写入 auth_user_id（如果列存在）
+    // 设置 owner_supabase_uid 关联 Supabase Auth 用户
+    const supabaseAuthUserId = signUpData.user.id
+    
     let merchantPayload = {
       email: normalizedEmail,
       name: name.trim(),
       verified: false,
       status: 'active'
     }
+    
+    // 尝试设置 owner_supabase_uid（如果列存在）
+    // 这是关联 Supabase Auth 用户的关键字段
     try {
-      // 探测是否存在 auth_user_id 列（不存在会抛出 42703: undefined column）
+      // 探测是否存在 owner_supabase_uid 列
       const { error: columnCheckError } = await admin
         .from('merchants')
-        .select('auth_user_id')
+        .select('owner_supabase_uid')
         .limit(0)
-      if (!columnCheckError && signUpData?.user?.id) {
-        merchantPayload = { ...merchantPayload, auth_user_id: signUpData.user.id }
+      if (!columnCheckError && supabaseAuthUserId) {
+        merchantPayload.owner_supabase_uid = supabaseAuthUserId
+        logger.info('Setting owner_supabase_uid for merchant', { 
+          merchantEmail: normalizedEmail,
+          authUserId: supabaseAuthUserId 
+        })
       }
-    } catch (_) {
-      // 忽略列探测异常，按无该列处理
+    } catch (err) {
+      // 如果列不存在，尝试使用 owner_user_id（向后兼容）
+      logger.warn('owner_supabase_uid column may not exist, trying owner_user_id', { error: err })
+      try {
+        const { error: userIdColumnCheckError } = await admin
+          .from('merchants')
+          .select('owner_user_id')
+          .limit(0)
+        if (!userIdColumnCheckError && supabaseAuthUserId) {
+          merchantPayload.owner_user_id = supabaseAuthUserId
+          logger.info('Setting owner_user_id for merchant (fallback)', { 
+            merchantEmail: normalizedEmail,
+            authUserId: supabaseAuthUserId 
+          })
+        }
+      } catch (_) {
+        // 忽略列探测异常，按无该列处理
+        logger.warn('Neither owner_supabase_uid nor owner_user_id column found, merchant will be created without user association')
+      }
     }
 
     const { data: newMerchant, error: merchantError } = await admin

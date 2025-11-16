@@ -52,14 +52,40 @@ export async function POST(request) {
       password,
     })
 
-    if (error || !data?.user) {
-      logger.warn('Merchant login failed via Supabase Auth', { email: normalizedEmail, error })
-      throw ErrorHandler.authenticationError('INVALID_CREDENTIALS', '邮箱或密码错误')
+    if (error) {
+      logger.warn('Merchant login failed via Supabase Auth', { 
+        email: normalizedEmail, 
+        error: error.message,
+        errorCode: error.status 
+      })
+      
+      // 提供更详细的错误信息
+      if (error.message?.includes('Email not confirmed') || error.message?.includes('email_not_confirmed')) {
+        throw ErrorHandler.authenticationError(
+          'EMAIL_NOT_CONFIRMED', 
+          '请先验证您的邮箱。请检查您的邮箱收件箱并点击验证链接。'
+        )
+      }
+      
+      if (error.message?.includes('Invalid login credentials') || error.message?.includes('invalid_credentials')) {
+        throw ErrorHandler.authenticationError('INVALID_CREDENTIALS', '邮箱或密码错误')
+      }
+      
+      throw ErrorHandler.authenticationError(
+        'LOGIN_FAILED', 
+        error.message || '登录失败，请重试'
+      )
+    }
+
+    if (!data?.user) {
+      logger.error('Merchant login returned no user data', { email: normalizedEmail })
+      throw ErrorHandler.authenticationError('LOGIN_FAILED', '登录失败，未返回用户数据')
     }
 
     logger.info('Merchant login via Supabase Auth success', {
       userId: data.user.id,
       email: data.user.email,
+      emailConfirmed: data.user.email_confirmed_at !== null,
     })
 
     // 可选：这里不直接检查 merchants 表，由 RSC/layout 统一做商家身份鉴权

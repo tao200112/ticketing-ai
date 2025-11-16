@@ -1,5 +1,5 @@
 // Moved to app/merchant/(protected)/page.js
-// This file is intentionally left empty to avoid route conflicts.
+// Keep this file as a noop to prevent route conflicts; do not import client hooks here.
 export default function MerchantLegacyPlaceholder() {
   return null
 }

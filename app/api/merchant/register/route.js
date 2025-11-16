@@ -196,103 +196,84 @@ export async function POST(request) {
       )
     }
 
-    // 2. 使用 Supabase Auth 创建用户账户
-    // 商家账号不需要邮箱验证，注册后立即确认邮箱以允许立即登录
-    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-      email: normalizedEmail,
-      password,
-      options: {
-        // 不设置 emailRedirectTo，避免发送验证邮件
-        emailRedirectTo: undefined,
-        data: {
-          role: 'merchant', // 在用户元数据中标记为商家
-          skip_email_verification: true // 标记为跳过邮箱验证
-        }
-      }
+    // 2. 使用 Supabase Admin API 直接创建已验证的商家用户
+    // 商家账号不需要邮箱验证，使用 admin.createUser 直接创建已验证用户
+    // 这样可以区别于顾客用户，不影响顾客注册流程
+    logger.info('Creating merchant user with Admin API (no email verification required)', {
+      email: normalizedEmail
     })
 
-    if (signUpError) {
-      logger.warn('Supabase Auth signUp failed for merchant', { email: normalizedEmail, error: signUpError })
-      // 如果是邮箱已存在，返回友好错误
-      if (signUpError.message?.includes('already registered') || signUpError.message?.includes('already exists')) {
-        throw ErrorHandler.conflictError(
-          'SUPABASE_USER_EXISTS',
-          '该邮箱已存在用户，请直接登录或联系管理员'
-        )
-      }
-      throw ErrorHandler.authenticationError(
-        'SIGNUP_FAILED',
-        signUpError.message || '注册失败，请重试'
+    const admin = createServiceRoleClient()
+    
+    // 首先检查邮箱是否已存在
+    const { data: { users }, error: listUsersError } = await admin.auth.admin.listUsers()
+    if (listUsersError) {
+      logger.error('Failed to list users to check for existing email', { error: listUsersError })
+      throw ErrorHandler.databaseError(
+        listUsersError,
+        'USER_CHECK_FAILED',
+        '无法检查邮箱是否已存在'
       )
     }
 
-    if (!signUpData?.user) {
-      logger.error('Supabase Auth signUp returned no user', { email: normalizedEmail, signUpData })
+    const existingUser = users.find(u => u.email?.toLowerCase() === normalizedEmail)
+    if (existingUser) {
+      logger.warn('Email already exists in Supabase Auth', { 
+        email: normalizedEmail,
+        existingUserId: existingUser.id,
+        existingUserRole: existingUser.user_metadata?.role
+      })
+      throw ErrorHandler.conflictError(
+        'SUPABASE_USER_EXISTS',
+        '该邮箱已存在用户，请直接登录或联系管理员'
+      )
+    }
+
+    // 使用 admin.createUser 直接创建已验证用户
+    const { data: createUserData, error: createUserError } = await admin.auth.admin.createUser({
+      email: normalizedEmail,
+      password,
+      email_confirm: true, // 直接创建已验证用户，无需邮箱验证
+      user_metadata: {
+        role: 'merchant', // 标记为商家用户
+        account_type: 'merchant', // 额外标记，便于区分
+        merchant_name: name.trim(), // 商家名称
+        skip_email_verification: true // 标记为跳过邮箱验证
+      }
+    })
+
+    if (createUserError) {
+      logger.error('Failed to create merchant user with Admin API', { 
+        email: normalizedEmail, 
+        error: createUserError 
+      })
+      throw ErrorHandler.authenticationError(
+        'SIGNUP_FAILED',
+        createUserError.message || '注册失败，无法创建用户账户'
+      )
+    }
+
+    if (!createUserData?.user) {
+      logger.error('Admin createUser returned no user', { email: normalizedEmail, createUserData })
       throw ErrorHandler.authenticationError(
         'SIGNUP_FAILED',
         '注册失败，未创建用户账户'
       )
     }
 
-    logger.info('Supabase Auth signUp success for merchant', {
-      userId: signUpData.user.id,
-      email: signUpData.user.email,
-      emailConfirmed: signUpData.user.email_confirmed_at !== null,
-      emailConfirmedAt: signUpData.user.email_confirmed_at,
-      confirmedAt: signUpData.user.confirmed_at,
-    })
+    const createdUser = createUserData.user
 
-    // 商家账号不需要邮箱验证，立即使用 Service Role 确认邮箱
-    // 这样注册后可以立即登录，无需等待邮箱验证
-    logger.info('Merchant account - auto-confirming email (no verification required)', {
-      userId: signUpData.user.id,
-      email: normalizedEmail
+    logger.info('Successfully created merchant user with Admin API', {
+      userId: createdUser.id,
+      email: createdUser.email,
+      emailConfirmed: createdUser.email_confirmed_at !== null,
+      emailConfirmedAt: createdUser.email_confirmed_at,
+      confirmedAt: createdUser.confirmed_at,
+      role: createdUser.user_metadata?.role
     })
-    
-    try {
-      const admin = createServiceRoleClient()
-      // 使用 admin API 立即确认邮箱
-      // 商家账号不需要邮箱验证，直接确认
-      const { data: updateData, error: updateError } = await admin.auth.admin.updateUserById(
-        signUpData.user.id,
-        {
-          email_confirm: true, // 确认邮箱，设置 email_confirmed_at
-          user_metadata: {
-            ...signUpData.user.user_metadata,
-            role: 'merchant',
-            skip_email_verification: true,
-            email_confirmed: true
-          }
-        }
-      )
-      
-      if (updateError) {
-        logger.error('Failed to auto-confirm merchant email - this will prevent login', {
-          userId: signUpData.user.id,
-          error: updateError.message,
-          errorCode: updateError.status
-        })
-        // 这是一个严重错误，但继续注册流程，让管理员可以手动修复
-      } else {
-        logger.info('Successfully auto-confirmed merchant email', {
-          userId: signUpData.user.id,
-          email: normalizedEmail,
-          emailConfirmedAt: updateData?.user?.email_confirmed_at,
-          confirmedAt: updateData?.user?.confirmed_at
-        })
-      }
-    } catch (confirmError) {
-      logger.error('Critical error during auto-confirm merchant email', {
-        userId: signUpData.user.id,
-        error: confirmError.message,
-        errorStack: confirmError.stack
-      })
-      // 这是一个严重错误，记录但不阻止注册流程
-      // 管理员可以使用调试工具手动确认邮箱
-    }
 
     // 3. 使用 Service Role 操作业务表，避免 RLS 阻断
-    const admin = createServiceRoleClient()
+    // admin 已在上面创建，继续使用
 
     // 检查 merchants 表中是否已存在记录（理论上不应该）
     const { data: existingMerchant, error: merchantCheckError } = await admin
@@ -311,7 +292,7 @@ export async function POST(request) {
     }
 
     if (existingMerchant) {
-      logger.warn('Merchant already exists for email after signUp', { email: normalizedEmail, merchantId: existingMerchant.id })
+      logger.warn('Merchant already exists for email after user creation', { email: normalizedEmail, merchantId: existingMerchant.id })
       throw ErrorHandler.conflictError(
         'MERCHANT_EMAIL_EXISTS',
         '该邮箱已经注册为商家，请直接登录'
@@ -320,7 +301,7 @@ export async function POST(request) {
 
     // 4. 在 merchants 表中创建商家记录（不再存储 password_hash）
     // 设置 owner_supabase_uid 关联 Supabase Auth 用户
-    const supabaseAuthUserId = signUpData.user.id
+    const supabaseAuthUserId = createdUser.id
     
     let merchantPayload = {
       email: normalizedEmail,
@@ -487,7 +468,8 @@ export async function POST(request) {
       }
     }
 
-    // 6. 返回成功响应（Supabase 会话 cookie 已由 auth.signUp 写入）
+    // 6. 返回成功响应
+    // 注意：使用 admin.createUser 不会自动创建会话，用户需要登录才能获得会话
     const response = NextResponse.json({
       success: true,
       message: '商家注册成功',

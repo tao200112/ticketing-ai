@@ -268,7 +268,7 @@ export async function PUT(request, { params }) {
                            merchant.email?.toLowerCase() === user.email?.toLowerCase()
             
             if (!isOwner) {
-              throw ErrorHandler.authenticationError(
+              throw ErrorHandler.authorizationError(
                 'UNAUTHORIZED',
                 'You do not have permission to update this event'
               )
@@ -283,13 +283,22 @@ export async function PUT(request, { params }) {
         }
       }
     } catch (authError) {
-      // 如果是认证错误，直接抛出
-      if (authError.type === 'AUTHENTICATION_ERROR' || authError.type === 'NOT_FOUND_ERROR') {
+      // 如果是认证、授权或未找到错误，必须重新抛出，阻止活动更新
+      if (authError.type === 'AUTHENTICATION_ERROR' || 
+          authError.type === 'AUTHORIZATION_ERROR' || 
+          authError.type === 'NOT_FOUND_ERROR') {
+        logger.error('Merchant authentication/authorization failed - blocking event update', { 
+          error: authError.message,
+          errorType: authError.type,
+          errorCode: authError.code,
+          event_id: id 
+        })
         throw authError
       }
       // 其他错误记录但不阻止（允许管理员更新）
-      logger.warn('Merchant authentication check failed for event update', { 
+      logger.warn('Merchant authentication check failed for event update (non-auth error)', { 
         error: authError.message,
+        errorType: authError.type,
         event_id: id 
       })
     }

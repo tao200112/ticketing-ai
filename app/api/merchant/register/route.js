@@ -312,6 +312,23 @@ export async function POST(request) {
         logger.warn('Neither owner_supabase_uid nor owner_user_id column found, merchant will be created without user association')
       }
     }
+    
+    // 尝试设置 temp_password（如果列存在，仅用于管理员查看）
+    try {
+      const { error: tempPasswordCheckError } = await admin
+        .from('merchants')
+        .select('temp_password')
+        .limit(0)
+      if (!tempPasswordCheckError) {
+        merchantPayload.temp_password = password
+        logger.info('Setting temp_password for merchant (admin view only)', { 
+          merchantEmail: normalizedEmail
+        })
+      }
+    } catch (_) {
+      // 忽略列探测异常，temp_password 列可能不存在
+      logger.debug('temp_password column not found, skipping password storage')
+    }
 
     const { data: newMerchant, error: merchantError } = await admin
       .from('merchants')

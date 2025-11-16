@@ -27,23 +27,36 @@ export default function NewEventWizardPage() {
   })
 
   useEffect(() => {
-    // 检查商家登录状态
-    const checkMerchantAuth = () => {
+    // 检查商家登录状态 - 使用 Supabase Auth
+    const checkMerchantAuth = async () => {
       setIsLoadingAuth(true)
-      const token = localStorage.getItem('merchantToken')
-      const user = localStorage.getItem('merchantUser')
-      
-      if (!token || !user) {
-        router.push('/merchant/auth/login')
-        return
-      }
       
       try {
-        const userData = JSON.parse(user)
-        setMerchantUser(userData)
+        // 检查 Supabase Auth 会话
+        const response = await fetch('/api/merchant/profile', {
+          credentials: 'include'
+        })
+        
+        if (!response.ok) {
+          // 未登录或不是商家，跳转到登录页
+          router.push('/merchant/auth/login?next=/merchant/events/new')
+          return
+        }
+        
+        const data = await response.json()
+        if (data.success && data.merchant) {
+          // 设置商家信息
+          setMerchantUser({
+            id: data.merchant.id,
+            email: data.merchant.email,
+            name: data.merchant.name
+          })
+        } else {
+          router.push('/merchant/auth/login?next=/merchant/events/new')
+        }
       } catch (err) {
-        console.error('Error parsing merchant user data:', err)
-        router.push('/merchant/auth/login')
+        console.error('Error checking merchant auth:', err)
+        router.push('/merchant/auth/login?next=/merchant/events/new')
       } finally {
         setIsLoadingAuth(false)
       }

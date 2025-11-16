@@ -53,10 +53,13 @@ export async function POST(request) {
     })
 
     if (error) {
+      // 详细记录错误信息用于调试
       logger.warn('Merchant login failed via Supabase Auth', { 
         email: normalizedEmail, 
         error: error.message,
-        errorCode: error.status 
+        errorCode: error.status,
+        errorName: error.name,
+        fullError: JSON.stringify(error, Object.getOwnPropertyNames(error))
       })
       
       // 提供更详细的错误信息
@@ -68,8 +71,21 @@ export async function POST(request) {
       }
       
       if (error.message?.includes('Invalid login credentials') || error.message?.includes('invalid_credentials')) {
+        // 记录更详细的错误信息
+        logger.error('Invalid credentials - checking if user exists in Supabase Auth', {
+          email: normalizedEmail,
+          errorDetails: error
+        })
         throw ErrorHandler.authenticationError('INVALID_CREDENTIALS', '邮箱或密码错误')
       }
+      
+      // 记录未知错误
+      logger.error('Unknown login error', {
+        email: normalizedEmail,
+        error: error.message,
+        errorCode: error.status,
+        fullError: error
+      })
       
       throw ErrorHandler.authenticationError(
         'LOGIN_FAILED', 

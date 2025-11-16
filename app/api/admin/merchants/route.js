@@ -26,6 +26,7 @@ export async function GET() {
         status,
         verified,
         max_events,
+        temp_password,
         created_at,
         updated_at
       `)

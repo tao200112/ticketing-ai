@@ -1,5 +1,5 @@
-// Moved to app/merchant/(protected)/page.js
-// Keep this file as a noop to prevent route conflicts; do not import client hooks here.
+// Moved to app/merchant/(protected)/page.tsx
+// No-op placeholder to avoid route conflicts; no client imports here.
 export default function MerchantLegacyPlaceholder() {
   return null
 }

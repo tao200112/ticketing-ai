@@ -165,35 +165,46 @@ export async function POST(request) {
       )
     }
 
-    // 检查邀请码是否已被使用
-    // 新表使用 used 字段，旧表使用 used_by 或 used_at 字段
-    const isUsed = inviteTableName === 'invite_codes' 
-      ? inviteCodeData.used 
-      : (inviteCodeData.used_at !== null || inviteCodeData.used_by !== null || inviteCodeData.is_active === false)
-
-    if (isUsed) {
-      throw ErrorHandler.validationError(
-        'INVITE_CODE_ALREADY_USED',
-        '邀请码已被使用，请联系管理员获取新的邀请码'
-      )
-    }
-
-    // 检查邀请码是否过期（仅对旧表）
-    if (inviteTableName === 'admin_invite_codes' && inviteCodeData.expires_at) {
-      if (new Date(inviteCodeData.expires_at) < new Date()) {
+    // 检查邀请码有效性（根据 admin_invite_codes 表结构）
+    // 表结构：id, code, is_active, used_by, expires_at, created_at, max_events
+    // 没有 used_at 字段
+    if (inviteTableName === 'admin_invite_codes') {
+      // 1. 检查 is_active 必须为 true
+      if (inviteCodeData.is_active !== true) {
         throw ErrorHandler.validationError(
-          'INVITE_CODE_EXPIRED',
-          '邀请码已过期，请联系管理员获取新的邀请码'
+          'INVITE_CODE_INACTIVE',
+          '邀请码已失效，请联系管理员获取新的邀请码'
         )
       }
-    }
 
-    // 检查邀请码是否活跃（仅对旧表）
-    if (inviteTableName === 'admin_invite_codes' && !inviteCodeData.is_active) {
-      throw ErrorHandler.validationError(
-        'INVITE_CODE_INACTIVE',
-        '邀请码已失效，请联系管理员获取新的邀请码'
-      )
+      // 2. 检查 used_by 必须为 null（未使用）
+      // 注意：used_by 可能是 null、undefined 或空字符串，需要严格检查
+      if (inviteCodeData.used_by !== null && inviteCodeData.used_by !== undefined && inviteCodeData.used_by !== '') {
+        throw ErrorHandler.validationError(
+          'INVITE_CODE_ALREADY_USED',
+          '邀请码已被使用，请联系管理员获取新的邀请码'
+        )
+      }
+
+      // 3. 检查 expires_at 必须大于当前时间
+      if (inviteCodeData.expires_at) {
+        const expiresAt = new Date(inviteCodeData.expires_at)
+        const now = new Date()
+        if (expiresAt < now) {
+          throw ErrorHandler.validationError(
+            'INVITE_CODE_EXPIRED',
+            '邀请码已过期，请联系管理员获取新的邀请码'
+          )
+        }
+      }
+    } else if (inviteTableName === 'invite_codes') {
+      // 新表逻辑（如果存在）
+      if (inviteCodeData.used === true) {
+        throw ErrorHandler.validationError(
+          'INVITE_CODE_ALREADY_USED',
+          '邀请码已被使用，请联系管理员获取新的邀请码'
+        )
+      }
     }
 
     // 2. 使用 Supabase Admin API 直接创建已验证的商家用户
@@ -411,11 +422,10 @@ export async function POST(request) {
       }
     } else {
       // 旧表 admin_invite_codes：根据实际表结构更新
-      // 表结构：id, code, max_events, is_active, used_by (UUID), used_at, expires_at, created_at, created_by
-      // used_by 是 UUID，应该设置为 auth_user_id（Supabase Auth 用户ID）
+      // 表结构：id, code, is_active, used_by, expires_at, created_at, max_events
+      // 注意：表中没有 used_at 字段，只更新 used_by 和 is_active
       const updatePayload = {
         is_active: false,
-        used_at: new Date().toISOString(),
         used_by: supabaseAuthUserId // 设置为 Supabase Auth 用户ID
       }
       
@@ -428,16 +438,18 @@ export async function POST(request) {
           code: inviteCodeData.code,
           is_active: inviteCodeData.is_active,
           used_by: inviteCodeData.used_by,
-          used_at: inviteCodeData.used_at
+          expires_at: inviteCodeData.expires_at
         }
       })
       
+      // 使用条件更新：只更新 is_active=true 且 used_by 为 null 的记录
+      // 这样可以防止并发问题
       const { data: updatedInvite, error: updateInviteError } = await admin
         .from('admin_invite_codes')
         .update(updatePayload)
-        // 旧表根据 code 更新（该表 code 为唯一约束）
         .eq('code', normalizedInviteCode)
         .eq('is_active', true)
+        .is('used_by', null) // 确保 used_by 为 null（未使用）
         .select()
         .maybeSingle()
 
@@ -462,33 +474,8 @@ export async function POST(request) {
       }
     }
 
-    // 6. 注册成功后自动登录（使用 signInWithPassword）
-    // 这样用户注册后可以立即访问商家页面，无需手动登录
-    logger.info('Auto-logging in merchant after registration', {
-      email: normalizedEmail,
-      userId: createdUser.id
-    })
-
-    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-      email: normalizedEmail,
-      password,
-    })
-
-    if (signInError) {
-      logger.error('Failed to auto-login merchant after registration', {
-        email: normalizedEmail,
-        error: signInError.message
-      })
-      // 即使自动登录失败，注册仍然成功，返回成功响应
-      // 用户需要手动登录
-    } else if (signInData?.user) {
-      logger.info('Successfully auto-logged in merchant after registration', {
-        userId: signInData.user.id,
-        email: normalizedEmail
-      })
-    }
-
-    // 7. 返回成功响应（会话已由 signInWithPassword 写入 cookie）
+    // 6. 返回成功响应
+    // 注意：自动登录由前端执行，后端只负责创建用户和商家记录
     const response = NextResponse.json({
       success: true,
       message: '商家注册成功',
@@ -502,7 +489,7 @@ export async function POST(request) {
     logger.success('Merchant registered successfully', { 
       merchantId: newMerchant.id, 
       email: normalizedEmail,
-      autoLoginSuccess: !!signInData?.user
+      authUserId: supabaseAuthUserId
     })
 
     return response

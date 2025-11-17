@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { getSupabaseBrowserClient } from '@/lib/supabase/client'
 
 export default function MerchantRegisterPage() {
   const router = useRouter()
@@ -108,10 +109,37 @@ export default function MerchantRegisterPage() {
       const data = await response.json()
 
       if (data.ok || data.success) {
-        // 注册成功 - 后端已自动登录，会话已存储在 httpOnly cookie 中
-        // 直接跳转到商家个人资料页面
-        console.log('✅ 商家注册成功，自动登录完成，跳转到商家页面')
-        router.push('/merchant/profile')
+        // 注册成功 - 前端需要执行自动登录
+        console.log('✅ 商家注册成功，开始自动登录...')
+        
+        try {
+          // 使用 Supabase 客户端执行登录
+          const supabase = getSupabaseBrowserClient()
+          const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+            email: formData.email,
+            password: formData.password,
+          })
+
+          if (signInError) {
+            console.error('自动登录失败:', signInError)
+            // 即使自动登录失败，也跳转到登录页面，用户可以手动登录
+            setErrors({ general: '注册成功，但自动登录失败，请手动登录' })
+            router.push('/merchant/auth/login')
+            return
+          }
+
+          if (signInData?.user) {
+            console.log('✅ 自动登录成功，跳转到商家页面')
+            router.push('/merchant/profile')
+          } else {
+            console.warn('自动登录返回空用户数据')
+            router.push('/merchant/auth/login')
+          }
+        } catch (loginError) {
+          console.error('自动登录异常:', loginError)
+          setErrors({ general: '注册成功，但自动登录失败，请手动登录' })
+          router.push('/merchant/auth/login')
+        }
       } else {
         // 处理错误响应
         const errorCode = data.error || data.code

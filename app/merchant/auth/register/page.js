@@ -130,7 +130,7 @@ export default function MerchantRegisterPage() {
 
           if (signInData?.user) {
             console.log('✅ 自动登录成功，跳转到商家页面')
-            router.push('/merchant/profile')
+            router.push('/merchant')
           } else {
             console.warn('自动登录返回空用户数据')
             router.push('/merchant/auth/login')

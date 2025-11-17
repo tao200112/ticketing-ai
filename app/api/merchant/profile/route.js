@@ -37,9 +37,15 @@ export async function GET(request) {
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     if (userError || !user) {
       logger.warn('Merchant profile: user not authenticated', { error: userError })
-      throw ErrorHandler.authenticationError(
-        'AUTHENTICATION_REQUIRED',
-        '请先登录'
+      // 返回 401 状态码，表示未认证
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'AUTHENTICATION_REQUIRED',
+          message: '请先登录',
+          type: 'AUTHENTICATION_ERROR'
+        },
+        { status: 401 }
       )
     }
 

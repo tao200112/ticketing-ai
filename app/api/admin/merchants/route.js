@@ -16,6 +16,7 @@ export async function GET() {
     }
 
     // 查询所有商家（使用 service role key，绕过 RLS）
+    // 不再查询 temp_password，所有密码由 Supabase Auth 处理
     const { data: merchants, error } = await supabaseAdmin
       .from('merchants')
       .select(`
@@ -26,7 +27,6 @@ export async function GET() {
         status,
         verified,
         max_events,
-        temp_password,
         created_at,
         updated_at
       `)

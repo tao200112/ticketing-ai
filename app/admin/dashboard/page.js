@@ -803,23 +803,6 @@ export default function AdminDashboard() {
                         >
                           {merchant.email}
                         </p>
-                        {merchant.temp_password && (
-                          <p
-                            style={{
-                              color: 'rgba(255, 255, 0, 0.9)',
-                              fontSize: '13px',
-                              marginBottom: '8px',
-                              fontWeight: 'bold',
-                              fontFamily: 'monospace',
-                              background: 'rgba(255, 255, 0, 0.1)',
-                              padding: '4px 8px',
-                              borderRadius: '4px',
-                              display: 'inline-block'
-                            }}
-                          >
-                            🔑 密码: {merchant.temp_password}
-                          </p>
-                        )}
                         <div
                           style={{
                             display: 'flex',

@@ -108,10 +108,10 @@ export default function MerchantRegisterPage() {
       const data = await response.json()
 
       if (data.ok || data.success) {
-        // 注册成功 - token is stored in httpOnly cookie automatically
-        // No need to store in localStorage anymore
-        console.log('✅ 商家注册成功，跳转到商家页面')
-        router.push('/merchant')
+        // 注册成功 - 后端已自动登录，会话已存储在 httpOnly cookie 中
+        // 直接跳转到商家个人资料页面
+        console.log('✅ 商家注册成功，自动登录完成，跳转到商家页面')
+        router.push('/merchant/profile')
       } else {
         // 处理错误响应
         const errorCode = data.error || data.code

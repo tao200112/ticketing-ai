@@ -166,10 +166,10 @@ export async function POST(request) {
     }
 
     // 检查邀请码是否已被使用
-    // 新表使用 used 字段，旧表使用 used_by 字段
+    // 新表使用 used 字段，旧表使用 used_by 或 used_at 字段
     const isUsed = inviteTableName === 'invite_codes' 
       ? inviteCodeData.used 
-      : (inviteCodeData.used_by !== null || inviteCodeData.is_active === false)
+      : (inviteCodeData.used_at !== null || inviteCodeData.used_by !== null || inviteCodeData.is_active === false)
 
     if (isUsed) {
       throw ErrorHandler.validationError(
@@ -310,58 +310,53 @@ export async function POST(request) {
       status: 'active'
     }
     
-    // 尝试设置 owner_supabase_uid（如果列存在）
-    // 这是关联 Supabase Auth 用户的关键字段
-    try {
-      // 探测是否存在 owner_supabase_uid 列
-      const { error: columnCheckError } = await admin
-        .from('merchants')
-        .select('owner_supabase_uid')
-        .limit(0)
-      if (!columnCheckError && supabaseAuthUserId) {
+    // 设置 owner_supabase_uid（关联 Supabase Auth 用户的关键字段）
+    // 优先使用 owner_supabase_uid，如果不存在则使用 owner_user_id（向后兼容）
+    if (supabaseAuthUserId) {
+      // 首先尝试设置 owner_supabase_uid
+      try {
+        const { error: columnCheckError } = await admin
+          .from('merchants')
+          .select('owner_supabase_uid')
+          .limit(0)
+        if (!columnCheckError) {
+          merchantPayload.owner_supabase_uid = supabaseAuthUserId
+          logger.info('Setting owner_supabase_uid for merchant', { 
+            merchantEmail: normalizedEmail,
+            authUserId: supabaseAuthUserId 
+          })
+        } else {
+          // 如果 owner_supabase_uid 列不存在，尝试使用 owner_user_id
+          const { error: userIdColumnCheckError } = await admin
+            .from('merchants')
+            .select('owner_user_id')
+            .limit(0)
+          if (!userIdColumnCheckError) {
+            merchantPayload.owner_user_id = supabaseAuthUserId
+            logger.info('Setting owner_user_id for merchant (fallback)', { 
+              merchantEmail: normalizedEmail,
+              authUserId: supabaseAuthUserId 
+            })
+          } else {
+            logger.warn('Neither owner_supabase_uid nor owner_user_id column found, merchant will be created without user association')
+          }
+        }
+      } catch (err) {
+        logger.error('Error checking merchant table columns', { error: err })
+        // 即使检查失败，也尝试直接设置（列可能仍然存在）
         merchantPayload.owner_supabase_uid = supabaseAuthUserId
-        logger.info('Setting owner_supabase_uid for merchant', { 
+        logger.info('Attempting to set owner_supabase_uid directly', { 
           merchantEmail: normalizedEmail,
           authUserId: supabaseAuthUserId 
         })
       }
-    } catch (err) {
-      // 如果列不存在，尝试使用 owner_user_id（向后兼容）
-      logger.warn('owner_supabase_uid column may not exist, trying owner_user_id', { error: err })
-      try {
-        const { error: userIdColumnCheckError } = await admin
-          .from('merchants')
-          .select('owner_user_id')
-          .limit(0)
-        if (!userIdColumnCheckError && supabaseAuthUserId) {
-          merchantPayload.owner_user_id = supabaseAuthUserId
-          logger.info('Setting owner_user_id for merchant (fallback)', { 
-            merchantEmail: normalizedEmail,
-            authUserId: supabaseAuthUserId 
-          })
-        }
-      } catch (_) {
-        // 忽略列探测异常，按无该列处理
-        logger.warn('Neither owner_supabase_uid nor owner_user_id column found, merchant will be created without user association')
-      }
+    } else {
+      logger.error('supabaseAuthUserId is null, cannot associate merchant with auth user', {
+        email: normalizedEmail
+      })
     }
     
-    // 尝试设置 temp_password（如果列存在，仅用于管理员查看）
-    try {
-      const { error: tempPasswordCheckError } = await admin
-        .from('merchants')
-        .select('temp_password')
-        .limit(0)
-      if (!tempPasswordCheckError) {
-        merchantPayload.temp_password = password
-        logger.info('Setting temp_password for merchant (admin view only)', { 
-          merchantEmail: normalizedEmail
-        })
-      }
-    } catch (_) {
-      // 忽略列探测异常，temp_password 列可能不存在
-      logger.debug('temp_password column not found, skipping password storage')
-    }
+    // 不再存储 temp_password，所有密码由 Supabase Auth 处理
 
     const { data: newMerchant, error: merchantError } = await admin
       .from('merchants')
@@ -417,12 +412,11 @@ export async function POST(request) {
     } else {
       // 旧表 admin_invite_codes：根据实际表结构更新
       // 表结构：id, code, max_events, is_active, used_by (UUID), used_at, expires_at, created_at, created_by
-      // 注意：used_by 是 UUID 引用 users(id)，但商家不在 users 表中
-      // 只更新 is_active 和 used_at，不更新 used_by（保持原值或 NULL）
+      // used_by 是 UUID，应该设置为 auth_user_id（Supabase Auth 用户ID）
       const updatePayload = {
         is_active: false,
-        used_at: new Date().toISOString()
-        // 不更新 used_by，因为它是外键引用 users(id)，商家不在 users 表中
+        used_at: new Date().toISOString(),
+        used_by: supabaseAuthUserId // 设置为 Supabase Auth 用户ID
       }
       
       logger.info('Updating invite code (admin_invite_codes) with payload', { 
@@ -468,8 +462,33 @@ export async function POST(request) {
       }
     }
 
-    // 6. 返回成功响应
-    // 注意：使用 admin.createUser 不会自动创建会话，用户需要登录才能获得会话
+    // 6. 注册成功后自动登录（使用 signInWithPassword）
+    // 这样用户注册后可以立即访问商家页面，无需手动登录
+    logger.info('Auto-logging in merchant after registration', {
+      email: normalizedEmail,
+      userId: createdUser.id
+    })
+
+    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+      email: normalizedEmail,
+      password,
+    })
+
+    if (signInError) {
+      logger.error('Failed to auto-login merchant after registration', {
+        email: normalizedEmail,
+        error: signInError.message
+      })
+      // 即使自动登录失败，注册仍然成功，返回成功响应
+      // 用户需要手动登录
+    } else if (signInData?.user) {
+      logger.info('Successfully auto-logged in merchant after registration', {
+        userId: signInData.user.id,
+        email: normalizedEmail
+      })
+    }
+
+    // 7. 返回成功响应（会话已由 signInWithPassword 写入 cookie）
     const response = NextResponse.json({
       success: true,
       message: '商家注册成功',
@@ -482,7 +501,8 @@ export async function POST(request) {
 
     logger.success('Merchant registered successfully', { 
       merchantId: newMerchant.id, 
-      email: normalizedEmail 
+      email: normalizedEmail,
+      autoLoginSuccess: !!signInData?.user
     })
 
     return response

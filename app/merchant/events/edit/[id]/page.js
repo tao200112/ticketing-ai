@@ -12,6 +12,7 @@ export default function EditEventPage() {
   const [error, setError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [merchantUser, setMerchantUser] = useState(null)
+  const [uploadingImage, setUploadingImage] = useState(false)
 
   useEffect(() => {
     // 检查商家登录状态 - 使用 Supabase Auth
@@ -113,6 +114,7 @@ export default function EditEventPage() {
       // 验证必填字段
       if (!eventData.title || !eventData.description || !eventData.startTime || !eventData.endTime || !eventData.location) {
         setError('Please fill in all required fields')
+        setIsSubmitting(false)
         return
       }
 
@@ -120,6 +122,7 @@ export default function EditEventPage() {
       const validPrices = eventData.prices.filter(price => price.name && price.amount_cents)
       if (validPrices.length === 0) {
         setError('Please set at least one valid ticket type')
+        setIsSubmitting(false)
         return
       }
 
@@ -127,6 +130,7 @@ export default function EditEventPage() {
       const invalidPrices = validPrices.filter(price => parseFloat(price.amount_cents) < 0.50)
       if (invalidPrices.length > 0) {
         setError('All ticket prices must be at least $0.50 (Stripe minimum requirement)')
+        setIsSubmitting(false)
         return
       }
 
@@ -157,6 +161,7 @@ export default function EditEventPage() {
 
       if (!result.success) {
         setError(result.message || 'Failed to update event')
+        setIsSubmitting(false)
         return
       }
 
@@ -200,6 +205,59 @@ export default function EditEventPage() {
         ...prev,
         prices: prev.prices.filter((_, i) => i !== index)
       }))
+    }
+  }
+
+  const handlePosterUpload = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setError('文件大小必须小于5MB')
+      return
+    }
+
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
+    if (!allowedTypes.includes(file.type)) {
+      setError('只支持图片文件 (JPEG, PNG, GIF, WebP)')
+      return
+    }
+
+    // Show preview
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      updateEventData('posterPreview', event.target?.result)
+    }
+    reader.readAsDataURL(file)
+
+    // Upload file
+    setUploadingImage(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const response = await fetch('/api/admin/upload', {
+        method: 'POST',
+        body: formData
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        updateEventData('posterPreview', result.url)
+        setError('')
+      } else {
+        setError(result.message || '上传图片失败')
+        updateEventData('posterPreview', null)
+      }
+    } catch (error) {
+      console.error('Error uploading image:', error)
+      setError('上传图片失败，请重试')
+      updateEventData('posterPreview', null)
+    } finally {
+      setUploadingImage(false)
     }
   }
 
@@ -450,6 +508,140 @@ export default function EditEventPage() {
                       e.target.style.boxShadow = 'none'
                     }}
                   />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                    Event Cover Image
+                  </label>
+                  <div style={{
+                    border: '2px dashed #d1d5db',
+                    borderRadius: '0.5rem',
+                    padding: '2rem',
+                    textAlign: 'center',
+                    transition: 'border-color 0.2s',
+                    position: 'relative',
+                    backgroundColor: '#f9fafb'
+                  }}
+                  onMouseEnter={(e) => e.target.style.borderColor = '#2563eb'}
+                  onMouseLeave={(e) => e.target.style.borderColor = '#d1d5db'}>
+                    {eventData?.posterPreview ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                        <img
+                          src={eventData.posterPreview}
+                          alt="Event cover preview"
+                          style={{ 
+                            maxWidth: '100%', 
+                            maxHeight: '20rem', 
+                            margin: '0 auto', 
+                            borderRadius: '0.5rem', 
+                            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                            objectFit: 'contain'
+                          }}
+                        />
+                        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              updateEventData('posterPreview', null)
+                            }}
+                            style={{
+                              color: '#dc2626',
+                              fontSize: '0.875rem',
+                              border: 'none',
+                              backgroundColor: 'transparent',
+                              cursor: 'pointer',
+                              transition: 'color 0.2s',
+                              padding: '0.5rem 1rem'
+                            }}
+                            onMouseEnter={(e) => e.target.style.color = '#b91c1c'}
+                            onMouseLeave={(e) => e.target.style.color = '#dc2626'}
+                          >
+                            移除图片
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                        <div style={{
+                          width: '4rem',
+                          height: '4rem',
+                          backgroundColor: '#e5e7eb',
+                          borderRadius: '50%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          margin: '0 auto'
+                        }}>
+                          <svg style={{ width: '2rem', height: '2rem', color: '#9ca3af' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                        </div>
+                        <div>
+                          <p style={{ color: '#374151', fontWeight: '500', margin: 0 }}>点击上传封面图片</p>
+                          <p style={{ color: '#6b7280', fontSize: '0.875rem', margin: '0.25rem 0 0 0' }}>支持 JPG, PNG 格式，推荐尺寸 1200x630</p>
+                        </div>
+                        {uploadingImage && (
+                          <div style={{ marginTop: '0.5rem' }}>
+                            <div style={{
+                              width: '1rem',
+                              height: '1rem',
+                              border: '2px solid #2563eb',
+                              borderTop: '2px solid transparent',
+                              borderRadius: '50%',
+                              animation: 'spin 1s linear infinite',
+                              margin: '0 auto'
+                            }}></div>
+                            <p style={{ color: '#6b7280', fontSize: '0.875rem', marginTop: '0.5rem' }}>上传中...</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handlePosterUpload}
+                      disabled={uploadingImage}
+                      style={{
+                        position: 'absolute',
+                        inset: 0,
+                        width: '100%',
+                        height: '100%',
+                        opacity: 0,
+                        cursor: uploadingImage ? 'not-allowed' : 'pointer'
+                      }}
+                    />
+                  </div>
+                  <div style={{ marginTop: '0.75rem' }}>
+                    <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                      或输入图片URL
+                    </label>
+                    <input
+                      type="url"
+                      value={eventData?.posterPreview || ''}
+                      onChange={(e) => {
+                        updateEventData('posterPreview', e.target.value)
+                      }}
+                      placeholder="输入图片URL（可选）"
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem 1rem',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '0.5rem',
+                        color: '#111827',
+                        fontSize: '1rem',
+                        outline: 'none'
+                      }}
+                      onFocus={(e) => {
+                        e.target.style.borderColor = '#2563eb'
+                        e.target.style.boxShadow = '0 0 0 3px rgba(37, 99, 235, 0.1)'
+                      }}
+                      onBlur={(e) => {
+                        e.target.style.borderColor = '#d1d5db'
+                        e.target.style.boxShadow = 'none'
+                      }}
+                    />
+                  </div>
                 </div>
               </div>
             </div>

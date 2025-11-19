@@ -1,7 +1,15 @@
+/**
+ * PartyTix Mobile App
+ * 集成原生 Google 登录，不再使用 WebView 登录
+ */
+
 import React, { useRef, useState, useEffect } from 'react';
-import { SafeAreaView, StyleSheet, Alert, Platform, View, Text } from 'react-native';
+import { SafeAreaView, StyleSheet, Alert, Platform, View, ActivityIndicator } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { WebView, WebViewNavigation } from 'react-native-webview';
+import { Linking } from 'react-native';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import LoginScreen from './screens/LoginScreen';
 
 /**
  * Web App URL 配置
@@ -24,9 +32,59 @@ const isRestrictedPath = (url: string): boolean => {
   }
 };
 
-export default function App() {
+/**
+ * 主应用内容组件（需要 Auth Context）
+ */
+function AppContent() {
+  const { session, loading } = useAuth();
   const webViewRef = useRef<WebView>(null);
   const [currentUrl, setCurrentUrl] = useState(WEB_APP_URL);
+
+  // 处理深链回调（OAuth 重定向）
+  useEffect(() => {
+    const handleDeepLink = async (event: { url: string }) => {
+      const url = event.url;
+      console.log('Deep link received:', url);
+      
+      // 处理 OAuth 回调
+      if (url.includes('auth-callback')) {
+        // 解析 URL 参数
+        try {
+          const urlObj = new URL(url);
+          const code = urlObj.searchParams.get('code');
+          const error = urlObj.searchParams.get('error');
+          
+          if (error) {
+            console.error('OAuth error:', error);
+            Alert.alert('登录失败', 'Google 登录失败，请重试');
+            return;
+          }
+          
+          if (code) {
+            // Supabase SDK 会自动处理 code 交换 token
+            // 我们只需要等待 onAuthStateChange 回调更新 session
+            console.log('OAuth code received, waiting for session update...');
+          }
+        } catch (err) {
+          console.error('Failed to parse deep link URL:', err);
+        }
+      }
+    };
+
+    // 监听初始 URL（如果 App 是通过深链启动的）
+    Linking.getInitialURL().then((url) => {
+      if (url) {
+        handleDeepLink({ url });
+      }
+    });
+
+    // 监听后续的深链
+    const subscription = Linking.addEventListener('url', handleDeepLink);
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
 
   // Web 平台：直接重定向到目标 URL
   useEffect(() => {
@@ -104,6 +162,26 @@ export default function App() {
     }
   };
 
+  // 加载中状态
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <StatusBar style="light" />
+        <ActivityIndicator size="large" color="#7C3AED" />
+      </View>
+    );
+  }
+
+  // 未登录：显示原生登录页面
+  if (!session) {
+    return (
+      <View style={styles.container}>
+        <StatusBar style="light" />
+        <LoginScreen />
+      </View>
+    );
+  }
+
   // Web 平台：使用 iframe 或直接重定向
   if (Platform.OS === 'web') {
     return (
@@ -122,7 +200,7 @@ export default function App() {
     );
   }
 
-  // 移动平台：使用 WebView
+  // 移动平台：已登录，显示 WebView
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
@@ -151,22 +229,33 @@ export default function App() {
           console.log('WebView finished loading');
         }}
       />
-      {/* 
-        未来扩展点：
-        - 可以在这里添加底部 Tab 导航（使用 React Navigation）
-        - 可以添加原生页面组件（登录、订单列表、票详情等）
-        - 当前只渲染 WebView，结构已预留扩展空间
-      */}
     </SafeAreaView>
+  );
+}
+
+/**
+ * 根组件：包装 AuthProvider
+ */
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#000',
   },
   webview: {
     flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: '#000',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

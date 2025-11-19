@@ -3,6 +3,7 @@
 import { useEffect, useState, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
+import { handleAfterLogin } from '@/lib/auth-after-login'
 
 function OAuthSuccessContent() {
   const router = useRouter()
@@ -13,16 +14,12 @@ function OAuthSuccessContent() {
     console.log('[OAuth] oauth-success page mounted')
     
     if (!loading && user) {
-      const role = user.user_metadata?.role
-      const destination =
-        role === 'merchant'
-          ? '/merchant'
-          : role === 'admin'
-          ? '/account/merchant/admin'
-          : '/account'
-
       setStatusMessage('Login successful, redirecting...')
-      router.replace(destination)
+      // 使用统一的 after-login 处理逻辑
+      handleAfterLogin({ 
+        path: typeof window !== 'undefined' ? window.location.pathname : '',
+        router 
+      })
       return
     }
 
@@ -58,16 +55,12 @@ function OAuthSuccessContent() {
             
             if (currentSession) {
               clearInterval(checkInterval)
-              const role = currentSession.user.user_metadata?.role
-              const destination =
-                role === 'merchant'
-                  ? '/merchant'
-                  : role === 'admin'
-                  ? '/account/merchant/admin'
-                  : '/account'
-
               setStatusMessage('Login successful, redirecting...')
-              router.replace(destination)
+              // 使用统一的 after-login 处理逻辑
+              handleAfterLogin({ 
+                path: typeof window !== 'undefined' ? window.location.pathname : '',
+                router 
+              })
             }
           }
         } catch (error) {

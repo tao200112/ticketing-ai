@@ -277,9 +277,6 @@ export async function POST(request) {
     logger.info('Successfully created merchant user with Admin API', {
       userId: createdUser.id,
       email: createdUser.email,
-      emailConfirmed: createdUser.email_confirmed_at !== null,
-      emailConfirmedAt: createdUser.email_confirmed_at,
-      confirmedAt: createdUser.confirmed_at,
       role: createdUser.user_metadata?.role
     })
 

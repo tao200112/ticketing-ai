@@ -18,7 +18,11 @@ import {
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 
-export default function LoginScreen() {
+interface LoginScreenProps {
+  onForgotPassword?: () => void;
+}
+
+export default function LoginScreen({ onForgotPassword }: LoginScreenProps) {
   const { signInWithGoogle, signInWithEmailPassword } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -108,7 +112,17 @@ export default function LoginScreen() {
 
           {/* 密码输入 */}
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>密码</Text>
+            <View style={styles.passwordHeader}>
+              <Text style={styles.label}>密码</Text>
+              {onForgotPassword && (
+                <TouchableOpacity
+                  onPress={onForgotPassword}
+                  disabled={loading || googleLoading}
+                >
+                  <Text style={styles.forgotPasswordText}>忘记密码？</Text>
+                </TouchableOpacity>
+              )}
+            </View>
             <TextInput
               style={styles.input}
               placeholder="请输入密码"
@@ -242,6 +256,16 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     textAlign: 'center',
+  },
+  passwordHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  forgotPasswordText: {
+    fontSize: 12,
+    color: '#7C3AED',
   },
 });
 

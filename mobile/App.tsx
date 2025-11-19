@@ -10,6 +10,7 @@ import { WebView, WebViewNavigation } from 'react-native-webview';
 import { Linking } from 'react-native';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import LoginScreen from './screens/LoginScreen';
+import ForgotPasswordScreen from './screens/ForgotPasswordScreen';
 
 /**
  * Web App URL 配置
@@ -39,6 +40,7 @@ function AppContent() {
   const { session, loading } = useAuth();
   const webViewRef = useRef<WebView>(null);
   const [currentUrl, setCurrentUrl] = useState(WEB_APP_URL);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
 
   // 处理深链回调（OAuth 重定向）
   useEffect(() => {
@@ -172,12 +174,16 @@ function AppContent() {
     );
   }
 
-  // 未登录：显示原生登录页面
+  // 未登录：显示原生登录页面或忘记密码页面
   if (!session) {
     return (
       <View style={styles.container}>
         <StatusBar style="light" />
-        <LoginScreen />
+        {showForgotPassword ? (
+          <ForgotPasswordScreen onBack={() => setShowForgotPassword(false)} />
+        ) : (
+          <LoginScreen onForgotPassword={() => setShowForgotPassword(true)} />
+        )}
       </View>
     );
   }

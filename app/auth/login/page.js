@@ -4,6 +4,7 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '../../../lib/auth-context'
+import { handleAfterLogin } from '@/lib/auth-after-login'
 
 function LoginPageContent() {
   const router = useRouter()
@@ -81,7 +82,12 @@ function LoginPageContent() {
       console.log('[Auth] Attempting Supabase login for:', formData.email)
       await loginWithPassword(formData.email, formData.password)
       setMessage('Login successful! Redirecting...')
-      router.replace('/account')
+      
+      // 使用统一的 after-login 处理逻辑
+      await handleAfterLogin({ 
+        path: typeof window !== 'undefined' ? window.location.pathname : '',
+        router 
+      })
     } catch (error) {
       console.error('[Auth] Login error:', error)
       setMessage(error?.message || 'Login failed, please check email and password')

@@ -153,7 +153,6 @@ export async function POST(request) {
     logger.info('Merchant login via Supabase Auth success', {
       userId: data.user.id,
       email: data.user.email,
-      emailConfirmed: data.user.email_confirmed_at !== null,
     })
 
     // 可选：这里不直接检查 merchants 表，由 RSC/layout 统一做商家身份鉴权

@@ -174,14 +174,15 @@ export default function AccountPage() {
             const { data: { user: authUser }, error: authError } = await client.auth.getUser()
             if (!authError && authUser) {
               const metadata = authUser.user_metadata || {}
+              const authProvider = authUser.app_metadata?.provider || 'email'
               userData = {
                 id: authUser.id,
                 email: authUser.email,
                 name: metadata.full_name || metadata.name || metadata.display_name || authUser.email || 'User',
                 role: metadata.role || 'user',
                 age: metadata.age || null,
-                auth_provider: authUser.app_metadata?.provider || 'email',
-                email_verified_at: authUser.email_confirmed_at || authUser.confirmed_at || null
+                auth_provider: authProvider,
+                require_email_verification: authProvider !== 'google' // 邮箱注册为 true，Google 为 false
               }
               console.log('⚠️ Using auth user data as fallback after sync failure')
             } else {
@@ -208,14 +209,15 @@ export default function AccountPage() {
             const { data: { user: authUser }, error: authError } = await client.auth.getUser()
             if (!authError && authUser) {
               const metadata = authUser.user_metadata || {}
+              const authProvider = authUser.app_metadata?.provider || 'email'
               userData = {
                 id: authUser.id,
                 email: authUser.email,
                 name: metadata.full_name || metadata.name || metadata.display_name || authUser.email || 'User',
                 role: metadata.role || 'user',
                 age: metadata.age || null,
-                auth_provider: authUser.app_metadata?.provider || 'email',
-                email_verified_at: authUser.email_confirmed_at || authUser.confirmed_at || null
+                auth_provider: authProvider,
+                require_email_verification: authProvider !== 'google' // 邮箱注册为 true，Google 为 false
               }
               console.log('⚠️ Using auth user data as fallback after sync error')
             } else {
@@ -681,8 +683,11 @@ export default function AccountPage() {
             </h1>
         </div>
 
-        {/* Email Verification Banner - Only show if email is not verified and not Google OAuth user */}
-        {user && !user.email_verified_at && user.auth_provider !== 'google' && (
+        {/* Email Verification Banner - 显示条件：
+            - require_email_verification = true（邮箱注册用户）
+            - email_verified_at 为 null（邮箱未验证）
+            注意：此提示不拦截功能，仅作为友好提醒 */}
+        {user && user.require_email_verification && !user.email_verified_at && (
           <div style={{
             background: 'rgba(251, 191, 36, 0.15)',
             border: '2px solid rgba(251, 191, 36, 0.4)',
@@ -707,7 +712,7 @@ export default function AccountPage() {
                   fontWeight: '600',
                   marginBottom: '8px'
                 }}>
-                  Email Verification Required
+                  邮箱尚未验证
                 </h3>
                 <p style={{
                   color: 'rgba(255, 255, 255, 0.9)',
@@ -715,7 +720,7 @@ export default function AccountPage() {
                   lineHeight: '1.6',
                   marginBottom: '12px'
                 }}>
-                  Your email address has not been verified. Please verify your email to protect your account and receive event notifications.
+                  您的邮箱地址尚未验证。验证邮箱可以帮助您找回密码并接收活动通知。您可以继续使用所有功能。
                 </p>
                 {verificationMessage && (
                   <div style={{

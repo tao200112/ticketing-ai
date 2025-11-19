@@ -48,7 +48,7 @@ export async function POST(request) {
           role: role,
           age: age,
           auth_provider: provider,
-          email_verified_at: user.email_confirmed_at || user.confirmed_at || existingUser.email_verified_at,
+          require_email_verification: existingUser.require_email_verification ?? false, // 保持现有值或默认 false
           updated_at: new Date().toISOString()
         })
         .eq('id', user.id)
@@ -77,6 +77,12 @@ export async function POST(request) {
     const age = metadata.age || null
     const provider = user.app_metadata?.provider || 'email'
 
+    // 判断是否需要邮箱验证：
+    // - Google 登录: false（不需要提示）
+    // - 邮箱注册: true（显示提示，但不拦截功能）
+    const isGoogleLogin = provider === 'google'
+    const requireEmailVerification = !isGoogleLogin // 邮箱注册用户需要显示提示
+
     const { data: newUser, error: insertError } = await admin
       .from('users')
       .insert({
@@ -86,7 +92,8 @@ export async function POST(request) {
         role: role,
         age: age,
         auth_provider: provider,
-        email_verified_at: user.email_confirmed_at || user.confirmed_at || null,
+        require_email_verification: requireEmailVerification,
+        email_verified_at: isGoogleLogin ? new Date().toISOString() : null, // Google 登录默认已确认
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })

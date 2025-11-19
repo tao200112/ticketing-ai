@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
+import { handleAfterLogin } from '@/lib/auth-after-login'
 
 export default function LoginForm({ onSuccess, onSwitchToRegister }) {
   const [formData, setFormData] = useState({ email: '', password: '' })
@@ -32,7 +33,12 @@ export default function LoginForm({ onSuccess, onSwitchToRegister }) {
       }
 
       onSuccess?.(sessionUser)
-      router.replace('/account')
+      
+      // 使用统一的 after-login 处理逻辑
+      await handleAfterLogin({ 
+        path: typeof window !== 'undefined' ? window.location.pathname : '',
+        router 
+      })
     } catch (authError) {
       console.error('Login error:', authError)
       setError(authError?.message || 'Login failed, please try again')

@@ -6,7 +6,8 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "generate-assets": "node scripts/generate-assets.js"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",
@@ -20,6 +21,8 @@
   },
   "devDependencies": {
     "@types/react": "~19.1.0",
+    "eas-cli": "^16.27.0",
+    "sharp": "^0.33.0",
     "typescript": "~5.9.2"
   },
   "private": true

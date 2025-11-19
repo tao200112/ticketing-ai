@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, Suspense } from "react";
 import Link from "next/link";
-import { getSupabaseClient } from "@/lib/supabase-client";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 const STATUS_LOADING = "loading";
 const STATUS_SUCCESS = "success";
@@ -18,7 +18,7 @@ function parseHashParams() {
 }
 
 function VerifyEmailContent() {
-  const supabase = useMemo(() => getSupabaseClient(), []);
+  const supabase = useMemo(() => getSupabaseBrowserClient(), []);
   const [status, setStatus] = useState(STATUS_LOADING);
   const [message, setMessage] = useState("Verifying your email...");
   const [userEmail, setUserEmail] = useState("");

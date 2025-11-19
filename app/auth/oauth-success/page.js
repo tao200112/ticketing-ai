@@ -33,8 +33,8 @@ function OAuthSuccessContent() {
     if (!user && !loading) {
       const checkInterval = setInterval(async () => {
         try {
-          const { getSupabaseClient } = await import('@/lib/supabase-client')
-          const supabase = getSupabaseClient()
+          const { getSupabaseBrowserClient } = await import('@/lib/supabase/client')
+          const supabase = getSupabaseBrowserClient()
           
           // Use getUser() for security - authenticates user by contacting Supabase Auth server
           const { data: { user }, error } = await supabase.auth.getUser()

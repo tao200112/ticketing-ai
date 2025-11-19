@@ -1,13 +1,13 @@
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
-import { getSupabaseClient } from '@/lib/supabase-client';
+import { getSupabaseBrowserClient } from '@/lib/supabase/client';
 
 export default function EmailVerificationBanner({ user }) {
   const [isVisible, setIsVisible] = useState(false);
   const [isResending, setIsResending] = useState(false);
   const [message, setMessage] = useState('');
-  const supabase = useMemo(() => getSupabaseClient(), []);
+  const supabase = useMemo(() => getSupabaseBrowserClient(), []);
 
   useEffect(() => {
     if (user && !user.emailVerified) {

@@ -67,24 +67,25 @@ export default function RegisterForm({ onSuccess, onSwitchToLogin }) {
       }
 
       const origin = typeof window !== 'undefined' ? window.location.origin.replace(/\/$/, '') : ''
-      const emailRedirectTo = origin ? `${origin}/auth/verify-email` : undefined
+      const emailRedirectTo = origin ? `${origin}/auth/callback` : undefined
 
       const data = await registerWithPassword(formData.email, formData.password, {
         data: metadata,
         emailRedirectTo,
       })
 
-      const sessionUser = data.user || data.session?.user || null
-      if (sessionUser) {
-        onSuccess?.(sessionUser)
-        router.replace('/account')
+      // 如果注册成功且有 session，调用 handleAfterLogin 并重定向
+      if (data.session) {
+        const { handleAfterLogin } = await import('@/lib/auth-after-login')
+        await handleAfterLogin({
+          path: typeof window !== 'undefined' ? window.location.pathname : '',
+          router,
+        })
         return
       }
 
-      // 如果启用了邮箱验证，Supabase 可能不会立即返回 session
-      if (!sessionUser) {
-        setError('Registration successful! Please check your email to confirm your account.')
-      }
+      // 如果没有 session（需要邮箱验证），显示成功消息但不重定向
+      setError('Registration successful! Please check your email to confirm your account.')
     } catch (authError) {
       console.error('Registration error:', authError)
       // 提供更详细的错误信息

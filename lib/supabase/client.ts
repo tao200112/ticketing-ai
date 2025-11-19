@@ -26,11 +26,22 @@ let browserSupabaseClient: ReturnType<typeof createBrowserClient> | null = null
  * 使用 @supabase/ssr 的 createBrowserClient
  * 自动管理会话 cookies 和 localStorage
  * 
+ * 配置说明：
+ * - flowType: "pkce" - 使用 PKCE 流程，更安全且支持邮箱验证回调
+ * - autoRefreshToken: true - 自动刷新 token
+ * - persistSession: true - 持久化会话到 localStorage
+ * 
  * @returns {SupabaseClient} Supabase 客户端实例
  */
 export function getSupabaseBrowserClient() {
   if (!browserSupabaseClient) {
-    browserSupabaseClient = createBrowserClient(supabaseUrl, supabaseAnonKey)
+    browserSupabaseClient = createBrowserClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        flowType: 'pkce',
+        autoRefreshToken: true,
+        persistSession: true,
+      },
+    })
   }
   return browserSupabaseClient
 }

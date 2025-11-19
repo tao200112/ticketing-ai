@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, Suspense } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { getSupabaseClient } from "@/lib/supabase-client";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 const STATUS_LOADING = "loading";
 const STATUS_READY = "ready";
@@ -20,7 +20,7 @@ function parseHashParams() {
 }
 
 function UpdatePasswordContent() {
-  const supabase = useMemo(() => getSupabaseClient(), []);
+  const supabase = useMemo(() => getSupabaseBrowserClient(), []);
   const router = useRouter();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");

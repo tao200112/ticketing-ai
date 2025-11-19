@@ -2,14 +2,14 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { getSupabaseClient } from "@/lib/supabase-client";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 const STATUS_IDLE = "idle";
 const STATUS_SUCCESS = "success";
 const STATUS_ERROR = "error";
 
 export default function ForgotPasswordPage() {
-  const supabase = useMemo(() => getSupabaseClient(), []);
+  const supabase = useMemo(() => getSupabaseBrowserClient(), []);
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState(STATUS_IDLE);
   const [message, setMessage] = useState("");

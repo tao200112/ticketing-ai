@@ -93,7 +93,7 @@ export default function RegisterPage() {
           : process.env.NEXT_PUBLIC_SITE_URL || ''
 
       const emailRedirectTo = siteOrigin
-        ? `${siteOrigin.replace(/\/$/, '')}/auth/oauth-success`
+        ? `${siteOrigin.replace(/\/$/, '')}/auth/callback`
         : undefined
 
       const data = await registerWithPassword(formData.email, formData.password, {
@@ -101,12 +101,18 @@ export default function RegisterPage() {
         emailRedirectTo,
       })
 
+      // 如果注册成功且有 session，调用 handleAfterLogin 并重定向
       if (data.session) {
         setMessage('Registration successful! Redirecting...')
-        router.replace('/account')
+        const { handleAfterLogin } = await import('@/lib/auth-after-login')
+        await handleAfterLogin({
+          path: typeof window !== 'undefined' ? window.location.pathname : '',
+          router,
+        })
         return
       }
 
+      // 如果没有 session（需要邮箱验证），显示成功消息但不重定向
       setMessage('Registration successful! Please check your email to confirm your account.')
     } catch (error) {
       console.error('Registration error:', error)

@@ -1,120 +1,161 @@
 /**
- * 认证相关函数
- * 实现原生 Google 登录
+ * Authentication functions
+ * Native Google login implementation
  */
 
-import * as AuthSession from 'expo-auth-session';
+import 'react-native-url-polyfill/auto';
+
 import * as WebBrowser from 'expo-web-browser';
-import { supabase } from './supabase.native';
+
+import * as Linking from 'expo-linking';
+
 import Constants from 'expo-constants';
 
-// 完成 WebBrowser 的认证会话
+import { supabase } from './supabase.native';
+
 WebBrowser.maybeCompleteAuthSession();
 
 /**
- * 使用 Google 登录
+ * Native Google login function for mobile
+ * Uses system browser for OAuth authentication, returns to app via deep link
  */
 export async function signInWithGoogle() {
   try {
-    // 生成重定向 URI
-    const redirectUri = AuthSession.makeRedirectUri({
-      scheme: Constants.expoConfig?.scheme || 'partytix',
-      path: 'auth-callback',
-    });
+    // 1) Build redirect URI: exp://...auth-callback
+    const redirectUri = Linking.createURL('auth-callback');
 
-    // 调用 Supabase OAuth
+    console.log('[OAuth] redirectUri:', redirectUri);
+
+    // 2) Request Supabase OAuth URL
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
         redirectTo: redirectUri,
-        skipBrowserRedirect: true, // 关键：让我们自己控制浏览器
-        queryParams: {
-          access_type: 'offline',
-          prompt: 'consent',
-        },
+        skipBrowserRedirect: true,
       },
     });
 
     if (error) {
-      console.error('Supabase OAuth error:', error);
+      console.error('[OAuth] Supabase OAuth error:', error);
       return { error };
     }
 
     if (!data?.url) {
-      return { error: new Error('No OAuth URL returned from Supabase') };
+      const err = new Error('No OAuth URL returned from Supabase');
+      console.error('[OAuth] ', err);
+      return { error: err };
     }
 
-    // 使用 AuthSession 打开系统浏览器
-    const result = await AuthSession.startAsync({
-      authUrl: data.url,
-      returnUrl: redirectUri,
-    });
+    console.log('[OAuth] Supabase OAuth URL:', data.url);
 
-    if (result.type === 'success') {
-      // 从 URL 中提取参数
-      const { params } = result;
-      
-      // 处理 Supabase OAuth 回调
-      // Supabase 会在回调 URL 中包含 code 或 error
-      if (params?.error) {
-        return { error: new Error(params.error_description || params.error) };
+    // 3) Open system browser and wait for redirect
+    const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUri);
+
+    console.log('[OAuth] openAuthSessionAsync result:', result);
+
+    // 4) Handle result
+    if (result.type !== 'success') {
+      if (result.type === 'cancel') {
+        return { error: new Error('User cancelled Google sign-in') };
       }
-      
-      // 如果返回了 code，Supabase SDK 需要从回调 URL 中提取并交换 token
-      // 由于使用了 skipBrowserRedirect: true，我们需要手动触发
-      if (params?.code && result.url) {
-        // 使用回调 URL 触发 Supabase 的 session 更新
-        // Supabase SDK 会监听 URL 变化并自动处理
-        // 我们只需要等待 onAuthStateChange 回调
-      }
-      
-      // Session 会通过 onAuthStateChange 自动更新
-      // 如果 session 没有立即更新，可能是异步处理中，等待即可
-      return { result };
-    } else if (result.type === 'cancel') {
-      return { error: new Error('User cancelled authentication') };
-    } else {
-      return { error: new Error(`Authentication failed: ${result.type}`) };
+      return {
+        error: new Error(
+          `Auth session did not succeed. type=${result.type}`
+        ),
+      };
     }
+
+    // When result.type === 'success', result contains url property
+    const callbackUrl = (result as { type: 'success'; url: string }).url;
+
+    if (!callbackUrl) {
+      return {
+        error: new Error('No callback URL returned from auth session'),
+      };
+    }
+
+    // 5) Parse code from callbackUrl
+    let code: string | null = null;
+
+    // Try using URL class to parse
+    try {
+      const urlObj = new URL(callbackUrl);
+      code = urlObj.searchParams.get('code');
+    } catch {
+      // URL parsing failed, use regex fallback
+      const match = callbackUrl.match(/[?&]code=([^&]+)/);
+      code = match ? decodeURIComponent(match[1]) : null;
+    }
+
+    if (!code) {
+      console.error(
+        `[OAuth] No auth code found in callback URL: ${callbackUrl}`
+      );
+      return { error: new Error('No auth code found in callback URL') };
+    }
+
+    console.log('[OAuth] Parsed auth code:', code);
+
+    // 6) Exchange code for session
+    const { data: sessionData, error: exchangeError } =
+      await supabase.auth.exchangeCodeForSession(code);
+
+    if (exchangeError) {
+      console.error('[OAuth] exchangeCodeForSession error:', exchangeError);
+      return { error: exchangeError };
+    }
+
+    console.log(
+      '[OAuth] exchangeCodeForSession success, hasSession:',
+      !!sessionData.session
+    );
+
+    return { data: sessionData };
   } catch (error) {
-    console.error('signInWithGoogle error:', error);
+    console.error('[OAuth] signInWithGoogle error:', error);
     return { error: error instanceof Error ? error : new Error('Unknown error') };
   }
 }
 
 /**
- * 使用邮箱和密码登录
+ * Sign in with email and password
  */
 export async function signInWithEmailPassword(email: string, password: string) {
   try {
+    console.log('[Auth] Attempting email/password sign in for:', email);
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
     if (error) {
+      console.error('[Auth] Email/password sign in error:', error);
       return { error };
     }
 
+    console.log('[Auth] Email/password sign in successful');
     return { data };
   } catch (error) {
-    console.error('signInWithEmailPassword error:', error);
+    console.error('[Auth] signInWithEmailPassword error:', error);
     return { error: error instanceof Error ? error : new Error('Unknown error') };
   }
 }
 
 /**
- * 登出
+ * Sign out
  */
 export async function signOut() {
   try {
+    console.log('[Auth] Signing out...');
     const { error } = await supabase.auth.signOut();
     if (error) {
+      console.error('[Auth] Sign out error:', error);
       return { error };
     }
+    console.log('[Auth] Sign out successful');
     return { success: true };
   } catch (error) {
-    console.error('signOut error:', error);
+    console.error('[Auth] signOut error:', error);
     return { error: error instanceof Error ? error : new Error('Unknown error') };
   }
 }

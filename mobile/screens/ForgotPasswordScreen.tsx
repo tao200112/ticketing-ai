@@ -1,6 +1,6 @@
 /**
- * 忘记密码页面
- * 发送密码重置邮件
+ * Forgot password screen
+ * Sends password reset email
  */
 
 import React, { useState } from 'react';
@@ -29,21 +29,21 @@ export default function ForgotPasswordScreen({ onBack }: ForgotPasswordScreenPro
 
   const handleResetPassword = async () => {
     if (!email.trim()) {
-      Alert.alert('输入错误', '请输入邮箱地址');
+      Alert.alert('Input Error', 'Please enter email address');
       return;
     }
 
-    // 验证邮箱格式
+    // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email.trim())) {
-      Alert.alert('输入错误', '请输入有效的邮箱地址');
+      Alert.alert('Input Error', 'Please enter a valid email address');
       return;
     }
 
     try {
       setLoading(true);
       
-      // 使用 Web 端的重置密码 URL
+      // Use web-side password reset URL
       const redirectTo = 'https://ticketing-ai-six.vercel.app/auth/update-password';
       
       const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
@@ -51,14 +51,14 @@ export default function ForgotPasswordScreen({ onBack }: ForgotPasswordScreenPro
       });
 
       if (error) {
-        Alert.alert('发送失败', error.message || '发送重置邮件失败，请重试');
+        Alert.alert('Send Failed', error.message || 'Failed to send reset email, please try again');
         return;
       }
 
       setSuccess(true);
     } catch (error: any) {
       console.error('Reset password error:', error);
-      Alert.alert('发送失败', '网络错误，请重试');
+      Alert.alert('Send Failed', 'Network error, please try again');
     } finally {
       setLoading(false);
     }
@@ -76,16 +76,16 @@ export default function ForgotPasswordScreen({ onBack }: ForgotPasswordScreenPro
         >
           <View style={styles.content}>
             <View style={styles.header}>
-              <Text style={styles.title}>邮件已发送</Text>
-              <Text style={styles.subtitle}>请检查您的邮箱</Text>
+              <Text style={styles.title}>Email Sent</Text>
+              <Text style={styles.subtitle}>Please check your email</Text>
             </View>
 
             <View style={styles.successContainer}>
               <Text style={styles.successText}>
-                如果该邮箱已注册，您将收到一封密码重置邮件。
+                If this email is registered, you will receive a password reset email.
               </Text>
               <Text style={styles.successHint}>
-                请点击邮件中的链接来重置您的密码。
+                Please click the link in the email to reset your password.
               </Text>
             </View>
 
@@ -93,7 +93,7 @@ export default function ForgotPasswordScreen({ onBack }: ForgotPasswordScreenPro
               style={styles.backButton}
               onPress={onBack}
             >
-              <Text style={styles.backButtonText}>返回登录</Text>
+              <Text style={styles.backButtonText}>Back to Login</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -112,15 +112,15 @@ export default function ForgotPasswordScreen({ onBack }: ForgotPasswordScreenPro
       >
         <View style={styles.content}>
           <View style={styles.header}>
-            <Text style={styles.title}>重置密码</Text>
-            <Text style={styles.subtitle}>请输入您的邮箱地址</Text>
+            <Text style={styles.title}>Reset Password</Text>
+            <Text style={styles.subtitle}>Please enter your email address</Text>
           </View>
 
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>邮箱</Text>
+            <Text style={styles.label}>Email</Text>
             <TextInput
               style={styles.input}
-              placeholder="请输入邮箱地址"
+              placeholder="Enter email address"
               placeholderTextColor="#999"
               value={email}
               onChangeText={setEmail}
@@ -139,7 +139,7 @@ export default function ForgotPasswordScreen({ onBack }: ForgotPasswordScreenPro
             {loading ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={styles.resetButtonText}>发送重置邮件</Text>
+              <Text style={styles.resetButtonText}>Send Reset Email</Text>
             )}
           </TouchableOpacity>
 
@@ -148,7 +148,7 @@ export default function ForgotPasswordScreen({ onBack }: ForgotPasswordScreenPro
             onPress={onBack}
             disabled={loading}
           >
-            <Text style={styles.backLinkText}>返回登录</Text>
+            <Text style={styles.backLinkText}>Back to Login</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>

@@ -1,6 +1,6 @@
 /**
- * 认证上下文
- * 管理用户登录状态和认证相关操作
+ * Authentication context
+ * Manages user login state and authentication operations
  */
 
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
@@ -25,35 +25,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // 获取初始 session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
+    let isMounted = true;
 
-    // 订阅认证状态变化
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
+    const init = async () => {
+      const { data } = await supabase.auth.getSession();
+      if (isMounted) {
+        console.log(
+          '[AuthContext] event: INITIAL_SESSION hasSession:',
+          !!data.session
+        );
+        setSession(data.session ?? null);
+        setUser(data.session?.user ?? null);
+        setLoading(false);
+      }
+    };
 
-    return () => subscription.unsubscribe();
+    init();
+
+    const { data: subscription } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        console.log('[AuthContext] event:', event, 'hasSession:', !!session);
+        if (isMounted) {
+          setSession(session ?? null);
+          setUser(session?.user ?? null);
+          setLoading(false);
+        }
+      }
+    );
+
+    return () => {
+      isMounted = false;
+      subscription.subscription.unsubscribe();
+    };
   }, []);
 
   const handleSignInWithGoogle = async () => {
     try {
+      console.log('[AuthContext] Starting Google sign in...');
       const { error } = await signInWithGoogle();
       if (error) {
-        console.error('Google sign in error:', error);
+        console.error('[AuthContext] Google sign in error:', error);
         throw error;
       }
-      // Session 会通过 onAuthStateChange 自动更新
+      // Session will be automatically updated via onAuthStateChange
+      console.log('[AuthContext] Google sign in initiated, waiting for session update...');
     } catch (error) {
-      console.error('Google sign in failed:', error);
+      console.error('[AuthContext] Google sign in failed:', error);
       throw error;
     }
   };
@@ -62,12 +79,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const { error } = await signInWithEmailPassword(email, password);
       if (error) {
-        console.error('Email sign in error:', error);
+        console.error('[AuthContext] Email sign in error:', error);
         throw error;
       }
-      // Session 会通过 onAuthStateChange 自动更新
+      // Session will be automatically updated via onAuthStateChange
     } catch (error) {
-      console.error('Email sign in failed:', error);
+      console.error('[AuthContext] Email sign in failed:', error);
       throw error;
     }
   };
@@ -76,12 +93,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const { error } = await signOut();
       if (error) {
-        console.error('Sign out error:', error);
+        console.error('[AuthContext] Sign out error:', error);
         throw error;
       }
-      // Session 会通过 onAuthStateChange 自动更新
+      // Session will be automatically updated via onAuthStateChange
     } catch (error) {
-      console.error('Sign out failed:', error);
+      console.error('[AuthContext] Sign out failed:', error);
       throw error;
     }
   };

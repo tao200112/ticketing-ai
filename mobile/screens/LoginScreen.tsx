@@ -1,6 +1,6 @@
 /**
- * 登录页面
- * 提供 Google 登录和邮箱密码登录
+ * Login screen
+ * Provides Google login and email/password login
  */
 
 import React, { useState } from 'react';
@@ -32,10 +32,15 @@ export default function LoginScreen({ onForgotPassword }: LoginScreenProps) {
   const handleGoogleSignIn = async () => {
     try {
       setGoogleLoading(true);
+      console.log('[LoginScreen] Google sign in button clicked');
       await signInWithGoogle();
-      // 成功后会通过 AuthContext 自动更新状态
+      // Success will automatically update state via AuthContext
+      // Note: session won't be available immediately, need to wait for deep link callback
+      console.log('[LoginScreen] Google sign in initiated, waiting for deep link callback...');
     } catch (error: any) {
-      Alert.alert('登录失败', error?.message || 'Google 登录失败，请重试');
+      console.error('[LoginScreen] Google sign in error:', error);
+      const errorMessage = error?.message || 'Google sign-in failed, please try again';
+      Alert.alert('Sign-in Failed', errorMessage);
     } finally {
       setGoogleLoading(false);
     }
@@ -43,16 +48,16 @@ export default function LoginScreen({ onForgotPassword }: LoginScreenProps) {
 
   const handleEmailSignIn = async () => {
     if (!email.trim() || !password.trim()) {
-      Alert.alert('输入错误', '请输入邮箱和密码');
+      Alert.alert('Input Error', 'Please enter email and password');
       return;
     }
 
     try {
       setLoading(true);
       await signInWithEmailPassword(email.trim(), password);
-      // 成功后会通过 AuthContext 自动更新状态
+      // Success will automatically update state via AuthContext
     } catch (error: any) {
-      Alert.alert('登录失败', error?.message || '邮箱登录失败，请重试');
+      Alert.alert('Sign-in Failed', error?.message || 'Email sign-in failed, please try again');
     } finally {
       setLoading(false);
     }
@@ -68,13 +73,13 @@ export default function LoginScreen({ onForgotPassword }: LoginScreenProps) {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.content}>
-          {/* Logo 和标题 */}
+          {/* Logo and title */}
           <View style={styles.header}>
             <Text style={styles.title}>PartyTix</Text>
-            <Text style={styles.subtitle}>欢迎回来</Text>
+            <Text style={styles.subtitle}>Welcome back</Text>
           </View>
 
-          {/* Google 登录按钮 */}
+          {/* Google sign-in button */}
           <TouchableOpacity
             style={[styles.googleButton, googleLoading && styles.buttonDisabled]}
             onPress={handleGoogleSignIn}
@@ -87,19 +92,19 @@ export default function LoginScreen({ onForgotPassword }: LoginScreenProps) {
             )}
           </TouchableOpacity>
 
-          {/* 分隔线 */}
+          {/* Divider */}
           <View style={styles.divider}>
             <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>或</Text>
+            <Text style={styles.dividerText}>or</Text>
             <View style={styles.dividerLine} />
           </View>
 
-          {/* 邮箱输入 */}
+          {/* Email input */}
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>邮箱</Text>
+            <Text style={styles.label}>Email</Text>
             <TextInput
               style={styles.input}
-              placeholder="请输入邮箱"
+              placeholder="Enter email"
               placeholderTextColor="#999"
               value={email}
               onChangeText={setEmail}
@@ -110,22 +115,22 @@ export default function LoginScreen({ onForgotPassword }: LoginScreenProps) {
             />
           </View>
 
-          {/* 密码输入 */}
+          {/* Password input */}
           <View style={styles.inputContainer}>
             <View style={styles.passwordHeader}>
-              <Text style={styles.label}>密码</Text>
+              <Text style={styles.label}>Password</Text>
               {onForgotPassword && (
                 <TouchableOpacity
                   onPress={onForgotPassword}
                   disabled={loading || googleLoading}
                 >
-                  <Text style={styles.forgotPasswordText}>忘记密码？</Text>
+                  <Text style={styles.forgotPasswordText}>Forgot password?</Text>
                 </TouchableOpacity>
               )}
             </View>
             <TextInput
               style={styles.input}
-              placeholder="请输入密码"
+              placeholder="Enter password"
               placeholderTextColor="#999"
               value={password}
               onChangeText={setPassword}
@@ -136,7 +141,7 @@ export default function LoginScreen({ onForgotPassword }: LoginScreenProps) {
             />
           </View>
 
-          {/* 邮箱登录按钮 */}
+          {/* Email sign-in button */}
           <TouchableOpacity
             style={[styles.emailButton, (loading || googleLoading) && styles.buttonDisabled]}
             onPress={handleEmailSignIn}
@@ -145,13 +150,13 @@ export default function LoginScreen({ onForgotPassword }: LoginScreenProps) {
             {loading ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={styles.emailButtonText}>登录</Text>
+              <Text style={styles.emailButtonText}>Sign In</Text>
             )}
           </TouchableOpacity>
 
-          {/* 提示文字 */}
+          {/* Hint text */}
           <Text style={styles.hint}>
-            登录即表示您同意我们的服务条款和隐私政策
+            By signing in, you agree to our Terms of Service and Privacy Policy
           </Text>
         </View>
       </ScrollView>

@@ -1,26 +1,45 @@
 /**
  * PartyTix Mobile App
- * 集成原生 Google 登录，不再使用 WebView 登录
+ * Integrated native Google login, no longer uses WebView for login
  */
 
-import React, { useRef, useState, useEffect } from 'react';
-import { SafeAreaView, StyleSheet, Alert, Platform, View, ActivityIndicator } from 'react-native';
+import React, { useRef, useState, useEffect, useMemo } from 'react';
+import { SafeAreaView, StyleSheet, Platform, View, ActivityIndicator, Alert } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { WebView, WebViewNavigation } from 'react-native-webview';
-import { Linking } from 'react-native';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import LoginScreen from './screens/LoginScreen';
 import ForgotPasswordScreen from './screens/ForgotPasswordScreen';
 
 /**
- * Web App URL 配置
- * 开发阶段使用：https://ticketing-ai-six.vercel.app
- * 将来可以改为正式域名，例如：https://partytix.com
+ * Web App URL configuration
+ * Development: https://ticketing-ai-six.vercel.app
+ * Can be changed to production domain later, e.g., https://partytix.com
  */
 const WEB_APP_URL = 'https://ticketing-ai-six.vercel.app';
 
 /**
- * 检查 URL 是否包含商家或管理员路径
+ * Build mobile-bridge URL with access_token and refresh_token
+ * @param session Supabase session object
+ * @returns mobile-bridge URL with token parameters or original URL
+ */
+const buildMobileBridgeUrl = (session: any): string => {
+  const accessToken = session?.access_token;
+  const refreshToken = session?.refresh_token;
+
+  if (accessToken && refreshToken) {
+    return (
+      `${WEB_APP_URL}/mobile-bridge` +
+      `?access_token=${encodeURIComponent(accessToken)}` +
+      `&refresh_token=${encodeURIComponent(refreshToken)}`
+    );
+  }
+
+  return WEB_APP_URL;
+};
+
+/**
+ * Check if URL contains merchant or admin paths
  */
 const isRestrictedPath = (url: string): boolean => {
   try {
@@ -28,81 +47,35 @@ const isRestrictedPath = (url: string): boolean => {
     const pathname = urlObj.pathname.toLowerCase();
     return pathname.includes('/merchant') || pathname.includes('/admin');
   } catch {
-    // 如果 URL 解析失败，检查字符串中是否包含路径
+    // If URL parsing fails, check if string contains path
     return url.toLowerCase().includes('/merchant') || url.toLowerCase().includes('/admin');
   }
 };
 
 /**
- * 主应用内容组件（需要 Auth Context）
+ * Main app content component (requires Auth Context)
  */
 function AppContent() {
   const { session, loading } = useAuth();
   const webViewRef = useRef<WebView>(null);
-  const [currentUrl, setCurrentUrl] = useState(WEB_APP_URL);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
 
-  // 处理深链回调（OAuth 重定向）
-  useEffect(() => {
-    const handleDeepLink = async (event: { url: string }) => {
-      const url = event.url;
-      console.log('Deep link received:', url);
-      
-      // 处理 OAuth 回调
-      if (url.includes('auth-callback')) {
-        // 解析 URL 参数
-        try {
-          const urlObj = new URL(url);
-          const code = urlObj.searchParams.get('code');
-          const error = urlObj.searchParams.get('error');
-          
-          if (error) {
-            console.error('OAuth error:', error);
-            Alert.alert('登录失败', 'Google 登录失败，请重试');
-            return;
-          }
-          
-          if (code) {
-            // Supabase SDK 会自动处理 code 交换 token
-            // 我们只需要等待 onAuthStateChange 回调更新 session
-            console.log('OAuth code received, waiting for session update...');
-          }
-        } catch (err) {
-          console.error('Failed to parse deep link URL:', err);
-        }
-      }
-    };
 
-    // 监听初始 URL（如果 App 是通过深链启动的）
-    Linking.getInitialURL().then((url) => {
-      if (url) {
-        handleDeepLink({ url });
-      }
-    });
-
-    // 监听后续的深链
-    const subscription = Linking.addEventListener('url', handleDeepLink);
-
-    return () => {
-      subscription.remove();
-    };
-  }, []);
-
-  // Web 平台：直接重定向到目标 URL
+  // Web platform: redirect directly to target URL
   useEffect(() => {
     if (Platform.OS === 'web') {
-      // 检查当前 URL 是否包含受限路径
+      // Check if current URL contains restricted paths
       if (typeof window !== 'undefined') {
         const checkAndRedirect = () => {
           const currentPath = window.location.pathname;
           if (isRestrictedPath(window.location.href)) {
-            alert('商家和管理员功能请在网页版使用。');
+            alert('Merchant and admin features are only available on the web version.');
             window.location.href = WEB_APP_URL;
             return;
           }
         };
 
-        // 监听 URL 变化
+        // Listen for URL changes
         const originalPushState = history.pushState;
         history.pushState = function (...args) {
           originalPushState.apply(history, args);
@@ -112,7 +85,7 @@ function AppContent() {
         window.addEventListener('popstate', checkAndRedirect);
         checkAndRedirect();
 
-        // 直接重定向到目标 URL（如果不在目标 URL）
+        // Redirect directly to target URL (if not already there)
         if (!window.location.href.includes(WEB_APP_URL.replace('https://', ''))) {
           window.location.href = WEB_APP_URL;
         }
@@ -125,37 +98,36 @@ function AppContent() {
   }, []);
 
   /**
-   * 拦截导航请求，阻止访问商家/管理员路径（iOS 和部分 Android）
+   * Intercept navigation requests, block access to merchant/admin paths (iOS and some Android)
    */
   const handleShouldStartLoadWithRequest = (request: { url: string }): boolean => {
     if (isRestrictedPath(request.url)) {
       Alert.alert(
-        '功能不可用',
-        '商家和管理员功能请在网页版使用。',
-        [{ text: '确定', onPress: () => {} }]
+        'Feature Unavailable',
+        'Merchant and admin features are only available on the web version.',
+        [{ text: 'OK', onPress: () => {} }]
       );
-      return false; // 阻止导航
+      return false; // Block navigation
     }
-    return true; // 允许导航
+    return true; // Allow navigation
   };
 
   /**
-   * 处理导航状态变化（Android 补充方案）
+   * Handle navigation state changes (Android fallback)
    */
   const handleNavigationStateChange = (navState: WebViewNavigation) => {
     const url = navState.url;
-    setCurrentUrl(url);
     
-    // 如果导航到受限路径，阻止并返回上一页
+    // If navigating to restricted path, block and go back
     if (isRestrictedPath(url)) {
       Alert.alert(
-        '功能不可用',
-        '商家和管理员功能请在网页版使用。',
+        'Feature Unavailable',
+        'Merchant and admin features are only available on the web version.',
         [
           {
-            text: '确定',
+            text: 'OK',
             onPress: () => {
-              // 返回上一页或首页
+              // Go back to previous page or home
               webViewRef.current?.goBack();
             },
           },
@@ -164,7 +136,15 @@ function AppContent() {
     }
   };
 
-  // 加载中状态
+  // Use useMemo to avoid repeatedly building URL (prevent infinite loops)
+  const webViewUrl = useMemo(() => {
+    if (!session) {
+      return WEB_APP_URL;
+    }
+    return buildMobileBridgeUrl(session);
+  }, [session]);
+
+  // Loading state
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -174,7 +154,7 @@ function AppContent() {
     );
   }
 
-  // 未登录：显示原生登录页面或忘记密码页面
+  // Not logged in: show native login page or forgot password page
   if (!session) {
     return (
       <View style={styles.container}>
@@ -188,7 +168,7 @@ function AppContent() {
     );
   }
 
-  // Web 平台：使用 iframe 或直接重定向
+  // Web platform: use iframe or direct redirect
   if (Platform.OS === 'web') {
     return (
       <View style={styles.container}>
@@ -206,13 +186,18 @@ function AppContent() {
     );
   }
 
-  // 移动平台：已登录，显示 WebView
+  // Mobile platform: logged in, show WebView
+  console.log(
+    '[WebView] Loading URL:',
+    webViewUrl.replace(/access_token=[^&]+/, 'access_token=***').replace(/refresh_token=[^&]+/, 'refresh_token=***')
+  );
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
       <WebView
         ref={webViewRef}
-        source={{ uri: WEB_APP_URL }}
+        source={{ uri: webViewUrl }}
         style={styles.webview}
         javaScriptEnabled={true}
         domStorageEnabled={true}
@@ -220,19 +205,19 @@ function AppContent() {
         thirdPartyCookiesEnabled={true}
         onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
         onNavigationStateChange={handleNavigationStateChange}
-        // 允许所有来源的导航（除了被拦截的路径）
+        // Allow navigation from all origins (except intercepted paths)
         originWhitelist={['*']}
-        // 处理错误
+        // Handle errors
         onError={(syntheticEvent) => {
           const { nativeEvent } = syntheticEvent;
-          console.warn('WebView error: ', nativeEvent);
+          console.warn('[WebView] Error: ', nativeEvent);
         }}
-        // 处理加载状态
+        // Handle loading state
         onLoadStart={() => {
-          console.log('WebView started loading');
+          console.log('[WebView] Started loading');
         }}
         onLoadEnd={() => {
-          console.log('WebView finished loading');
+          console.log('[WebView] Finished loading');
         }}
       />
     </SafeAreaView>
@@ -240,7 +225,7 @@ function AppContent() {
 }
 
 /**
- * 根组件：包装 AuthProvider
+ * Root component: wraps AuthProvider
  */
 export default function App() {
   return (

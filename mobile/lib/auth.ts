@@ -5,15 +5,33 @@
 
 import 'react-native-url-polyfill/auto';
 
+import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
-
-import * as Linking from 'expo-linking';
-
 import Constants from 'expo-constants';
 
 import { supabase } from './supabase.native';
 
 WebBrowser.maybeCompleteAuthSession();
+
+function getRedirectUri() {
+  const isExpoGo = Constants.appOwnership === 'expo';
+  const redirectUri = isExpoGo
+    ? AuthSession.makeRedirectUri({ useProxy: true } as AuthSession.AuthSessionRedirectUriOptions & {
+        useProxy: true;
+      })
+    : AuthSession.makeRedirectUri({
+        scheme: 'partytix',
+        path: 'auth-callback',
+      });
+
+  console.log(
+    '[App] Redirect type:',
+    isExpoGo ? 'Expo Go (proxy)' : 'Standalone (partytix://auth-callback)'
+  );
+  console.log('[Debug] Final redirectUri =', redirectUri);
+
+  return redirectUri;
+}
 
 /**
  * Native Google login function for mobile
@@ -21,99 +39,56 @@ WebBrowser.maybeCompleteAuthSession();
  */
 export async function signInWithGoogle() {
   try {
-    // 1) Build redirect URI: exp://...auth-callback
-    const redirectUri = Linking.createURL('auth-callback');
+    console.log('[Auth] signInWithGoogle start');
+    const redirectUri = getRedirectUri();
+    console.log('[OAuth] Redirect URI:', redirectUri);
 
-    console.log('[OAuth] redirectUri:', redirectUri);
+    const supabaseConfigUrl =
+      process.env.EXPO_PUBLIC_SUPABASE_URL ||
+      Constants.expoConfig?.extra?.supabaseUrl;
 
-    // 2) Request Supabase OAuth URL
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: redirectUri,
-        skipBrowserRedirect: true,
-      },
+    if (!supabaseConfigUrl) {
+      throw new Error('Missing Supabase URL');
+    }
+
+    const authUrl = `${supabaseConfigUrl}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(
+      redirectUri
+    )}`;
+    console.log('[OAuth] Auth URL:', authUrl);
+
+    const startAsync = (AuthSession as any).startAsync;
+    if (typeof startAsync !== 'function') {
+      throw new Error('AuthSession.startAsync is not available');
+    }
+
+    const result = await startAsync({ authUrl });
+    console.log('[OAuth] AuthSession result:', JSON.stringify(result, null, 2));
+
+    if (result.type !== 'success') {
+      throw new Error(`Auth session did not succeed. type=${result.type}`);
+    }
+
+    const { access_token, refresh_token } = result.params || {};
+
+    if (!access_token || !refresh_token) {
+      throw new Error('Missing access_token or refresh_token in OAuth result');
+    }
+
+    const { data, error } = await supabase.auth.setSession({
+      access_token,
+      refresh_token,
     });
 
     if (error) {
-      console.error('[OAuth] Supabase OAuth error:', error);
-      return { error };
+      console.error('[Auth] supabase.auth.setSession error:', error);
+      throw error;
     }
 
-    if (!data?.url) {
-      const err = new Error('No OAuth URL returned from Supabase');
-      console.error('[OAuth] ', err);
-      return { error: err };
-    }
-
-    console.log('[OAuth] Supabase OAuth URL:', data.url);
-
-    // 3) Open system browser and wait for redirect
-    const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUri);
-
-    console.log('[OAuth] openAuthSessionAsync result:', result);
-
-    // 4) Handle result
-    if (result.type !== 'success') {
-      if (result.type === 'cancel') {
-        return { error: new Error('User cancelled Google sign-in') };
-      }
-      return {
-        error: new Error(
-          `Auth session did not succeed. type=${result.type}`
-        ),
-      };
-    }
-
-    // When result.type === 'success', result contains url property
-    const callbackUrl = (result as { type: 'success'; url: string }).url;
-
-    if (!callbackUrl) {
-      return {
-        error: new Error('No callback URL returned from auth session'),
-      };
-    }
-
-    // 5) Parse code from callbackUrl
-    let code: string | null = null;
-
-    // Try using URL class to parse
-    try {
-      const urlObj = new URL(callbackUrl);
-      code = urlObj.searchParams.get('code');
-    } catch {
-      // URL parsing failed, use regex fallback
-      const match = callbackUrl.match(/[?&]code=([^&]+)/);
-      code = match ? decodeURIComponent(match[1]) : null;
-    }
-
-    if (!code) {
-      console.error(
-        `[OAuth] No auth code found in callback URL: ${callbackUrl}`
-      );
-      return { error: new Error('No auth code found in callback URL') };
-    }
-
-    console.log('[OAuth] Parsed auth code:', code);
-
-    // 6) Exchange code for session
-    const { data: sessionData, error: exchangeError } =
-      await supabase.auth.exchangeCodeForSession(code);
-
-    if (exchangeError) {
-      console.error('[OAuth] exchangeCodeForSession error:', exchangeError);
-      return { error: exchangeError };
-    }
-
-    console.log(
-      '[OAuth] exchangeCodeForSession success, hasSession:',
-      !!sessionData.session
-    );
-
-    return { data: sessionData };
+    console.log('[Auth] Supabase session set');
+    return data.session;
   } catch (error) {
-    console.error('[OAuth] signInWithGoogle error:', error);
-    return { error: error instanceof Error ? error : new Error('Unknown error') };
+    console.error('[Auth] signInWithGoogle error:', error);
+    throw error instanceof Error ? error : new Error('Unknown error');
   }
 }
 
@@ -133,7 +108,32 @@ export async function signInWithEmailPassword(email: string, password: string) {
       return { error };
     }
 
-    console.log('[Auth] Email/password sign in successful');
+    console.log(
+      '[Auth] Email/password sign in successful, hasSession:',
+      !!data.session,
+      'userId:',
+      data.session?.user?.id,
+      'expiresAt:',
+      data.session?.expires_at
+    );
+
+    // Verify session was saved by immediately getting it
+    try {
+      const { data: verifyData, error: verifyError } = await supabase.auth.getSession();
+      if (verifyError) {
+        console.error('[Auth] Failed to verify saved session:', verifyError);
+      } else {
+        console.log(
+          '[Auth] Session verification: hasSession:',
+          !!verifyData.session,
+          'userId:',
+          verifyData.session?.user?.id
+        );
+      }
+    } catch (verifyErr) {
+      console.error('[Auth] Error verifying session:', verifyErr);
+    }
+
     return { data };
   } catch (error) {
     console.error('[Auth] signInWithEmailPassword error:', error);

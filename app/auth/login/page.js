@@ -5,6 +5,7 @@ import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '../../../lib/auth-context'
 import { handleAfterLogin } from '@/lib/auth-after-login'
+import { isMobileAppEnvironment } from '@/lib/mobile-app-detector'
 
 function LoginPageContent() {
   const router = useRouter()
@@ -18,6 +19,12 @@ function LoginPageContent() {
   const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
   const [message, setMessage] = useState('')
+  const [inMobileApp, setInMobileApp] = useState(false)
+
+  // Detect mobile app environment
+  useEffect(() => {
+    setInMobileApp(isMobileAppEnvironment())
+  }, [])
 
   // Check for error in URL params (from OAuth callback)
   useEffect(() => {
@@ -125,6 +132,67 @@ function LoginPageContent() {
 
   const isSuccessMessage = message && message.toLowerCase().includes('success')
 
+  // Render mobile app message if inside WebView
+  if (inMobileApp) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #0f172a 0%, #7c3aed 50%, #0f172a 100%)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '16px'
+      }}>
+        <div style={{
+          background: 'rgba(15, 23, 42, 0.6)',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          borderRadius: '16px',
+          boxShadow: '0 25px 50px rgba(0, 0, 0, 0.3)',
+          padding: '32px',
+          width: '100%',
+          maxWidth: '448px',
+          textAlign: 'center'
+        }}>
+          <div style={{ marginBottom: '24px' }}>
+            <h1 style={{
+              fontSize: '1.875rem',
+              fontWeight: 'bold',
+              color: 'white',
+              marginBottom: '16px'
+            }}>PartyTix</h1>
+            <p style={{ color: '#94a3b8', fontSize: '1rem', lineHeight: '1.6' }}>
+              You are using the PartyTix mobile app.
+            </p>
+          </div>
+          
+          <div style={{
+            padding: '20px',
+            backgroundColor: 'rgba(124, 58, 237, 0.1)',
+            border: '1px solid rgba(124, 58, 237, 0.3)',
+            borderRadius: '8px',
+            marginBottom: '24px'
+          }}>
+            <p style={{ color: 'white', fontSize: '0.875rem', lineHeight: '1.6' }}>
+              Please log in via the app's native login screen. Once you are logged in, 
+              the app will automatically sign you into the web content.
+            </p>
+          </div>
+
+          <div style={{
+            marginTop: '24px',
+            paddingTop: '24px',
+            borderTop: '1px solid rgba(255, 255, 255, 0.1)'
+          }}>
+            <p style={{ color: '#94a3b8', fontSize: '0.875rem' }}>
+              If you need to log in, please use the native login screen in the app.
+            </p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Normal browser login UI
   return (
     <div style={{
       minHeight: '100vh',

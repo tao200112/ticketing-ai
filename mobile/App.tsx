@@ -8,6 +8,7 @@ import { SafeAreaView, StyleSheet, Platform, View, ActivityIndicator, Alert } fr
 import { StatusBar } from 'expo-status-bar';
 import { WebView, WebViewNavigation } from 'react-native-webview';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { supabase } from './lib/supabase.native';
 import LoginScreen from './screens/LoginScreen';
 import ForgotPasswordScreen from './screens/ForgotPasswordScreen';
 
@@ -20,8 +21,9 @@ const WEB_APP_URL = 'https://ticketing-ai-six.vercel.app';
 
 /**
  * Build mobile-bridge URL with access_token and refresh_token
+ * Always includes source=mobile-app parameter to identify mobile app environment
  * @param session Supabase session object
- * @returns mobile-bridge URL with token parameters or original URL
+ * @returns mobile-bridge URL with token parameters or URL with source param
  */
 const buildMobileBridgeUrl = (session: any): string => {
   const accessToken = session?.access_token;
@@ -31,11 +33,13 @@ const buildMobileBridgeUrl = (session: any): string => {
     return (
       `${WEB_APP_URL}/mobile-bridge` +
       `?access_token=${encodeURIComponent(accessToken)}` +
-      `&refresh_token=${encodeURIComponent(refreshToken)}`
+      `&refresh_token=${encodeURIComponent(refreshToken)}` +
+      `&source=mobile-app`
     );
   }
 
-  return WEB_APP_URL;
+  // Even without tokens, include source=mobile-app to identify mobile app
+  return `${WEB_APP_URL}?source=mobile-app`;
 };
 
 /**
@@ -59,6 +63,16 @@ function AppContent() {
   const { session, loading } = useAuth();
   const webViewRef = useRef<WebView>(null);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
+
+  // Debug logging
+  useEffect(() => {
+    console.log('[App] Session state:', {
+      hasSession: !!session,
+      hasUser: !!session?.user,
+      loading,
+      sessionExpiresAt: session?.expires_at,
+    });
+  }, [session, loading]);
 
 
   // Web platform: redirect directly to target URL
@@ -99,8 +113,10 @@ function AppContent() {
 
   /**
    * Intercept navigation requests, block access to merchant/admin paths (iOS and some Android)
+   * Also prevent navigation to login page if we should use native login
    */
   const handleShouldStartLoadWithRequest = (request: { url: string }): boolean => {
+    // Block restricted paths
     if (isRestrictedPath(request.url)) {
       Alert.alert(
         'Feature Unavailable',
@@ -109,6 +125,21 @@ function AppContent() {
       );
       return false; // Block navigation
     }
+
+    // If navigating to web login page, this means web session is invalid
+    // Clear native session and show native login screen instead
+    if (request.url.includes('/auth/login') || request.url.includes('/login')) {
+      // Only handle if it doesn't have source=mobile-app (which shows mobile app message)
+      if (!request.url.includes('source=mobile-app')) {
+        console.warn('[App] Blocked navigation to web login page. Clearing session and showing native login.');
+        // Clear session and this will trigger re-render to show native login
+        supabase.auth.signOut().then(() => {
+          console.log('[App] Session cleared due to login page navigation');
+        });
+        return false; // Block navigation
+      }
+    }
+
     return true; // Allow navigation
   };
 
@@ -117,6 +148,8 @@ function AppContent() {
    */
   const handleNavigationStateChange = (navState: WebViewNavigation) => {
     const url = navState.url;
+    
+    console.log('[App] WebView navigation:', url);
     
     // If navigating to restricted path, block and go back
     if (isRestrictedPath(url)) {
@@ -133,19 +166,38 @@ function AppContent() {
           },
         ]
       );
+      return;
+    }
+
+    // If navigating to login page, this means web session is invalid
+    // Clear native session and show native login screen
+    if (url.includes('/auth/login') || url.includes('/login')) {
+      // Only handle if it doesn't have source=mobile-app (which shows mobile app message)
+      if (!url.includes('source=mobile-app')) {
+        console.warn('[App] WebView navigated to login page, session likely invalid. Clearing session and showing native login.');
+        // Clear session and this will trigger re-render to show native login
+        supabase.auth.signOut().then(() => {
+          console.log('[App] Session cleared due to login page navigation');
+        });
+      }
     }
   };
 
   // Use useMemo to avoid repeatedly building URL (prevent infinite loops)
+  // Only build URL if we have a valid session (will be used after session check)
   const webViewUrl = useMemo(() => {
-    if (!session) {
-      return WEB_APP_URL;
+    if (!session || !session.user) {
+      // This should not be reached due to early return above, but for safety:
+      return `${WEB_APP_URL}?source=mobile-app`;
     }
-    return buildMobileBridgeUrl(session);
+    const url = buildMobileBridgeUrl(session);
+    console.log('[App] Built WebView URL:', url.replace(/access_token=[^&]+/, 'access_token=***').replace(/refresh_token=[^&]+/, 'refresh_token=***'));
+    return url;
   }, [session]);
 
   // Loading state
   if (loading) {
+    console.log('[App] Still loading, showing loading indicator');
     return (
       <View style={styles.loadingContainer}>
         <StatusBar style="light" />
@@ -155,7 +207,8 @@ function AppContent() {
   }
 
   // Not logged in: show native login page or forgot password page
-  if (!session) {
+  if (!session || !session.user) {
+    console.log('[App] No valid session, showing native LoginScreen');
     return (
       <View style={styles.container}>
         <StatusBar style="light" />
@@ -187,10 +240,7 @@ function AppContent() {
   }
 
   // Mobile platform: logged in, show WebView
-  console.log(
-    '[WebView] Loading URL:',
-    webViewUrl.replace(/access_token=[^&]+/, 'access_token=***').replace(/refresh_token=[^&]+/, 'refresh_token=***')
-  );
+  console.log('[App] Valid session exists, showing WebView');
 
   return (
     <SafeAreaView style={styles.container}>
@@ -213,11 +263,26 @@ function AppContent() {
           console.warn('[WebView] Error: ', nativeEvent);
         }}
         // Handle loading state
-        onLoadStart={() => {
-          console.log('[WebView] Started loading');
+        onLoadStart={(syntheticEvent) => {
+          const { nativeEvent } = syntheticEvent;
+          console.log('[WebView] Started loading:', nativeEvent.url);
         }}
-        onLoadEnd={() => {
-          console.log('[WebView] Finished loading');
+        onLoadEnd={(syntheticEvent) => {
+          const { nativeEvent } = syntheticEvent;
+          const url = nativeEvent.url;
+          console.log('[WebView] Finished loading:', url);
+          
+          // Check if loaded page is login page (indicates web session is invalid)
+          if (url.includes('/auth/login') || url.includes('/login')) {
+            // Only handle if it doesn't have source=mobile-app (which shows mobile app message)
+            if (!url.includes('source=mobile-app')) {
+              console.warn('[WebView] Loaded login page, session likely invalid. Clearing session and showing native login.');
+              // Clear session and this will trigger re-render to show native login
+              supabase.auth.signOut().then(() => {
+                console.log('[App] Session cleared due to login page load');
+              });
+            }
+          }
         }}
       />
     </SafeAreaView>

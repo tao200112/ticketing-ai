@@ -50,7 +50,13 @@
     "test:env": "node scripts/test-env-config.js",
     "migrate:email-verification": "node scripts/run-database-migration.js",
     "test:final": "node scripts/test-email-verification-final.js",
-    "test:email-sending": "node scripts/test-email-sending.js"
+    "test:email-sending": "node scripts/test-email-sending.js",
+    "dev:mobile": "cd mobile && npm start",
+    "mobile:start": "cd mobile && npm start",
+    "mobile:ios": "cd mobile && npm run ios",
+    "mobile:android": "cd mobile && npm run android",
+    "mobile:web": "cd mobile && npm run web",
+    "mobile:install": "cd mobile && npm install"
   },
   "dependencies": {
     "@sentry/nextjs": "^10.22.0",

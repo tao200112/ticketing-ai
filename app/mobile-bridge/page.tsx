@@ -12,10 +12,13 @@ export default function MobileBridgePage() {
     const url = new URL(window.location.href)
     const accessToken = url.searchParams.get('access_token')
     const refreshToken = url.searchParams.get('refresh_token')
+    const sourceParam = url.searchParams.get('source')
 
     if (!accessToken || !refreshToken) {
       console.error('[MobileBridge] Missing tokens in URL')
-      router.replace('/')
+      // Preserve source param if present
+      const redirectUrl = sourceParam === 'mobile-app' ? '/?source=mobile-app' : '/'
+      router.replace(redirectUrl)
       return
     }
 
@@ -30,7 +33,11 @@ export default function MobileBridgePage() {
 
         if (error) {
           console.error('[MobileBridge] setSession error:', error)
-          router.replace('/auth/login')
+          // Preserve source param if present
+          const redirectUrl = sourceParam === 'mobile-app' 
+            ? '/auth/login?source=mobile-app' 
+            : '/auth/login'
+          router.replace(redirectUrl)
           return
         }
 
@@ -39,16 +46,21 @@ export default function MobileBridgePage() {
           data.session?.user?.id
         )
 
-        // Clean tokens from URL
+        // Clean tokens from URL but preserve source param
         url.searchParams.delete('access_token')
         url.searchParams.delete('refresh_token')
         window.history.replaceState({}, '', url.toString())
 
-        // Redirect to main app page
-        router.replace('/')
+        // Redirect to main app page with source param preserved
+        const redirectUrl = sourceParam === 'mobile-app' ? '/?source=mobile-app' : '/'
+        router.replace(redirectUrl)
       } catch (e) {
         console.error('[MobileBridge] unexpected error:', e)
-        router.replace('/auth/login')
+        // Preserve source param if present
+        const redirectUrl = sourceParam === 'mobile-app' 
+          ? '/auth/login?source=mobile-app' 
+          : '/auth/login'
+        router.replace(redirectUrl)
       }
     })()
   }, [router, supabase])

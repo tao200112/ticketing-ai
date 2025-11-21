@@ -237,13 +237,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const handleSignInWithGoogle = async () => {
     try {
       console.log('[AuthContext] Starting Google sign in...');
-      const { error } = await signInWithGoogle();
-      if (error) {
-        console.error('[AuthContext] Google sign in error:', error);
-        throw error;
-      }
+      await signInWithGoogle();
       // Session will be automatically updated via onAuthStateChange
-      console.log('[AuthContext] Google sign in initiated, waiting for session update...');
     } catch (error) {
       console.error('[AuthContext] Google sign in failed:', error);
       throw error;

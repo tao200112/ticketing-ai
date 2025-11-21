@@ -16,14 +16,14 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
-import { useAuth } from '../context/AuthContext';
+import { useGoogleSignIn, signInWithEmailPassword as emailSignIn } from '../lib/auth';
 
 interface LoginScreenProps {
   onForgotPassword?: () => void;
 }
 
 export default function LoginScreen({ onForgotPassword }: LoginScreenProps) {
-  const { signInWithGoogle, signInWithEmailPassword } = useAuth();
+  const { signInWithGoogle } = useGoogleSignIn();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -54,7 +54,7 @@ export default function LoginScreen({ onForgotPassword }: LoginScreenProps) {
 
     try {
       setLoading(true);
-      await signInWithEmailPassword(email.trim(), password);
+      await emailSignIn(email.trim(), password);
       // Success will automatically update state via AuthContext
     } catch (error: any) {
       Alert.alert('Sign-in Failed', error?.message || 'Email sign-in failed, please try again');

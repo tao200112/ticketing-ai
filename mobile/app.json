@@ -1,12 +1,13 @@
 {
   "expo": {
+    "owner": "taoliu0711",
     "name": "PartyTix",
     "slug": "partytix",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "scheme": "partytix",
     "splash": {
       "image": "./assets/splash.png",

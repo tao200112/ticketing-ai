@@ -7,7 +7,6 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": false,
     "scheme": "partytix",
     "splash": {
       "image": "./assets/splash.png",
@@ -16,7 +15,15 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.partytix.client"
+      "bundleIdentifier": "com.partytix.client",
+      "associatedDomains": [],
+      "infoPlist": {
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLSchemes": ["partytix"]
+          }
+        ]
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -25,7 +32,20 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.partytix.client"
+      "package": "com.partytix.client",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "partytix",
+              "host": "auth-callback"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"

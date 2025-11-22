@@ -3,42 +3,92 @@
  * Native Google login implementation
  */
 
-import { useCallback } from 'react';
 import 'react-native-url-polyfill/auto';
 
-import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
-import Constants from 'expo-constants';
 
 import { supabase } from '../supabase.native';
 
 WebBrowser.maybeCompleteAuthSession();
 
-const SUPABASE_URL =
-  process.env.EXPO_PUBLIC_SUPABASE_URL || Constants.expoConfig?.extra?.supabaseUrl;
+const NATIVE_REDIRECT_URI = 'partytix://auth-callback';
 
-if (!SUPABASE_URL) {
-  console.error('[Auth] Missing Supabase URL configuration');
+function getSearchParamsFromUrl(url: string) {
+  const hashIndex = url.indexOf('#');
+  if (hashIndex !== -1) {
+    const fragment = url.substring(hashIndex + 1);
+    return new URLSearchParams(fragment);
+  }
+
+  const queryIndex = url.indexOf('?');
+  if (queryIndex !== -1) {
+    const query = url.substring(queryIndex + 1);
+    return new URLSearchParams(query);
+  }
+
+  return new URLSearchParams();
 }
 
-export function getRedirectUri() {
-  const redirectUri = AuthSession.makeRedirectUri({
-    scheme: 'partytix',
-    useProxy: true,
-  } as AuthSession.AuthSessionRedirectUriOptions & { useProxy: true });
+export async function handleOAuthRedirect(callbackUrl: string) {
+  console.log('[Callback] Handling redirect URL:', callbackUrl);
+  const params = getSearchParamsFromUrl(callbackUrl);
+  console.log('[Callback] Parsed keys:', Array.from(params.keys()));
 
-  console.log('[App] Using proxy redirect URI:', redirectUri);
-  return redirectUri;
+  const accessToken = params.get('access_token');
+  const refreshToken = params.get('refresh_token');
+
+  if (accessToken && refreshToken) {
+    console.log('[Callback] Using access_token / refresh_token to set session');
+    const { data, error } = await supabase.auth.setSession({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+    });
+
+    if (error) {
+      console.error('[Callback] setSession error:', error);
+      return;
+    }
+
+    console.log(
+      '[Callback] setSession success, user id:',
+      data.session?.user?.id,
+      'hasSession:',
+      Boolean(data.session)
+    );
+    return;
+  }
+
+  const code = params.get('code');
+
+  if (code) {
+    console.log('[Callback] Exchanging code for session:', code);
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+
+    if (error) {
+      console.error('[Callback] exchangeCodeForSession error:', error);
+      return;
+    }
+
+    console.log(
+      '[Callback] exchangeCodeForSession success, user id:',
+      data.session?.user?.id,
+      'hasSession:',
+      Boolean(data.session)
+    );
+    return;
+  }
+
+  console.warn('[Callback] No usable params found in redirect URL');
 }
 
 export async function signInWithGoogle() {
   console.log('[Auth] signInWithGoogle start');
-  const redirectUri = getRedirectUri();
+  console.log('[Auth] Using native redirect URI:', NATIVE_REDIRECT_URI);
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
-      redirectTo: redirectUri,
+      redirectTo: NATIVE_REDIRECT_URI,
     },
   });
 
@@ -52,17 +102,22 @@ export async function signInWithGoogle() {
     throw new Error('[OAuth] Missing authorization url from Supabase');
   }
 
-  console.log('[OAuth] Opening auth session URL via startAsync:', authUrl);
+  console.log('[OAuth] Opening auth session via WebBrowser.openAuthSessionAsync:', authUrl);
 
-  const result = await AuthSession.startAsync({ authUrl });
-  console.log('[OAuth] AuthSession result:', JSON.stringify(result, null, 2));
+  const result = await WebBrowser.openAuthSessionAsync(authUrl, NATIVE_REDIRECT_URI);
+  console.log('[OAuth] WebBrowser result:', JSON.stringify(result, null, 2));
 
   if (result.type !== 'success') {
     throw new Error(`[OAuth] Auth flow failed, result type=${result.type}`);
   }
 
-  // Supabase onAuthStateChange will hydrate the session automatically.
-  console.log('[AuthContext] Google OAuth completed, waiting for Supabase session');
+  if (result.url) {
+    await handleOAuthRedirect(result.url);
+  } else {
+    console.warn('[Callback] OAuth result missing redirect URL');
+  }
+
+  console.log('[Callback] Browser returned to native redirect:', NATIVE_REDIRECT_URI);
   return result;
 }
 
@@ -70,12 +125,8 @@ export async function signInWithGoogle() {
  * Hook that exposes Google OAuth trigger
  */
 export function useGoogleSignIn() {
-  const startGoogleSignIn = useCallback(() => {
-    return signInWithGoogle();
-  }, []);
-
   return {
-    signInWithGoogle: startGoogleSignIn,
+    signInWithGoogle,
   };
 }
 

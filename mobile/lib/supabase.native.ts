@@ -28,6 +28,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false, // React Native doesn't need to detect session in URL
+    flowType: 'pkce',
     // lock is handled internally by SDK, no manual configuration needed
   },
 });

@@ -265,7 +265,7 @@ export default function MerchantLoginPage() {
         {/* Back to Home */}
         <div style={{ textAlign: 'center', marginTop: '1rem' }}>
           <Link 
-            href="/"
+            href="/blacksburg"
             style={{
               color: '#6b7280',
               textDecoration: 'none',

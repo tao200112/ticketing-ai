@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
-import EventCard from '../../components/EventCard'
+import EventCard from '@/components/events/EventCard'
 import { useEvents } from '../../lib/hooks/use-api'
 
 export default function EventsPage() {
@@ -178,7 +178,7 @@ export default function EventsPage() {
 
         {/* 返回首页 */}
         <div style={{ textAlign: 'center', marginTop: '32px' }}>
-          <Link href="/" style={{
+          <Link href="/blacksburg" style={{
             display: 'inline-block',
             padding: '12px 24px',
             backgroundColor: '#374151',

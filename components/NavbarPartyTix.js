@@ -2,16 +2,55 @@
 
 import Link from 'next/link'
 import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import NavLinkItem from './NavLinkItem'
 
 export default function NavbarPartyTix() {
   const router = useRouter()
   const { user, logout } = useAuth()
+  const pathname = usePathname()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
   const [isSigningOut, setIsSigningOut] = useState(false)
+  const navItems = [
+    { label: 'Events', href: '/blacksburg', matchers: ['/events'] },
+    { label: 'Activity', href: '/activity', matchers: [] },
+    { label: 'Tickets', href: '/tickets', matchers: [] }
+  ]
+  const desktopNavLinkStyle = {
+    color: 'rgba(255, 255, 255, 0.85)',
+    textDecoration: 'none',
+    fontWeight: 500,
+    paddingBottom: '6px',
+    borderBottom: '2px solid transparent',
+    letterSpacing: '0.02em',
+    transition: 'color 0.3s ease, border-color 0.3s ease'
+  }
+  const desktopNavLinkActiveStyle = {
+    color: '#ffffff',
+    borderBottomColor: '#a855f7'
+  }
+  const mobileNavLinkStyle = {
+    ...desktopNavLinkStyle,
+    width: '100%',
+    padding: '8px 0',
+    borderBottom: '1px solid rgba(255, 255, 255, 0.08)'
+  }
+  const mobileNavLinkActiveStyle = {
+    ...desktopNavLinkActiveStyle,
+    borderBottomColor: '#a855f7'
+  }
+  const isNavActive = (item) => {
+    if (!pathname) return false
+    if (item.href === '/blacksburg') {
+      if (pathname === '/blacksburg' || pathname.startsWith('/blacksburg/')) {
+        return true
+      }
+      return item.matchers?.some((match) => pathname.startsWith(match))
+    }
+    return pathname === item.href || pathname.startsWith(`${item.href}/`)
+  }
 
   useEffect(() => {
     const checkScreenSize = () => {
@@ -41,12 +80,14 @@ export default function NavbarPartyTix() {
     }
   }, [logout, closeMobileMenu, router])
 
-  const renderAuthLinks = (variant = 'desktop') => {
+  const renderAuthLinks = (variant = 'desktop', onNavigate) => {
     const baseStyle = {
       color: 'white',
       textDecoration: 'none',
       transition: 'color 0.3s ease'
     }
+    const clickHandler = variant === 'mobile' ? onNavigate : undefined
+    const isAccountActive = pathname?.startsWith('/account')
 
     if (user) {
       return (
@@ -58,9 +99,14 @@ export default function NavbarPartyTix() {
               background: 'linear-gradient(135deg, #7C3AED 0%, #22D3EE 100%)',
               padding: variant === 'desktop' ? '8px 16px' : '12px 16px',
               borderRadius: '8px',
-              fontWeight: '500'
+              fontWeight: '600',
+              boxShadow: isAccountActive ? '0 0 18px rgba(124, 58, 237, 0.4)' : 'none'
             }}
-            onClick={variant === 'mobile' ? closeMobileMenu : undefined}
+            activeStyle={{
+              boxShadow: '0 0 18px rgba(124, 58, 237, 0.55)'
+            }}
+            isActive={isAccountActive}
+            onClick={clickHandler}
           >
             Account
           </NavLinkItem>
@@ -87,7 +133,7 @@ export default function NavbarPartyTix() {
         <NavLinkItem
           href="/auth/login"
           style={baseStyle}
-          onClick={variant === 'mobile' ? closeMobileMenu : undefined}
+            onClick={clickHandler}
         >
           Login
         </NavLinkItem>
@@ -100,7 +146,7 @@ export default function NavbarPartyTix() {
             borderRadius: '8px',
             fontWeight: '500'
           }}
-          onClick={variant === 'mobile' ? closeMobileMenu : undefined}
+            onClick={clickHandler}
         >
           Sign Up
         </NavLinkItem>
@@ -169,26 +215,17 @@ export default function NavbarPartyTix() {
               gap: '24px'
             }}
           >
-          <NavLinkItem
-            href="/events"
-            style={{
-              color: 'white',
-              textDecoration: 'none',
-              transition: 'color 0.3s ease'
-            }}
-          >
-            Events
-          </NavLinkItem>
-          <NavLinkItem
-            href="/activity"
-            style={{
-              color: 'white',
-              textDecoration: 'none',
-              transition: 'color 0.3s ease'
-            }}
-          >
-            Activity
-          </NavLinkItem>
+            {navItems.map((item) => (
+              <NavLinkItem
+                key={item.href}
+                href={item.href}
+                style={desktopNavLinkStyle}
+                activeStyle={desktopNavLinkActiveStyle}
+                isActive={isNavActive(item)}
+              >
+                {item.label}
+              </NavLinkItem>
+            ))}
             {renderAuthLinks('desktop')}
           </div>
         )}
@@ -226,33 +263,19 @@ export default function NavbarPartyTix() {
             gap: '16px'
           }}
         >
-          <NavLinkItem
-            href="/events"
-            style={{
-              color: 'white',
-              textDecoration: 'none',
-              fontSize: '16px',
-              padding: '8px 0',
-              transition: 'color 0.3s ease'
-            }}
-            onClick={closeMobileMenu}
-          >
-            Events
-          </NavLinkItem>
-          <NavLinkItem
-            href="/activity"
-            style={{
-              color: 'white',
-              textDecoration: 'none',
-              fontSize: '16px',
-              padding: '8px 0',
-              transition: 'color 0.3s ease'
-            }}
-            onClick={closeMobileMenu}
-          >
-            Activity
-          </NavLinkItem>
-          {renderAuthLinks('mobile')}
+          {navItems.map((item) => (
+            <NavLinkItem
+              key={item.href}
+              href={item.href}
+              style={mobileNavLinkStyle}
+              activeStyle={mobileNavLinkActiveStyle}
+              isActive={isNavActive(item)}
+              onClick={closeMobileMenu}
+            >
+              {item.label}
+            </NavLinkItem>
+          ))}
+          {renderAuthLinks('mobile', closeMobileMenu)}
         </div>
       )}
     </nav>

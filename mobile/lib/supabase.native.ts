@@ -33,3 +33,5 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   },
 });
 
+console.log('[SupabaseNative] Client initialized with autoRefreshToken + persistSession');
+

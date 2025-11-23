@@ -14,10 +14,10 @@ export default function MobileBridgePage() {
     const refreshToken = url.searchParams.get('refresh_token')
     const sourceParam = url.searchParams.get('source')
 
+    const redirectUrl = sourceParam === 'mobile-app' ? '/?source=mobile-app' : '/'
+
     if (!accessToken || !refreshToken) {
-      console.error('[MobileBridge] Missing tokens in URL')
-      // Preserve source param if present
-      const redirectUrl = sourceParam === 'mobile-app' ? '/?source=mobile-app' : '/'
+      console.warn('[MobileBridge] Missing tokens in URL, skipping session injection')
       router.replace(redirectUrl)
       return
     }
@@ -33,10 +33,6 @@ export default function MobileBridgePage() {
 
         if (error) {
           console.error('[MobileBridge] setSession error:', error)
-          // Preserve source param if present
-          const redirectUrl = sourceParam === 'mobile-app' 
-            ? '/auth/login?source=mobile-app' 
-            : '/auth/login'
           router.replace(redirectUrl)
           return
         }
@@ -51,15 +47,9 @@ export default function MobileBridgePage() {
         url.searchParams.delete('refresh_token')
         window.history.replaceState({}, '', url.toString())
 
-        // Redirect to main app page with source param preserved
-        const redirectUrl = sourceParam === 'mobile-app' ? '/?source=mobile-app' : '/'
         router.replace(redirectUrl)
       } catch (e) {
         console.error('[MobileBridge] unexpected error:', e)
-        // Preserve source param if present
-        const redirectUrl = sourceParam === 'mobile-app' 
-          ? '/auth/login?source=mobile-app' 
-          : '/auth/login'
         router.replace(redirectUrl)
       }
     })()

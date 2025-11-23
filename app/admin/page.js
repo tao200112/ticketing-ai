@@ -134,7 +134,7 @@ export default function AdminLogin() {
           marginTop: '2rem',
           textAlign: 'center'
         }}>
-          <a href="/" style={{
+          <a href="/blacksburg" style={{
             color: '#007bff',
             textDecoration: 'none',
             fontSize: '0.9rem'

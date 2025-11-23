@@ -2,13 +2,12 @@
 
 import Link from "next/link"
 import React, { useState, useEffect } from "react"
-import NavbarPartyTix from "../components/NavbarPartyTix"
-import EventCard from "../components/EventCard"
-import { SkeletonGrid } from "../components/SkeletonCard"
-// import { hasSupabase } from "../lib/safeEnv" // Removed, using new API client
-import { useEvents } from "../lib/hooks/use-api"
+import NavbarPartyTix from "@/components/NavbarPartyTix"
+import EventCard from "@/components/events/EventCard"
+import { SkeletonGrid } from "@/components/events/SkeletonCard"
+import { useEvents } from "@/lib/hooks/use-api"
 
-export default function Home() {
+export default function BlacksburgPage() {
   // Use new API hook
   const { data: apiEvents, loading: apiLoading, error: apiError } = useEvents()
   const [localEvents, setLocalEvents] = useState([])

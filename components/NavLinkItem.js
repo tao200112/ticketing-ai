@@ -24,12 +24,27 @@ export default function NavLinkItem({
   onClick,
   onMouseEnter,
   onMouseLeave,
+  isActive = false,
+  activeClassName,
+  activeStyle,
 }) {
+  const combinedClassName = [
+    className,
+    isActive && activeClassName ? activeClassName : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+
+  const combinedStyle = {
+    ...(style || {}),
+    ...(isActive && activeStyle ? activeStyle : {}),
+  }
+
   return (
     <Link
       href={href}
-      className={className}
-      style={style}
+      className={combinedClassName || undefined}
+      style={combinedStyle}
       onClick={onClick}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}

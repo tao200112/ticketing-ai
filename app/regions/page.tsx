@@ -1,20 +1,12 @@
-'use client'
-
 import NavbarPartyTix from '@/components/NavbarPartyTix'
 import RegionCard from '@/components/regions/RegionCard'
+import { fetchActiveRegions } from '@/lib/regions'
 
-const regions = [
-  {
-    title: 'Blacksburg, Virginia',
-    subtitle: 'Virginia Tech · Downtown · Neon nightlife',
-    href: '/blacksburg',
-    badge: 'Live Now',
-    imageUrl:
-      'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=900&q=60',
-  },
-]
+export const dynamic = 'force-dynamic'
 
-export default function RegionsPage() {
+export default async function RegionsPage() {
+  const regions = await fetchActiveRegions()
+
   return (
     <div
       style={{
@@ -96,7 +88,7 @@ export default function RegionsPage() {
                 marginBottom: '6px',
               }}
             >
-              Current Location
+              Always-on Coverage
             </p>
             <h3
               style={{
@@ -106,7 +98,7 @@ export default function RegionsPage() {
                 marginBottom: '4px',
               }}
             >
-              Blacksburg, VA
+              Explore active LineLeap regions
             </h3>
             <span
               style={{
@@ -114,7 +106,7 @@ export default function RegionsPage() {
                 fontSize: '0.9rem',
               }}
             >
-              Detected via device · VT Campus
+              Tap a city below to jump directly into its events hub.
             </span>
           </div>
           <div
@@ -126,21 +118,47 @@ export default function RegionsPage() {
               fontSize: '0.95rem',
             }}
           >
-            LineLeap coverage expanding · Request your city →
+            Want to bring PartyTix to your city? Contact us →
           </div>
         </section>
 
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-            gap: '28px',
-          }}
-        >
-          {regions.map((region) => (
-            <RegionCard key={region.href} {...region} />
-          ))}
-        </div>
+        {regions.length === 0 ? (
+          <div
+            style={{
+              borderRadius: '20px',
+              border: '1px dashed rgba(255, 255, 255, 0.3)',
+              padding: '40px',
+              textAlign: 'center',
+              color: 'white',
+              background: 'rgba(0, 0, 0, 0.25)',
+            }}
+          >
+            <div style={{ fontSize: '2rem', marginBottom: '12px' }}>🌎</div>
+            <p style={{ fontSize: '18px', marginBottom: '8px' }}>No regions available yet</p>
+            <p style={{ color: 'rgba(255, 255, 255, 0.6)' }}>
+              Check back soon or reach out if you'd like PartyTix in your area.
+            </p>
+          </div>
+        ) : (
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+              gap: '28px',
+            }}
+          >
+            {regions.map((region) => (
+              <RegionCard
+                key={region.id}
+                title={region.name}
+                subtitle={region.subtitle || undefined}
+                href={`/${region.slug}`}
+                imageUrl={region.cover_image || undefined}
+                badge={region.is_active ? 'Live Now' : undefined}
+              />
+            ))}
+          </div>
+        )}
       </main>
     </div>
   )

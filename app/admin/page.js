@@ -2,11 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useDefaultRegionSlug } from '@/hooks/use-default-region-slug';
 
 export default function AdminLogin() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const router = useRouter();
+  const defaultRegionSlug = useDefaultRegionSlug();
 
   // Check if already logged in, redirect to dashboard if logged in
   useEffect(() => {
@@ -134,7 +136,7 @@ export default function AdminLogin() {
           marginTop: '2rem',
           textAlign: 'center'
         }}>
-          <a href="/blacksburg" style={{
+          <a href={`/${defaultRegionSlug}`} style={{
             color: '#007bff',
             textDecoration: 'none',
             fontSize: '0.9rem'

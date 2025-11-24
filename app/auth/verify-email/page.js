@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, Suspense } from "react";
 import Link from "next/link";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { useDefaultRegionSlug } from "@/hooks/use-default-region-slug";
 
 const STATUS_LOADING = "loading";
 const STATUS_SUCCESS = "success";
@@ -24,6 +25,7 @@ function VerifyEmailContent() {
   const [userEmail, setUserEmail] = useState("");
   const [userName, setUserName] = useState("");
   const [isResending, setIsResending] = useState(false);
+  const defaultRegionSlug = useDefaultRegionSlug();
 
   useEffect(() => {
     if (!supabase) {
@@ -157,7 +159,7 @@ function VerifyEmailContent() {
                     Login Now
                   </Link>
                   <Link
-                    href="/blacksburg"
+                    href={`/${defaultRegionSlug}`}
                     className="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                   >
                     Back to Home

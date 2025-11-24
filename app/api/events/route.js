@@ -2,10 +2,11 @@ import { NextResponse } from 'next/server'
 import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase-api'
 import { ErrorHandler, handleApiError } from '@/lib/error-handler'
 import { createLogger } from '@/lib/logger'
+import { ensureRegionId } from '@/lib/regions'
 
 const logger = createLogger('events-api')
 
-export async function GET() {
+export async function GET(request) {
   try {
     // 如果没有配置 Supabase，返回空数组
     if (!isSupabaseConfigured()) {
@@ -16,12 +17,34 @@ export async function GET() {
       })
     }
 
-    // 创建 Supabase 客户端
     const supabase = createSupabaseClient()
+    const url = new URL(request.url)
+    const regionSlug = url.searchParams.get('region')
+    let regionFilterId = null
+
+    if (regionSlug) {
+      const { data: regionRecord, error: regionError } = await supabase
+        .from('regions')
+        .select('id')
+        .eq('slug', regionSlug)
+        .eq('is_active', true)
+        .maybeSingle()
+
+      if (regionError) {
+        logger.warn('Failed to resolve region slug', { regionSlug, error: regionError })
+        return NextResponse.json({ success: true, data: [] })
+      }
+
+      if (!regionRecord) {
+        return NextResponse.json({ success: true, data: [] })
+      }
+
+      regionFilterId = regionRecord.id
+    }
 
     // 从 Supabase 获取活动数据
     // 首先查询所有活动，然后在前端过滤（这样可以处理 status 字段可能为 null 的情况）
-    let { data: events, error } = await supabase
+    let queryBuilder = supabase
       .from('events')
       .select(`
         *,
@@ -39,6 +62,12 @@ export async function GET() {
         )
       `)
       .order('created_at', { ascending: false })
+
+    if (regionFilterId) {
+      queryBuilder = queryBuilder.eq('region_id', regionFilterId)
+    }
+
+    let { data: events, error } = await queryBuilder
     
     // 如果查询失败，尝试只查询 published 状态的活动
     if (error || !events || events.length === 0) {
@@ -197,7 +226,9 @@ export async function POST(request) {
       poster_url,
       merchant_id,
       prices,
-      status = 'published'
+      status = 'published',
+      region_id: bodyRegionId,
+      region_slug: regionSlug
     } = body
 
     // 如果提供了merchant_id，验证当前用户是否有权限为该商家创建活动
@@ -251,7 +282,15 @@ export async function POST(request) {
       )
     }
 
-    // 创建活动
+    const resolvedRegionId = await ensureRegionId({ regionId: bodyRegionId, regionSlug })
+
+    if (!resolvedRegionId) {
+      throw ErrorHandler.validationError(
+        'INVALID_REGION',
+        'Region is required'
+      )
+    }
+
     const { data: event, error: eventError } = await supabase
       .from('events')
       .insert([
@@ -266,7 +305,8 @@ export async function POST(request) {
           merchant_id: merchant_id || null,
           status: status,
           max_attendees: null,
-          current_attendees: 0
+          current_attendees: 0,
+          region_id: resolvedRegionId
         }
       ])
       .select()

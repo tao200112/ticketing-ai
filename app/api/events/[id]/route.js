@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase-api'
 import { ErrorHandler, handleApiError } from '@/lib/error-handler'
 import { createLogger } from '@/lib/logger'
+import { ensureRegionId } from '@/lib/regions'
 
 const logger = createLogger('event-detail-api')
 
@@ -226,7 +227,7 @@ export async function PUT(request, { params }) {
     const resolvedParams = await params
     const id = resolvedParams?.id || resolvedParams?.id
     const body = await request.json()
-    const { title, description, startTime, endTime, location, poster_url, merchant_id, status, prices } = body
+    const { title, description, startTime, endTime, location, poster_url, merchant_id, status, prices, region_id: bodyRegionId, region_slug: regionSlug } = body
 
     if (!isSupabaseConfigured()) {
       throw ErrorHandler.configurationError(
@@ -304,6 +305,16 @@ export async function PUT(request, { params }) {
     }
 
     // 更新活动基本信息
+    let regionIdToUpdate = null
+    const shouldUpdateRegion = bodyRegionId !== undefined || regionSlug !== undefined
+
+    if (shouldUpdateRegion) {
+      regionIdToUpdate = await ensureRegionId({ regionId: bodyRegionId, regionSlug })
+      if (!regionIdToUpdate) {
+        throw ErrorHandler.validationError('INVALID_REGION', 'Region is required')
+      }
+    }
+
     const updateData = {
       title,
       description,
@@ -313,7 +324,8 @@ export async function PUT(request, { params }) {
       venue_name: location,
       poster_url: poster_url || null,
       ...(merchant_id !== undefined && { merchant_id: merchant_id || null }),
-      ...(status && { status })
+      ...(status && { status }),
+      ...(shouldUpdateRegion && { region_id: regionIdToUpdate })
     }
 
     const { data: event, error } = await supabase

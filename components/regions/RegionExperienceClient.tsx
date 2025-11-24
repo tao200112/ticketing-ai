@@ -6,19 +6,21 @@ import NavbarPartyTix from "@/components/NavbarPartyTix"
 import EventCard from "@/components/events/EventCard"
 import { SkeletonGrid } from "@/components/events/SkeletonCard"
 import { useEvents } from "@/lib/hooks/use-api"
+import type { RegionRecord } from "@/lib/regions"
 
-export default function BlacksburgPage() {
-  // Use new API hook
-  const { data: apiEvents, loading: apiLoading, error: apiError } = useEvents()
-  const [localEvents, setLocalEvents] = useState([])
+type RegionExperienceProps = {
+  region: RegionRecord
+}
+
+export default function RegionExperienceClient({ region }: RegionExperienceProps) {
+  const { data: apiEvents, loading: apiLoading, error: apiError } = useEvents(region?.slug)
   const [activities, setActivities] = useState([])
   const [activitiesLoading, setActivitiesLoading] = useState(true)
   const [loading, setLoading] = useState(true)
 
-  console.log('🏠 Home 组件渲染:', { apiEvents, apiLoading, apiError })
+  console.log('🏠 Region page render:', { slug: region?.slug, apiEvents, apiLoading, apiError })
 
   useEffect(() => {
-    loadLocalEvents()
     loadActivities()
     
     // Listen to localStorage changes for real-time updates
@@ -47,7 +49,7 @@ export default function BlacksburgPage() {
       window.removeEventListener('storage', handleStorageChange)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
-  }, [])
+  }, [region?.slug])
 
   const loadActivities = async () => {
     try {
@@ -62,11 +64,6 @@ export default function BlacksburgPage() {
     } finally {
       setActivitiesLoading(false)
     }
-  }
-
-  // No longer using localStorage, all events fetched from Supabase API
-  const loadLocalEvents = () => {
-    setLocalEvents([])
   }
 
   // Merge API data and local data
@@ -132,7 +129,7 @@ export default function BlacksburgPage() {
             marginBottom: '24px',
             lineHeight: '1.2'
           }}>
-            Welcome to <span className="text-partytix-gradient">PartyTix</span>
+            Welcome to <span className="text-partytix-gradient">{region?.name || 'PartyTix'}</span>
           </h1>
           <p style={{ 
             fontSize: '1.1rem', 
@@ -142,7 +139,7 @@ export default function BlacksburgPage() {
             margin: '0 auto 32px auto',
             lineHeight: '1.6'
           }}>
-            Discover amazing events, buy tickets, and enjoy unforgettable experiences. From concerts to food festivals, everything is on PartyTix.
+            {region?.subtitle || 'Discover nightlife, curated events, and PartyTix exclusives for this city.'}
           </p>
 
           <div style={{ 
@@ -152,8 +149,8 @@ export default function BlacksburgPage() {
             justifyContent: 'center',
             alignItems: 'center'
           }}>
-            <Link href="/events" className="btn-partytix-gradient">
-              Browse Events
+            <Link href="/regions" className="btn-partytix-gradient">
+              Choose Another Region
             </Link>
             <Link href="/auth/register" style={{
               padding: '12px 24px',
@@ -218,10 +215,8 @@ export default function BlacksburgPage() {
             </div>
           )}
 
-          <div style={{ textAlign: 'center', marginTop: '32px' }}>
-            <Link href="/events" className="btn-partytix-gradient">
-              Browse Events
-            </Link>
+          <div style={{ textAlign: 'center', marginTop: '32px', color: 'rgba(255, 255, 255, 0.7)' }}>
+            Showing highlights for {region?.name || 'this region'}
           </div>
         </div>
       </div>

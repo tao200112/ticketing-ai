@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { useDefaultRegionSlug } from '@/hooks/use-default-region-slug'
 
 export default function MerchantLoginPage() {
   const router = useRouter()
@@ -11,6 +12,7 @@ export default function MerchantLoginPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const defaultRegionSlug = useDefaultRegionSlug()
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -265,7 +267,7 @@ export default function MerchantLoginPage() {
         {/* Back to Home */}
         <div style={{ textAlign: 'center', marginTop: '1rem' }}>
           <Link 
-            href="/blacksburg"
+            href={`/${defaultRegionSlug}`}
             style={{
               color: '#6b7280',
               textDecoration: 'none',

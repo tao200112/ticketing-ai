@@ -4,12 +4,14 @@ import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import EventCard from '@/components/events/EventCard'
 import { useEvents } from '../../lib/hooks/use-api'
+import { useDefaultRegionSlug } from '@/hooks/use-default-region-slug'
 
 export default function EventsPage() {
   // 使用新的 API 钩子
   const { data: apiEvents, loading: apiLoading, error: apiError } = useEvents()
   const [localEvents, setLocalEvents] = useState([])
   const [loading, setLoading] = useState(true)
+  const defaultRegionSlug = useDefaultRegionSlug()
 
   useEffect(() => {
     // 确保只在客户端执行
@@ -178,7 +180,7 @@ export default function EventsPage() {
 
         {/* 返回首页 */}
         <div style={{ textAlign: 'center', marginTop: '32px' }}>
-          <Link href="/blacksburg" style={{
+          <Link href={`/${defaultRegionSlug}`} style={{
             display: 'inline-block',
             padding: '12px 24px',
             backgroundColor: '#374151',

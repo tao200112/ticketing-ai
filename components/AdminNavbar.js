@@ -89,6 +89,16 @@ export default function AdminNavbar() {
               Dashboard
             </Link>
             <Link 
+              href="/admin/regions" 
+              style={{ 
+                color: 'white', 
+                textDecoration: 'none',
+                transition: 'color 0.3s ease'
+              }}
+            >
+              Regions
+            </Link>
+            <Link 
               href="/admin/scan" 
               style={{ 
                 color: 'white', 
@@ -178,6 +188,19 @@ export default function AdminNavbar() {
             onClick={() => setIsMobileMenuOpen(false)}
           >
             Dashboard
+          </Link>
+          <Link 
+            href="/admin/regions" 
+            style={{ 
+              color: 'white', 
+              textDecoration: 'none',
+              fontSize: '16px',
+              padding: '8px 0',
+              transition: 'color 0.3s ease'
+            }}
+            onClick={() => setIsMobileMenuOpen(false)}
+          >
+            Regions
           </Link>
           <Link 
             href="/admin/scan" 

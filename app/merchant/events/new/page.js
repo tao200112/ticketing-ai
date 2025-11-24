@@ -12,6 +12,8 @@ export default function NewEventWizardPage() {
   const [error, setError] = useState('')
   const [merchantUser, setMerchantUser] = useState(null)
   const [isLoadingAuth, setIsLoadingAuth] = useState(true)
+  const [regions, setRegions] = useState([])
+  const [regionsLoading, setRegionsLoading] = useState(true)
 
   const [eventData, setEventData] = useState({
     title: '',
@@ -21,6 +23,7 @@ export default function NewEventWizardPage() {
     location: '',
     poster: null,
     posterPreview: null,
+    region_slug: '',
     prices: [
       { name: '', amount_cents: '', inventory: '', limit_per_user: '', ticket_kind: '' }
     ]
@@ -82,6 +85,34 @@ export default function NewEventWizardPage() {
     }))
   }
 
+  useEffect(() => {
+    const loadRegions = async () => {
+      try {
+        setRegionsLoading(true)
+        const response = await fetch('/api/regions')
+        if (response.ok) {
+          const result = await response.json()
+          const regionList = result?.data || []
+          setRegions(regionList)
+          if (regionList.length > 0) {
+            setEventData(prev => prev.region_slug ? prev : ({ ...prev, region_slug: regionList[0].slug }))
+          } else {
+            setEventData(prev => ({ ...prev, region_slug: '' }))
+          }
+        } else {
+          setRegions([])
+        }
+      } catch (error) {
+        console.error('Failed to load regions', error)
+        setRegions([])
+      } finally {
+        setRegionsLoading(false)
+      }
+    }
+
+    loadRegions()
+  }, [])
+
   const addPrice = () => {
     setEventData(prev => ({
       ...prev,
@@ -141,6 +172,12 @@ export default function NewEventWizardPage() {
         return
       }
 
+      if (!eventData.region_slug) {
+        setError('Please select a region')
+        setIsSubmitting(false)
+        return
+      }
+
       // 验证价格设置（库存是可选的，留空表示无限，但ticket_kind是必需的）
       const validPrices = eventData.prices.filter(price => price.name && price.amount_cents && price.ticket_kind)
       if (validPrices.length === 0) {
@@ -180,6 +217,7 @@ export default function NewEventWizardPage() {
           location: eventData.location,
           poster_url: eventData.posterPreview,
           merchant_id: merchantId,
+          region_slug: eventData.region_slug,
           prices: validPrices.map(price => ({
             name: price.name,
             amount_cents: Math.round(parseFloat(price.amount_cents) * 100), // 将美元转换为分
@@ -568,6 +606,51 @@ export default function NewEventWizardPage() {
                         e.target.style.boxShadow = 'none'
                       }}
                     />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: 'rgba(255, 255, 255, 0.9)', marginBottom: '0.5rem' }}>
+                      Region *
+                    </label>
+                    {regionsLoading ? (
+                      <div style={{ padding: '0.75rem 1rem', borderRadius: '0.5rem', border: '1px dashed rgba(255, 255, 255, 0.2)', color: 'rgba(255, 255, 255, 0.65)' }}>
+                        Loading regions...
+                      </div>
+                    ) : regions.length > 0 ? (
+                      <select
+                        value={eventData.region_slug}
+                        onChange={(e) => updateEventData('region_slug', e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem 1rem',
+                          border: '1px solid rgba(255, 255, 255, 0.2)',
+                          borderRadius: '0.5rem',
+                          color: 'white',
+                          backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                          fontSize: '1rem',
+                          outline: 'none',
+                          cursor: 'pointer'
+                        }}
+                        onFocus={(e) => {
+                          e.target.style.borderColor = '#7c3aed'
+                          e.target.style.boxShadow = '0 0 0 3px rgba(124, 58, 237, 0.2)'
+                        }}
+                        onBlur={(e) => {
+                          e.target.style.borderColor = 'rgba(255, 255, 255, 0.2)'
+                          e.target.style.boxShadow = 'none'
+                        }}
+                      >
+                        {regions.map((region) => (
+                          <option key={region.id} value={region.slug} style={{ color: '#111827' }}>
+                            {region.name}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <div style={{ padding: '0.75rem 1rem', borderRadius: '0.5rem', border: '1px dashed rgba(248, 113, 113, 0.4)', background: 'rgba(248, 113, 113, 0.1)', color: '#fca5a5' }}>
+                        No active regions available yet.
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

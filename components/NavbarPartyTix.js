@@ -1,23 +1,26 @@
 'use client'
 
 import Link from 'next/link'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import NavLinkItem from './NavLinkItem'
+import { useDefaultRegionSlug } from '@/hooks/use-default-region-slug'
 
 export default function NavbarPartyTix() {
   const router = useRouter()
   const { user, logout } = useAuth()
   const pathname = usePathname()
+  const defaultRegionSlug = useDefaultRegionSlug()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
   const [isSigningOut, setIsSigningOut] = useState(false)
-  const navItems = [
-    { label: 'Events', href: '/blacksburg', matchers: ['/events'] },
-    { label: 'Activity', href: '/activity', matchers: [] },
-    { label: 'Tickets', href: '/tickets', matchers: [] }
-  ]
+  const eventsHref = defaultRegionSlug ? `/${defaultRegionSlug}` : '/regions'
+  const navItems = useMemo(() => ([
+    { label: 'Events', href: eventsHref, matchers: ['/events'] },
+    { label: 'Activity', href: '/activity', matchers: ['/activity'] },
+    { label: 'Tickets', href: '/tickets', matchers: ['/tickets'] }
+  ]), [eventsHref])
   const desktopNavLinkStyle = {
     color: 'rgba(255, 255, 255, 0.85)',
     textDecoration: 'none',
@@ -43,13 +46,10 @@ export default function NavbarPartyTix() {
   }
   const isNavActive = (item) => {
     if (!pathname) return false
-    if (item.href === '/blacksburg') {
-      if (pathname === '/blacksburg' || pathname.startsWith('/blacksburg/')) {
-        return true
-      }
-      return item.matchers?.some((match) => pathname.startsWith(match))
+    if (pathname === item.href || pathname.startsWith(`${item.href}/`)) {
+      return true
     }
-    return pathname === item.href || pathname.startsWith(`${item.href}/`)
+    return item.matchers?.some((match) => pathname.startsWith(match))
   }
 
   useEffect(() => {

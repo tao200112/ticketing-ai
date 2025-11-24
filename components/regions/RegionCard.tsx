@@ -4,17 +4,17 @@ import Link from 'next/link'
 import { CSSProperties } from 'react'
 
 type RegionCardProps = {
+  slug: string
   title: string
   subtitle?: string
-  href: string
   imageUrl?: string
   badge?: string
 }
 
 export default function RegionCard({
+  slug,
   title,
   subtitle,
-  href,
   imageUrl,
   badge,
 }: RegionCardProps) {
@@ -29,10 +29,7 @@ export default function RegionCard({
       }
 
   return (
-    <Link
-      href={href}
-      style={{ textDecoration: 'none' }}
-    >
+    <Link href={`/${slug}`} style={{ textDecoration: 'none' }}>
       <div
         style={{
           position: 'relative',

@@ -150,9 +150,9 @@ export default async function RegionsPage() {
             {regions.map((region) => (
               <RegionCard
                 key={region.id}
+                slug={region.slug}
                 title={region.name}
                 subtitle={region.subtitle || undefined}
-                href={`/${region.slug}`}
                 imageUrl={region.cover_image || undefined}
                 badge={region.is_active ? 'Live Now' : undefined}
               />

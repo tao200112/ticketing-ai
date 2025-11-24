@@ -4,24 +4,19 @@ import { getRegionBySlug } from '@/lib/regions'
 
 export const dynamic = 'force-dynamic'
 
-type RegionPageParams = {
-  region: string
-}
+export default async function RegionPage({ params }: { params: { region: string } }) {
+  const { region } = params || {}
 
-export default async function RegionPage({ params }: { params: Promise<RegionPageParams> }) {
-  const resolvedParams = await params
-  const slug = resolvedParams?.region
-
-  if (!slug) {
+  if (!region) {
     notFound()
   }
 
-  const region = await getRegionBySlug(slug)
+  const regionData = await getRegionBySlug(region)
 
-  if (!region || !region.is_active) {
+  if (!regionData || !regionData.is_active) {
     notFound()
   }
 
-  return <RegionExperienceClient region={region} />
+  return <RegionExperienceClient region={regionData} />
 }
 

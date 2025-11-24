@@ -15,21 +15,39 @@ export default function NavbarPartyTix() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
   const [isSigningOut, setIsSigningOut] = useState(false)
-  const eventsHref = defaultRegionSlug ? `/${defaultRegionSlug}` : '/regions'
-  const isRegionsPage = pathname === '/regions'
+  const normalizedPathname = pathname || '/'
+  const pathSegments = useMemo(
+    () => normalizedPathname.split('/').filter(Boolean),
+    [normalizedPathname]
+  )
+  const firstSegment = pathSegments[0]
+  const restrictedSegments = useMemo(
+    () => new Set(['regions', 'tickets', 'ticket', 'account', 'auth', 'merchant', 'admin', 'activity', 'events']),
+    []
+  )
+  const isRegionContext = Boolean(firstSegment) && !restrictedSegments.has(firstSegment)
+  const regionSlugForNav = isRegionContext ? firstSegment : defaultRegionSlug
+
   const navItems = useMemo(() => {
-    if (isRegionsPage) {
+    if (isRegionContext && regionSlugForNav) {
+      const regionRoot = `/${regionSlugForNav}`
       return [
+        { label: 'Events', href: regionRoot, matchers: [regionRoot, `${regionRoot}/`] },
+        {
+          label: 'Activity',
+          href: '/activity',
+          matchers: ['/activity', `${regionRoot}/activity`],
+        },
         { label: 'Tickets', href: '/tickets', matchers: ['/tickets'] },
+        { label: 'Account', href: '/account', matchers: ['/account'] },
       ]
     }
 
     return [
-      { label: 'Events', href: eventsHref, matchers: ['/events'] },
-      { label: 'Activity', href: '/activity', matchers: ['/activity'] },
       { label: 'Tickets', href: '/tickets', matchers: ['/tickets'] },
+      { label: 'Account', href: '/account', matchers: ['/account'] },
     ]
-  }, [eventsHref, isRegionsPage])
+  }, [isRegionContext, regionSlugForNav])
   const desktopNavLinkStyle = {
     color: 'rgba(255, 255, 255, 0.85)',
     textDecoration: 'none',
@@ -54,11 +72,13 @@ export default function NavbarPartyTix() {
     borderBottomColor: '#a855f7'
   }
   const isNavActive = (item) => {
-    if (!pathname) return false
-    if (pathname === item.href || pathname.startsWith(`${item.href}/`)) {
+    if (!normalizedPathname) return false
+    if (normalizedPathname === item.href || normalizedPathname.startsWith(`${item.href}/`)) {
       return true
     }
-    return item.matchers?.some((match) => pathname.startsWith(match))
+    return Array.isArray(item.matchers)
+      ? item.matchers.some((match) => normalizedPathname.startsWith(match))
+      : false
   }
 
   useEffect(() => {
@@ -96,44 +116,23 @@ export default function NavbarPartyTix() {
       transition: 'color 0.3s ease'
     }
     const clickHandler = variant === 'mobile' ? onNavigate : undefined
-    const isAccountActive = pathname?.startsWith('/account')
 
     if (user) {
       return (
-        <>
-          <NavLinkItem
-            href="/account"
-            style={{
-              ...baseStyle,
-              background: 'linear-gradient(135deg, #7C3AED 0%, #22D3EE 100%)',
-              padding: variant === 'desktop' ? '8px 16px' : '12px 16px',
-              borderRadius: '8px',
-              fontWeight: '600',
-              boxShadow: isAccountActive ? '0 0 18px rgba(124, 58, 237, 0.4)' : 'none'
-            }}
-            activeStyle={{
-              boxShadow: '0 0 18px rgba(124, 58, 237, 0.55)'
-            }}
-            isActive={isAccountActive}
-            onClick={clickHandler}
-          >
-            Account
-          </NavLinkItem>
-          <button
-            onClick={handleLogout}
-            disabled={isSigningOut}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: 'white',
-              fontSize: variant === 'desktop' ? '1rem' : '16px',
-              cursor: isSigningOut ? 'wait' : 'pointer',
-              padding: variant === 'desktop' ? '0' : '8px 0'
-            }}
-          >
-            {isSigningOut ? 'Signing out...' : 'Logout'}
-          </button>
-        </>
+        <button
+          onClick={handleLogout}
+          disabled={isSigningOut}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: 'white',
+            fontSize: variant === 'desktop' ? '1rem' : '16px',
+            cursor: isSigningOut ? 'wait' : 'pointer',
+            padding: variant === 'desktop' ? '0' : '8px 0'
+          }}
+        >
+          {isSigningOut ? 'Signing out...' : 'Logout'}
+        </button>
       )
     }
 

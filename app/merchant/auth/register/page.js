@@ -4,7 +4,6 @@ export const dynamic = 'force-dynamic'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { getSupabaseBrowserClient } from '@/lib/supabase/client'
 
 export default function MerchantRegisterPage() {
   const router = useRouter()
@@ -109,32 +108,33 @@ export default function MerchantRegisterPage() {
       const data = await response.json()
 
       if (data.ok || data.success) {
-        // 注册成功 - 前端需要执行自动登录
-        console.log('✅ 商家注册成功，开始自动登录...')
-        
+        // 注册成功 - 通过 Route Handler 执行登录，写入 httpOnly cookie
+        console.log('✅ 商家注册成功，开始创建服务端会话...')
+
         try {
-          // 使用 Supabase 客户端执行登录
-          const supabase = getSupabaseBrowserClient()
-          const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-            email: formData.email,
-            password: formData.password,
+          const loginResponse = await fetch('/api/merchant/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: formData.email, password: formData.password }),
+            credentials: 'include'
           })
 
-          if (signInError) {
-            console.error('自动登录失败:', signInError)
-            // 即使自动登录失败，也跳转到登录页面，用户可以手动登录
-            setErrors({ general: '注册成功，但自动登录失败，请手动登录' })
+          let loginData = null
+          try {
+            loginData = await loginResponse.json()
+          } catch (parseError) {
+            loginData = null
+          }
+
+          if (!loginResponse.ok || !loginData?.success) {
+            console.error('自动登录失败:', loginData)
+            setErrors({ general: loginData?.error || loginData?.message || '注册成功，但自动登录失败，请手动登录' })
             router.push('/merchant/auth/login')
             return
           }
 
-          if (signInData?.user) {
-            console.log('✅ 自动登录成功，跳转到商家页面')
-            router.push('/merchant')
-          } else {
-            console.warn('自动登录返回空用户数据')
-            router.push('/merchant/auth/login')
-          }
+          console.log('✅ 自动登录成功，跳转到商家页面（基于 cookie 会话）')
+          router.push('/merchant')
         } catch (loginError) {
           console.error('自动登录异常:', loginError)
           setErrors({ general: '注册成功，但自动登录失败，请手动登录' })

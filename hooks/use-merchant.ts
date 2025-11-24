@@ -1,7 +1,6 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { getSupabaseBrowserClient } from '@/lib/supabase/client'
 
 type MerchantProfile = {
   id: string
@@ -32,25 +31,13 @@ export function useMerchant(): UseMerchantResult {
   const [error, setError] = useState<string | null>(null)
 
   const fetchMerchant = useCallback(async () => {
-    const supabase = getSupabaseBrowserClient()
     setLoading(true)
     setError(null)
 
     try {
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-      if (sessionError) {
-        throw sessionError
-      }
-
-      const sessionUserId = session?.user?.id
-      if (!sessionUserId) {
-        setMerchant(null)
-        setLoading(false)
-        return null
-      }
-
       const response = await fetch('/api/merchant/profile', {
-        credentials: 'include'
+        credentials: 'include',
+        cache: 'no-store',
       })
 
       let payload: any = null
@@ -67,10 +54,27 @@ export function useMerchant(): UseMerchantResult {
         return null
       }
 
-      if (payload.merchant.auth_user_id !== sessionUserId) {
+      const sessionUserId = payload?.session_user_id
+      const merchantData = payload.merchant as MerchantProfile | null
+
+      if (!merchantData || !sessionUserId) {
+        setMerchant(null)
+        setError('MERCHANT_SESSION_MISSING')
+        setLoading(false)
+        return null
+      }
+
+      if (!merchantData.auth_user_id) {
+        setMerchant(null)
+        setError('MERCHANT_PROFILE_INVALID')
+        setLoading(false)
+        return null
+      }
+
+      if (merchantData.auth_user_id !== sessionUserId) {
         console.warn('[useMerchant] Session user does not match merchant.auth_user_id', {
           sessionUserId,
-          merchantAuthUserId: payload.merchant.auth_user_id
+          merchantAuthUserId: merchantData.auth_user_id,
         })
         setMerchant(null)
         setError('MERCHANT_SESSION_MISMATCH')
@@ -78,9 +82,9 @@ export function useMerchant(): UseMerchantResult {
         return null
       }
 
-      setMerchant(payload.merchant)
+      setMerchant(merchantData)
       setLoading(false)
-      return payload.merchant as MerchantProfile
+      return merchantData
     } catch (err) {
       console.error('[useMerchant] Failed to load merchant', err)
       setMerchant(null)

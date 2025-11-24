@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic'
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import MerchantNavbar from '@/components/MerchantNavbar'
+import { useMerchant } from '@/hooks/use-merchant'
 import jsQR from 'jsqr'
 
 export default function MerchantScanPage() {
@@ -12,7 +13,6 @@ export default function MerchantScanPage() {
   const [scanResult, setScanResult] = useState(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [userRole, setUserRole] = useState(null)
   const [debugInfo, setDebugInfo] = useState([])
   const [showDebug, setShowDebug] = useState(false) // 默认隐藏调试面板
   
@@ -29,31 +29,29 @@ export default function MerchantScanPage() {
     setDebugInfo(prev => [...prev.slice(-19), logEntry])
   }
 
+  const { merchant, loading: merchantLoading, error: merchantError } = useMerchant()
+  const userRole = merchant ? 'boss' : null
+
   useEffect(() => {
-    const checkMerchantAuth = () => {
-      const token = localStorage.getItem('merchantToken')
-      const user = localStorage.getItem('merchantUser')
-      
-      if (!token || !user) {
-        router.push('/merchant/auth/login')
-        return
-      }
-      
-      const parsedUser = JSON.parse(user)
-      const role = parsedUser.merchant_role || 'boss'
-      setUserRole(role)
+    if (!merchantLoading && !merchant) {
+      router.replace(`/merchant/auth/login?next=${encodeURIComponent('/merchant/scan')}`)
     }
-    
-    checkMerchantAuth()
-    
+  }, [merchant, merchantLoading, router])
+
+  useEffect(() => {
     return () => {
       stopScanning()
     }
-  }, [router])
+  }, [])
 
   const startScanning = async () => {
     try {
       setError('')
+      if (!merchant) {
+        setError('Please login first')
+        addDebugLog('❌ Not logged in', 'error')
+        return
+      }
       addDebugLog('🎥 Starting camera...', 'info')
       
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -291,14 +289,11 @@ export default function MerchantScanPage() {
       setLoading(true)
       setError('')
       
-      const merchantUserStr = localStorage.getItem('merchantUser')
-      if (!merchantUserStr) {
+      if (!merchant) {
         setError('Please login first')
         return
       }
-      
-      const merchantUser = JSON.parse(merchantUserStr)
-      
+
       // 先验证票务信息（不核销）
       const verifyResponse = await fetch('/api/tickets/verify', {
         method: 'POST',
@@ -331,7 +326,7 @@ export default function MerchantScanPage() {
         if (event?.merchant_id) {
           // 检查当前用户是否是该商家的成员或拥有者
           const merchantId = event.merchant_id
-          const currentMerchantId = merchantUser.merchant_id || merchantUser.merchantId
+          const currentMerchantId = merchant.id
           
           // 如果当前用户有merchant_id，检查是否匹配
           if (currentMerchantId && currentMerchantId !== merchantId) {
@@ -425,15 +420,11 @@ export default function MerchantScanPage() {
       setError('')
       addDebugLog('🔄 Starting ticket redemption...', 'info')
       
-      const merchantUserStr = localStorage.getItem('merchantUser')
-      if (!merchantUserStr) {
+      if (!merchant) {
         setError('Please login first')
         addDebugLog('❌ Not logged in', 'error')
         return
       }
-      
-      const merchantUser = JSON.parse(merchantUserStr)
-      const userId = merchantUser.id
       
       addDebugLog(`📤 Sending redemption request for QR: ${qrData.substring(0, 30)}...`, 'info')
       
@@ -444,8 +435,7 @@ export default function MerchantScanPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          qr_payload: qrData,
-          user_id: userId
+          qr_payload: qrData
         }),
       })
       
@@ -531,6 +521,36 @@ export default function MerchantScanPage() {
     stopScanning()
   }
 
+  if (merchantLoading) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)',
+        paddingTop: '80px'
+      }}>
+        <MerchantNavbar userRole={null} />
+        <div style={{ maxWidth: '800px', margin: '120px auto', padding: '32px', color: 'white', textAlign: 'center' }}>
+          Loading merchant session...
+        </div>
+      </div>
+    )
+  }
+
+  if (!merchant) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)',
+        paddingTop: '80px'
+      }}>
+        <MerchantNavbar userRole={null} />
+        <div style={{ maxWidth: '800px', margin: '120px auto', padding: '32px', color: 'white', textAlign: 'center' }}>
+          Redirecting to merchant login...
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div style={{
       minHeight: '100vh',
@@ -549,6 +569,20 @@ export default function MerchantScanPage() {
         }}>
           Ticket Scanner
         </h1>
+
+        {merchantError && (
+          <div style={{
+            marginBottom: '16px',
+            padding: '12px',
+            background: 'rgba(239, 68, 68, 0.1)',
+            border: '1px solid #ef4444',
+            borderRadius: '8px',
+            color: '#ef4444',
+            textAlign: 'center'
+          }}>
+            {merchantError}
+          </div>
+        )}
 
         {/* Scanner Area */}
         <div style={{

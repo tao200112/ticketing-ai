@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic'
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import MerchantNavbar from '@/components/MerchantNavbar'
+import { useMerchant } from '@/hooks/use-merchant'
 import jsQR from 'jsqr'
 
 export default function MerchantStaffPage() {
@@ -14,10 +15,11 @@ export default function MerchantStaffPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [stream, setStream] = useState(null)
-  const [userRole, setUserRole] = useState(null)
   const [debugInfo, setDebugInfo] = useState([])
   const [showDebug, setShowDebug] = useState(true) // 默认显示调试面板
   const [scanAttempts, setScanAttempts] = useState(0)
+  const { merchant, loading: merchantLoading, error: merchantError } = useMerchant()
+  const userRole = merchant ? 'boss' : null
   
   // 添加调试日志函数（同时显示在UI和控制台）
   const addDebugLog = (message, type = 'info') => {
@@ -31,23 +33,12 @@ export default function MerchantStaffPage() {
   const canvasRef = useRef(null)
 
   useEffect(() => {
-    // 检查商家登录状态
-    const checkMerchantAuth = () => {
-      const token = localStorage.getItem('merchantToken')
-      const user = localStorage.getItem('merchantUser')
-      
-      if (!token || !user) {
-        router.push('/merchant/auth/login')
-        return
-      }
-      
-      const parsedUser = JSON.parse(user)
-      // 所有商家用户都可以访问Staff页面，不需要区分角色
-      setUserRole('boss') // 设置为boss，但仅用于导航栏显示
+    if (!merchantLoading && !merchant) {
+      router.replace(`/merchant/auth/login?next=${encodeURIComponent('/merchant/staff')}`)
     }
-    
-    checkMerchantAuth()
-    
+  }, [merchant, merchantLoading, router])
+
+  useEffect(() => {
     return () => {
       if (stream) {
         stream.getTracks().forEach(track => track.stop())
@@ -56,7 +47,7 @@ export default function MerchantStaffPage() {
         clearInterval(scanIntervalRef.current)
       }
     }
-  }, [router, stream])
+  }, [stream])
 
   const startScanning = async () => {
     let mediaStream = null
@@ -94,7 +85,7 @@ export default function MerchantStaffPage() {
         }
         setStream(null)
         setIsScanning(false)
-        setDebugInfo('')
+        setDebugInfo([])
         setError('Video element not initialized. Please refresh the page and try again.')
         return
       }
@@ -347,23 +338,18 @@ export default function MerchantStaffPage() {
       setLoading(true)
       setError('')
       
-      const merchantUserStr = localStorage.getItem('merchantUser')
-      if (!merchantUserStr) {
+      if (!merchant) {
         setError('Please login first')
         return
       }
-      
-      const merchantUser = JSON.parse(merchantUserStr)
-      const userId = merchantUser.id
-      
+
       const response = await fetch('/api/merchant/redeem', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          qr_payload: qrData,
-          user_id: userId
+          qr_payload: qrData
         }),
       })
       
@@ -445,9 +431,39 @@ export default function MerchantStaffPage() {
     setScannedCode('')
     setScanResult(null)
     setError('')
-    setDebugInfo('')
+    setDebugInfo([])
     setScanAttempts(0)
     stopScanning()
+  }
+
+  if (merchantLoading) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)',
+        paddingTop: '80px'
+      }}>
+        <MerchantNavbar userRole={null} />
+        <div style={{ maxWidth: '800px', margin: '120px auto', padding: '32px', color: 'white', textAlign: 'center' }}>
+          Loading merchant session...
+        </div>
+      </div>
+    )
+  }
+
+  if (!merchant) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)',
+        paddingTop: '80px'
+      }}>
+        <MerchantNavbar userRole={null} />
+        <div style={{ maxWidth: '800px', margin: '120px auto', padding: '32px', color: 'white', textAlign: 'center' }}>
+          Redirecting to merchant login...
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -468,6 +484,20 @@ export default function MerchantStaffPage() {
         }}>
           Staff Ticket Scanner
         </h1>
+
+        {merchantError && (
+          <div style={{
+            marginBottom: '16px',
+            padding: '12px',
+            background: 'rgba(239, 68, 68, 0.1)',
+            border: '1px solid #ef4444',
+            borderRadius: '8px',
+            color: '#ef4444',
+            textAlign: 'center'
+          }}>
+            {merchantError}
+          </div>
+        )}
 
         {/* Scanner Area */}
         <div style={{

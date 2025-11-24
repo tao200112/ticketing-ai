@@ -20,10 +20,18 @@ export default function MerchantNavbar({ userRole = 'boss' }) {
     return () => window.removeEventListener('resize', checkScreenSize)
   }, [])
 
-  const handleLogout = () => {
-    localStorage.removeItem('merchantToken')
-    localStorage.removeItem('merchantUser')
-    router.push('/merchant/auth/login')
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/merchant/logout', {
+        method: 'POST',
+        credentials: 'include'
+      })
+    } catch (error) {
+      console.error('[MerchantNavbar] Failed to logout merchant', error)
+    } finally {
+      router.push('/merchant/auth/login')
+      router.refresh()
+    }
   }
 
   return (

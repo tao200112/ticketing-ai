@@ -8,7 +8,7 @@ import { NextResponse } from 'next/server'
 import { ErrorHandler, handleApiError } from '@/lib/error-handler'
 import { createLogger } from '@/lib/logger'
 import { cookies } from 'next/headers'
-import { createServerClient } from '@supabase/ssr'
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 
 const logger = createLogger('merchant-profile-api')
 
@@ -34,35 +34,30 @@ export async function GET(request) {
       throw ErrorHandler.configurationError('CONFIG_ERROR', 'Supabase 未配置')
     }
 
-    const cookieStore = cookies()
-    const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll()
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            cookieStore.set(name, value, options)
-          })
-        },
-      },
+    const supabase = createRouteHandlerClient({
+      cookies,
     })
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
-    if (userError || !user?.id) {
-      logger.warn('Merchant profile: user not authenticated', { error: userError })
+    const {
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession()
+
+    if (sessionError || !session?.user?.id) {
+      logger.warn('Merchant profile: user not authenticated', { error: sessionError })
       return NextResponse.json(
         {
           success: false,
           error: 'AUTHENTICATION_REQUIRED',
           message: '请先登录',
-          type: 'AUTHENTICATION_ERROR'
+          type: 'AUTHENTICATION_ERROR',
+          session_user_id: null,
         },
         { status: 401 }
       )
     }
 
-    const authUserId = user.id
+    const authUserId = session.user.id
 
     const { data: merchant, error: merchantError } = await supabase
       .from('merchants')
@@ -106,7 +101,8 @@ export async function GET(request) {
 
     return NextResponse.json({
       success: true,
-      merchant: merchantResponse
+      merchant: merchantResponse,
+      session_user_id: authUserId,
     })
 
   } catch (error) {

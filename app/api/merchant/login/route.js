@@ -8,7 +8,7 @@ import { NextResponse } from 'next/server'
 import { ErrorHandler, handleApiError } from '@/lib/error-handler'
 import { createLogger } from '@/lib/logger'
 import { cookies } from 'next/headers'
-import { createServerClient } from '@supabase/ssr'
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 
 const logger = createLogger('merchant-login-api')
 
@@ -30,19 +30,9 @@ export async function POST(request) {
       throw ErrorHandler.configurationError('CONFIG_ERROR', 'Supabase 未配置')
     }
 
-    // 使用 @supabase/ssr + cookies() 让 Supabase 写入会话 cookie
-    const cookieStore = cookies()
-    const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll()
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            cookieStore.set(name, value, options)
-          })
-        },
-      },
+    // 使用 Supabase Auth Helpers 让 Supabase 自动写入会话 cookie
+    const supabase = createRouteHandlerClient({
+      cookies,
     })
 
     const normalizedEmail = email.trim().toLowerCase()

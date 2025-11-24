@@ -6,7 +6,7 @@
 
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
-import { createServerClient } from '@supabase/ssr'
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 
 export async function POST() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -19,18 +19,8 @@ export async function POST() {
     )
   }
 
-  const cookieStore = cookies()
-  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
-    cookies: {
-      getAll() {
-        return cookieStore.getAll()
-      },
-      setAll(cookiesToSet) {
-        cookiesToSet.forEach(({ name, value, options }) => {
-          cookieStore.set(name, value, options)
-        })
-      },
-    },
+  const supabase = createRouteHandlerClient({
+    cookies,
   })
 
   await supabase.auth.signOut()

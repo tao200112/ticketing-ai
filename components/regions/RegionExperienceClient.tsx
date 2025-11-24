@@ -1,7 +1,7 @@
 'use client'
 
 import Link from "next/link"
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useCallback } from "react"
 import NavbarPartyTix from "@/components/NavbarPartyTix"
 import EventCard from "@/components/events/EventCard"
 import { SkeletonGrid } from "@/components/events/SkeletonCard"
@@ -13,48 +13,38 @@ type RegionExperienceProps = {
 }
 
 export default function RegionExperienceClient({ region }: RegionExperienceProps) {
-  const { data: apiEvents, loading: apiLoading, error: apiError } = useEvents(region?.slug)
+  const regionSlug = region?.slug?.trim?.() || ''
+
+  useEffect(() => {
+    if (!regionSlug) {
+      console.warn('[RegionExperienceClient] Missing region.slug')
+    }
+  }, [regionSlug])
+
+  const {
+    data: apiEvents,
+    loading: apiLoading,
+    error: apiError,
+    refresh: refreshEvents
+  } = useEvents(regionSlug || undefined)
   const [activities, setActivities] = useState([])
   const [activitiesLoading, setActivitiesLoading] = useState(true)
   const [loading, setLoading] = useState(true)
 
   console.log('🏠 Region page render:', { slug: region?.slug, apiEvents, apiLoading, apiError })
 
-  useEffect(() => {
-    loadActivities()
-    
-    // Listen to localStorage changes for real-time updates
-    const handleStorageChange = (e) => {
-      if (e.key === 'merchantEvents') {
-        loadLocalEvents()
-      }
-    }
-    
-    // Add page visibility change listener to refresh data when page becomes visible
-    const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        console.log('🔄 Page visible again, refreshing event data')
-        // Trigger useEvents to refetch data
-        if (window.refreshEvents) {
-          window.refreshEvents()
-        }
-        loadActivities()
-      }
-    }
-    
-    window.addEventListener('storage', handleStorageChange)
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-    
-    return () => {
-      window.removeEventListener('storage', handleStorageChange)
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
-    }
-  }, [region?.slug])
-
-  const loadActivities = async () => {
+  const loadActivities = useCallback(async (slug = regionSlug) => {
     try {
       setActivitiesLoading(true)
-      const response = await fetch('/api/activities')
+      const query = slug
+        ? `/api/activities?region=${encodeURIComponent(slug)}`
+        : '/api/activities'
+
+      if (!slug) {
+        console.warn('[RegionExperienceClient] Missing region slug when loading activities, falling back to global list')
+      }
+
+      const response = await fetch(query)
       const result = await response.json()
       if (result.success) {
         setActivities(result.data || [])
@@ -64,7 +54,73 @@ export default function RegionExperienceClient({ region }: RegionExperienceProps
     } finally {
       setActivitiesLoading(false)
     }
-  }
+  }, [regionSlug])
+
+  const loadLocalEvents = useCallback(() => {
+    try {
+      const raw = localStorage.getItem('merchantEvents') || '[]'
+      let merchantEvents = JSON.parse(raw)
+
+      merchantEvents = merchantEvents.filter(event => {
+        const title = event.title || ''
+        return !(title === 'aa' || title === 'bb' || title === '11')
+      })
+
+      const publicEvents = merchantEvents.map(event => ({
+        id: event.id,
+        name: event.title,
+        description: event.description,
+        start_date: event.startTime,
+        location: event.location,
+        poster_url: event.poster,
+        starting_price: event.prices && event.prices.length > 0
+          ? Math.min(...event.prices.map(p => p.amount_cents))
+          : 0,
+        status: 'active',
+        ticketsSold: event.ticketsSold || 0,
+        totalTickets: event.totalTickets || 0,
+        revenue: event.revenue || 0
+      }))
+
+      return publicEvents
+    } catch (error) {
+      console.error('Error loading local events:', error)
+      return []
+    }
+  }, [])
+
+  useEffect(() => {
+    setActivities([])
+    loadActivities(regionSlug)
+
+    // Listen to localStorage changes for real-time updates
+    const handleStorageChange = (e) => {
+      if (e.key === 'merchantEvents') {
+        loadLocalEvents()
+      }
+    }
+
+    // Add page visibility change listener to refresh data when page becomes visible
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        console.log('🔄 Page visible again, refreshing event data')
+        if (typeof window !== 'undefined' && window.refreshEvents) {
+          window.refreshEvents()
+        } else {
+          refreshEvents()
+        }
+        loadActivities(regionSlug)
+      }
+    }
+
+    window.addEventListener('storage', handleStorageChange)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [regionSlug, loadActivities, loadLocalEvents, refreshEvents])
 
   // Merge API data and local data
   const events = React.useMemo(() => {

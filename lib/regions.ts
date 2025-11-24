@@ -104,16 +104,32 @@ export async function getDefaultRegionSlug() {
   return region?.slug || DEFAULT_REGION_SLUG
 }
 
-export async function ensureRegionId(options: { regionId?: string | null; regionSlug?: string | null } = {}) {
-  if (options.regionId) {
-    return options.regionId
+type EnsureRegionOptions = {
+  regionId?: string | null
+  regionSlug?: string | null
+  requireMatch?: boolean
+}
+
+export async function ensureRegionId(options: EnsureRegionOptions = {}) {
+  const { regionId, regionSlug, requireMatch = false } = options
+
+  if (regionId) {
+    return regionId
   }
 
-  if (options.regionSlug) {
-    const region = await getRegionBySlug(options.regionSlug)
+  if (regionSlug) {
+    const normalizedSlug = regionSlug.toString().trim().toLowerCase()
+    const region = await getRegionBySlug(normalizedSlug)
     if (region) {
       return region.id
     }
+    if (requireMatch) {
+      return null
+    }
+  }
+
+  if (requireMatch) {
+    return null
   }
 
   const fallback = await getDefaultRegion()

@@ -19,23 +19,27 @@ export async function GET(request) {
 
     const supabase = createSupabaseClient()
     const url = new URL(request.url)
-    const regionSlug = url.searchParams.get('region')
+    const regionSlugParam = url.searchParams.get('region')?.toString().trim().toLowerCase() || null
     let regionFilterId = null
 
-    if (regionSlug) {
+    if (regionSlugParam) {
       const { data: regionRecord, error: regionError } = await supabase
         .from('regions')
         .select('id')
-        .eq('slug', regionSlug)
+        .eq('slug', regionSlugParam)
         .eq('is_active', true)
         .maybeSingle()
 
       if (regionError) {
-        logger.warn('Failed to resolve region slug', { regionSlug, error: regionError })
-        return NextResponse.json({ success: true, data: [] })
+        logger.error('Failed to resolve region slug', { regionSlug: regionSlugParam, error: regionError })
+        return NextResponse.json(
+          { success: false, error: 'Failed to resolve region' },
+          { status: 500 }
+        )
       }
 
       if (!regionRecord) {
+        logger.info('Region slug not found, returning empty events', { regionSlug: regionSlugParam })
         return NextResponse.json({ success: true, data: [] })
       }
 
@@ -44,73 +48,69 @@ export async function GET(request) {
 
     // 从 Supabase 获取活动数据
     // 首先查询所有活动，然后在前端过滤（这样可以处理 status 字段可能为 null 的情况）
-    let queryBuilder = supabase
-      .from('events')
-      .select(`
-        *,
-        merchants (
-          id,
-          name,
-          email
-        ),
-        prices (
-          id,
-          name,
-          amount_cents,
-          inventory,
-          sold_count
-        )
-      `)
-      .order('created_at', { ascending: false })
+    const baseSelect = `
+      *,
+      merchants (
+        id,
+        name,
+        email
+      ),
+      prices (
+        id,
+        name,
+        amount_cents,
+        inventory,
+        sold_count
+      )
+    `
 
-    if (regionFilterId) {
-      queryBuilder = queryBuilder.eq('region_id', regionFilterId)
+    const buildEventQuery = (publishedOnly = false) => {
+      let query = supabase
+        .from('events')
+        .select(baseSelect)
+        .order('start_at', { ascending: true, nullsFirst: false })
+        .order('created_at', { ascending: false })
+
+      if (publishedOnly) {
+        query = query.eq('status', 'published')
+      }
+
+      if (regionFilterId) {
+        query = query.eq('region_id', regionFilterId)
+      }
+
+      return query
     }
 
-    let { data: events, error } = await queryBuilder
-    
-    // 如果查询失败，尝试只查询 published 状态的活动
-    if (error || !events || events.length === 0) {
-      logger.info('Querying published events only')
-      const { data: publishedEvents, error: publishedError } = await supabase
-        .from('events')
-        .select(`
-          *,
-          merchants (
-            id,
-            name,
-            email
-          ),
-          prices (
-            id,
-            name,
-            amount_cents,
-            inventory,
-            sold_count
-          )
-        `)
-        .eq('status', 'published')
-        .order('created_at', { ascending: false })
+    let { data: events, error } = await buildEventQuery(false)
+
+    const shouldAttemptFallback =
+      !regionFilterId && (!events || events.length === 0 || Boolean(error))
+
+    if (shouldAttemptFallback) {
+      logger.info('Primary events query empty, attempting published-only fallback')
+      const { data: publishedEvents, error: publishedError } = await buildEventQuery(true)
       
       if (!publishedError && publishedEvents) {
         events = publishedEvents
-        logger.info(`Found ${publishedEvents.length} published events`)
+        error = null
+        logger.info(`Found ${publishedEvents.length} published events in fallback query`)
       } else if (publishedError) {
         logger.warn('Error querying published events', { error: publishedError })
+        if (!error) {
+          error = publishedError
+        }
       }
-    } else {
+    } else if (events && events.length > 0) {
       // 如果查询成功，过滤出已发布的活动（如果 status 字段存在）
       // 如果 status 为 null 或 undefined，也视为已发布（兼容旧数据）
-      if (events && events.length > 0) {
-        const publishedEvents = events.filter(event => {
-          const status = event.status
-          // 如果 status 为 null、undefined 或 'published'，都视为已发布
-          return status === 'published' || status === null || status === undefined
-        })
-        if (publishedEvents.length > 0) {
-          events = publishedEvents
-          logger.info(`Filtered to ${publishedEvents.length} published/active events from ${events.length} total`)
-        }
+      const publishedEvents = events.filter(event => {
+        const status = event.status
+        return status === 'published' || status === null || status === undefined
+      })
+      if (publishedEvents.length > 0 && publishedEvents.length !== events.length) {
+        events = publishedEvents
+        logger.info(`Filtered to ${publishedEvents.length} published/active events from ${events.length} total`)
       }
     }
 

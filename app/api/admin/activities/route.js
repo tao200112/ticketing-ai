@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase-api'
 import { ErrorHandler, handleApiError } from '@/lib/error-handler'
 import { createLogger } from '@/lib/logger'
+import { ensureRegionId } from '@/lib/regions'
 
 const logger = createLogger('admin-activities-api')
 
@@ -40,7 +41,14 @@ export async function POST(request) {
     }
 
     const body = await request.json()
-    const { title, image_url, text, is_active = true } = body
+    const {
+      title,
+      image_url,
+      text,
+      is_active = true,
+      region_slug,
+      region_id: bodyRegionId
+    } = body
 
     if (!text || text.trim() === '') {
       throw ErrorHandler.validationError(
@@ -56,7 +64,26 @@ export async function POST(request) {
       )
     }
 
+    if (!region_slug && !bodyRegionId) {
+      throw ErrorHandler.validationError(
+        'MISSING_REGION',
+        'Region selection is required'
+      )
+    }
+
     const supabase = createSupabaseClient()
+    const resolvedRegionId = await ensureRegionId({
+      regionId: bodyRegionId,
+      regionSlug: region_slug,
+      requireMatch: true
+    })
+
+    if (!resolvedRegionId) {
+      throw ErrorHandler.validationError(
+        'INVALID_REGION',
+        'Region slug is invalid'
+      )
+    }
 
     // Get max sort_order to set new activity at the end
     // Handle case where sort_order column might not exist yet
@@ -83,7 +110,8 @@ export async function POST(request) {
       title: title.trim(),
       image_url: image_url || null,
       text: text.trim(),
-      is_active: is_active
+      is_active: is_active,
+      region_id: resolvedRegionId
     }
 
     // Try to add sort_order, but don't fail if column doesn't exist

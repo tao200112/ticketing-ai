@@ -13,11 +13,15 @@ export default function AdminNewActivityPage() {
   const [uploadingImage, setUploadingImage] = useState(false)
   const [imagePreview, setImagePreview] = useState(null)
 
+  const [regions, setRegions] = useState([])
+  const [regionsLoading, setRegionsLoading] = useState(true)
+  const [regionsError, setRegionsError] = useState('')
   const [activityData, setActivityData] = useState({
     title: '',
     image_url: '',
     text: '',
-    is_active: true
+    is_active: true,
+    region_slug: ''
   })
 
   useEffect(() => {
@@ -45,6 +49,35 @@ export default function AdminNewActivityPage() {
     
     checkAdminAuth()
   }, [router])
+
+  useEffect(() => {
+    const loadRegions = async () => {
+      try {
+        setRegionsLoading(true)
+        setRegionsError('')
+        const response = await fetch('/api/admin/regions')
+        const result = await response.json()
+
+        if (!response.ok || !result.success) {
+          throw new Error(result.error || 'Failed to load regions')
+        }
+
+        const regionList = Array.isArray(result.data) ? result.data : []
+        setRegions(regionList)
+        setActivityData(prev => ({
+          ...prev,
+          region_slug: prev.region_slug || regionList[0]?.slug || ''
+        }))
+      } catch (err) {
+        console.error('Error loading regions:', err)
+        setRegionsError('加载地区列表失败，请刷新页面后重试。')
+      } finally {
+        setRegionsLoading(false)
+      }
+    }
+
+    loadRegions()
+  }, [])
 
   const updateActivityData = (field, value) => {
     setActivityData(prev => ({
@@ -111,6 +144,11 @@ export default function AdminNewActivityPage() {
       }
       if (!activityData.text || activityData.text.trim() === '') {
         setError('请输入活动描述')
+        setIsSubmitting(false)
+        return
+      }
+      if (!activityData.region_slug) {
+        setError('请选择所属地区')
         setIsSubmitting(false)
         return
       }
@@ -344,6 +382,53 @@ export default function AdminNewActivityPage() {
                       e.target.style.boxShadow = 'none'
                     }}
                   />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: 'rgba(255, 255, 255, 0.9)', marginBottom: '0.5rem' }}>
+                    所属地区 *
+                  </label>
+                  <select
+                    value={activityData.region_slug}
+                    onChange={(e) => updateActivityData('region_slug', e.target.value)}
+                    disabled={regionsLoading || regions.length === 0}
+                    style={{
+                      width: '100%',
+                      padding: '0.65rem 0.75rem',
+                      borderRadius: '0.5rem',
+                      border: '1px solid rgba(255, 255, 255, 0.2)',
+                      backgroundColor: 'rgba(15, 23, 42, 0.6)',
+                      color: 'white',
+                      fontSize: '0.95rem',
+                      outline: 'none',
+                      cursor: regionsLoading ? 'not-allowed' : 'pointer'
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = '#7c3aed'
+                      e.target.style.boxShadow = '0 0 0 3px rgba(124, 58, 237, 0.2)'
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = 'rgba(255, 255, 255, 0.2)'
+                      e.target.style.boxShadow = 'none'
+                    }}
+                  >
+                    {regionsLoading && (
+                      <option value="">加载地区...</option>
+                    )}
+                    {!regionsLoading && regions.length === 0 && (
+                      <option value="">暂无可用地区</option>
+                    )}
+                    {!regionsLoading && regions.map((region) => (
+                      <option key={region.id} value={region.slug}>
+                        {region.name}
+                      </option>
+                    ))}
+                  </select>
+                  {regionsError && (
+                    <p style={{ color: '#fca5a5', fontSize: '0.85rem', marginTop: '0.5rem' }}>
+                      {regionsError}
+                    </p>
+                  )}
                 </div>
 
                 <div>

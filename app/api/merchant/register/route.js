@@ -8,6 +8,7 @@ import { NextResponse } from 'next/server'
 import { ErrorHandler, handleApiError } from '@/lib/error-handler'
 import { createLogger } from '@/lib/logger'
 import { createClient } from '@supabase/supabase-js'
+import { getDefaultRegion, ensureRegionId } from '@/lib/regions'
 
 const logger = createLogger('merchant-register-api')
 
@@ -246,6 +247,23 @@ export async function POST(request) {
       )
     }
 
+    // 2.1 解析商家所属区域
+    const defaultRegion = await getDefaultRegion()
+    if (!defaultRegion) {
+      return NextResponse.json(
+        { error: 'No default region configured' },
+        { status: 500 }
+      )
+    }
+
+    let regionId = defaultRegion.id
+    if (inviteCodeData.region_slug) {
+      const inviteRegionId = await ensureRegionId({ regionSlug: inviteCodeData.region_slug })
+      if (inviteRegionId) {
+        regionId = inviteRegionId
+      }
+    }
+
     // 4. 在 merchants 表中创建商家记录（不再存储 password_hash）
     // 设置 owner_supabase_uid 关联 Supabase Auth 用户
     const supabaseAuthUserId = createdUser.id
@@ -254,49 +272,17 @@ export async function POST(request) {
       email: normalizedEmail,
       name: name.trim(),
       verified: false,
-      status: 'active'
+      status: 'active',
+      region_id: regionId
     }
     
     // 设置 owner_supabase_uid（关联 Supabase Auth 用户的关键字段）
-    // 优先使用 owner_supabase_uid，如果不存在则使用 owner_user_id（向后兼容）
     if (supabaseAuthUserId) {
-      // 首先尝试设置 owner_supabase_uid
-      try {
-        const { error: columnCheckError } = await admin
-          .from('merchants')
-          .select('owner_supabase_uid')
-          .limit(0)
-        if (!columnCheckError) {
-          merchantPayload.owner_supabase_uid = supabaseAuthUserId
-          logger.info('Setting owner_supabase_uid for merchant', { 
-            merchantEmail: normalizedEmail,
-            authUserId: supabaseAuthUserId 
-          })
-        } else {
-          // 如果 owner_supabase_uid 列不存在，尝试使用 owner_user_id
-          const { error: userIdColumnCheckError } = await admin
-            .from('merchants')
-            .select('owner_user_id')
-            .limit(0)
-          if (!userIdColumnCheckError) {
-            merchantPayload.owner_user_id = supabaseAuthUserId
-            logger.info('Setting owner_user_id for merchant (fallback)', { 
-              merchantEmail: normalizedEmail,
-              authUserId: supabaseAuthUserId 
-            })
-          } else {
-            logger.warn('Neither owner_supabase_uid nor owner_user_id column found, merchant will be created without user association')
-          }
-        }
-      } catch (err) {
-        logger.error('Error checking merchant table columns', { error: err })
-        // 即使检查失败，也尝试直接设置（列可能仍然存在）
-        merchantPayload.owner_supabase_uid = supabaseAuthUserId
-        logger.info('Attempting to set owner_supabase_uid directly', { 
-          merchantEmail: normalizedEmail,
-          authUserId: supabaseAuthUserId 
-        })
-      }
+      merchantPayload.owner_supabase_uid = supabaseAuthUserId
+      logger.info('Setting owner_supabase_uid for merchant', { 
+        merchantEmail: normalizedEmail,
+        authUserId: supabaseAuthUserId 
+      })
     } else {
       logger.error('supabaseAuthUserId is null, cannot associate merchant with auth user', {
         email: normalizedEmail

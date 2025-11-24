@@ -16,11 +16,20 @@ export default function NavbarPartyTix() {
   const [isMobile, setIsMobile] = useState(false)
   const [isSigningOut, setIsSigningOut] = useState(false)
   const eventsHref = defaultRegionSlug ? `/${defaultRegionSlug}` : '/regions'
-  const navItems = useMemo(() => ([
-    { label: 'Events', href: eventsHref, matchers: ['/events'] },
-    { label: 'Activity', href: '/activity', matchers: ['/activity'] },
-    { label: 'Tickets', href: '/tickets', matchers: ['/tickets'] }
-  ]), [eventsHref])
+  const isRegionsPage = pathname === '/regions'
+  const navItems = useMemo(() => {
+    if (isRegionsPage) {
+      return [
+        { label: 'Tickets', href: '/tickets', matchers: ['/tickets'] },
+      ]
+    }
+
+    return [
+      { label: 'Events', href: eventsHref, matchers: ['/events'] },
+      { label: 'Activity', href: '/activity', matchers: ['/activity'] },
+      { label: 'Tickets', href: '/tickets', matchers: ['/tickets'] },
+    ]
+  }, [eventsHref, isRegionsPage])
   const desktopNavLinkStyle = {
     color: 'rgba(255, 255, 255, 0.85)',
     textDecoration: 'none',

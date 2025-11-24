@@ -231,37 +231,39 @@ export async function POST(request) {
       region_slug: regionSlug
     } = body
 
+    let merchantRegionId = null
+
     // 如果提供了merchant_id，验证当前用户是否有权限为该商家创建活动
     if (merchant_id) {
       try {
         const { getSupabaseUser } = await import('@/lib/supabase/server')
         const user = await getSupabaseUser()
-        
-        if (user) {
-          // 检查用户是否是该商家的所有者
-          const { data: merchant, error: merchantError } = await supabase
-            .from('merchants')
-            .select('id, owner_supabase_uid, email')
-            .eq('id', merchant_id)
-            .maybeSingle()
-          
-          if (merchantError) {
-            logger.warn('Error checking merchant ownership', { error: merchantError, merchant_id })
-          } else if (merchant) {
+
+        const { data: merchant, error: merchantError } = await supabase
+          .from('merchants')
+          .select('id, owner_supabase_uid, email, region_id')
+          .eq('id', merchant_id)
+          .maybeSingle()
+
+        if (merchantError) {
+          logger.warn('Error checking merchant ownership', { error: merchantError, merchant_id })
+        } else if (merchant) {
+          merchantRegionId = merchant.region_id
+
+          if (user) {
             // 验证所有权：通过 owner_supabase_uid 或 email
-            const isOwner = merchant.owner_supabase_uid === user.id || 
+            const isOwner = merchant.owner_supabase_uid === user.id ||
                            merchant.email?.toLowerCase() === user.email?.toLowerCase()
-            
+
             if (!isOwner) {
               throw ErrorHandler.authenticationError(
                 'UNAUTHORIZED',
                 'You do not have permission to create events for this merchant'
               )
             }
-            
-            logger.info('Merchant ownership verified', { 
-              merchant_id, 
-              userId: user.id 
+            logger.info('Merchant ownership verified', {
+              merchant_id,
+              userId: user.id,
             })
           }
         }
@@ -282,7 +284,18 @@ export async function POST(request) {
       )
     }
 
-    const resolvedRegionId = await ensureRegionId({ regionId: bodyRegionId, regionSlug })
+    let resolvedRegionId = null
+    if (merchant_id) {
+      if (!merchantRegionId) {
+        throw ErrorHandler.validationError(
+          'INVALID_MERCHANT_REGION',
+          'Merchant is missing a region assignment'
+        )
+      }
+      resolvedRegionId = merchantRegionId
+    } else {
+      resolvedRegionId = await ensureRegionId({ regionId: bodyRegionId, regionSlug })
+    }
 
     if (!resolvedRegionId) {
       throw ErrorHandler.validationError(

@@ -31,12 +31,12 @@ export default function EditEventPage() {
         
         const data = await response.json()
         if (data.success && data.merchant) {
-          // 设置商家信息
           const merchantData = {
             id: data.merchant.id,
             email: data.merchant.email,
             name: data.merchant.name,
-            merchant_id: data.merchant.id
+            merchant_id: data.merchant.id,
+            region_id: data.merchant.region_id || data.merchant.region?.id || null
           }
           setMerchantUser(merchantData)
           
@@ -71,10 +71,15 @@ export default function EditEventPage() {
       
       const event = result.data
       
-      // 检查权限：只能编辑自己的事件
+      // 检查权限：只能编辑自己的事件，并确保区域匹配
       const merchantId = user.merchant_id || user.id
       if (merchantId && event.merchant_id !== merchantId) {
         setError('You do not have permission to edit this event')
+        setLoading(false)
+        return
+      }
+      if (user.region_id && event.region_id && user.region_id !== event.region_id) {
+        setError('You cannot edit events outside of your assigned region')
         setLoading(false)
         return
       }
@@ -147,6 +152,7 @@ export default function EditEventPage() {
           endTime: eventData.endTime,
           location: eventData.location,
           poster_url: eventData.posterPreview,
+          region_id: merchantUser?.region_id,
           prices: validPrices.map(price => ({
             name: price.name,
             amount_cents: Math.round(parseFloat(price.amount_cents) * 100), // 将美元转换为分存储

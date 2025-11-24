@@ -43,5 +43,20 @@ begin
 
     alter table public.events
         alter column region_id set not null;
+
+        -- ensure merchants table has region support
+        alter table public.merchants
+            add column if not exists region_id uuid references public.regions(id) on delete restrict;
+
+        if v_region_id is not null then
+            update public.merchants
+            set region_id = v_region_id
+            where region_id is null;
+        end if;
+
+        alter table public.merchants
+            alter column region_id set not null;
 end $$;
+
+create index if not exists idx_merchants_region_id on public.merchants(region_id);
 

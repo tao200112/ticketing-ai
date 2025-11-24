@@ -89,6 +89,16 @@ export default function AdminNavbar() {
               Dashboard
             </Link>
             <Link 
+              href="/admin/merchants" 
+              style={{ 
+                color: 'white', 
+                textDecoration: 'none',
+                transition: 'color 0.3s ease'
+              }}
+            >
+              Merchants
+            </Link>
+            <Link 
               href="/admin/regions" 
               style={{ 
                 color: 'white', 
@@ -188,6 +198,19 @@ export default function AdminNavbar() {
             onClick={() => setIsMobileMenuOpen(false)}
           >
             Dashboard
+          </Link>
+          <Link 
+            href="/admin/merchants" 
+            style={{ 
+              color: 'white', 
+              textDecoration: 'none',
+              fontSize: '16px',
+              padding: '8px 0',
+              transition: 'color 0.3s ease'
+            }}
+            onClick={() => setIsMobileMenuOpen(false)}
+          >
+            Merchants
           </Link>
           <Link 
             href="/admin/regions" 

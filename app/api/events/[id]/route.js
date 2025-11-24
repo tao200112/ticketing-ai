@@ -239,11 +239,13 @@ export async function PUT(request, { params }) {
     const supabase = createSupabaseClient()
 
     // 验证商家身份：检查当前用户是否有权限更新该活动
+    let merchantRegionId = null
+    let isMerchantEditor = false
     try {
       // 先获取活动信息
       const { data: existingEvent, error: eventError } = await supabase
         .from('events')
-        .select('merchant_id')
+        .select('merchant_id, region_id')
         .eq('id', id)
         .single()
       
@@ -259,11 +261,12 @@ export async function PUT(request, { params }) {
           // 检查用户是否是该商家的所有者
           const { data: merchant, error: merchantError } = await supabase
             .from('merchants')
-            .select('id, owner_supabase_uid, email')
+            .select('id, owner_supabase_uid, email, region_id')
             .eq('id', existingEvent.merchant_id)
             .maybeSingle()
           
           if (!merchantError && merchant) {
+            merchantRegionId = merchant.region_id
             // 验证所有权
             const isOwner = merchant.owner_supabase_uid === user.id || 
                            merchant.email?.toLowerCase() === user.email?.toLowerCase()
@@ -275,6 +278,7 @@ export async function PUT(request, { params }) {
               )
             }
             
+            isMerchantEditor = true
             logger.info('Merchant ownership verified for event update', { 
               event_id: id,
               merchant_id: existingEvent.merchant_id,
@@ -308,7 +312,12 @@ export async function PUT(request, { params }) {
     let regionIdToUpdate = null
     const shouldUpdateRegion = bodyRegionId !== undefined || regionSlug !== undefined
 
-    if (shouldUpdateRegion) {
+    if (isMerchantEditor) {
+      if (!merchantRegionId) {
+        throw ErrorHandler.validationError('INVALID_REGION', 'Merchant is missing a region assignment')
+      }
+      regionIdToUpdate = merchantRegionId
+    } else if (shouldUpdateRegion) {
       regionIdToUpdate = await ensureRegionId({ regionId: bodyRegionId, regionSlug })
       if (!regionIdToUpdate) {
         throw ErrorHandler.validationError('INVALID_REGION', 'Region is required')

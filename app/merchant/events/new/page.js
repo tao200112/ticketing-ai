@@ -12,9 +12,7 @@ export default function NewEventWizardPage() {
   const [error, setError] = useState('')
   const [merchantUser, setMerchantUser] = useState(null)
   const [isLoadingAuth, setIsLoadingAuth] = useState(true)
-  const [regions, setRegions] = useState([])
-  const [regionsLoading, setRegionsLoading] = useState(true)
-
+  const [merchantRegion, setMerchantRegion] = useState(null)
   const [eventData, setEventData] = useState({
     title: '',
     description: '',
@@ -23,7 +21,6 @@ export default function NewEventWizardPage() {
     location: '',
     poster: null,
     posterPreview: null,
-    region_slug: '',
     prices: [
       { name: '', amount_cents: '', inventory: '', limit_per_user: '', ticket_kind: '' }
     ]
@@ -48,12 +45,26 @@ export default function NewEventWizardPage() {
         
         const data = await response.json()
         if (data.success && data.merchant) {
+          const inferredRegionId = data.merchant.region_id || data.merchant.region?.id || null
+          if (!inferredRegionId) {
+            setError('Your merchant profile is missing a region assignment. Please contact an administrator.')
+            setMerchantUser(null)
+            return
+          }
+
+          setMerchantRegion({
+            id: inferredRegionId,
+            name: data.merchant.region?.name || 'Assigned Region',
+            slug: data.merchant.region?.slug || null
+          })
+
           // 设置商家信息（包含merchant_id用于创建活动）
           setMerchantUser({
             id: data.merchant.id,
             email: data.merchant.email,
             name: data.merchant.name,
-            merchant_id: data.merchant.id
+            merchant_id: data.merchant.id,
+            region_id: inferredRegionId
           })
         } else {
           router.push('/merchant/auth/login?next=/merchant/events/new')
@@ -84,34 +95,6 @@ export default function NewEventWizardPage() {
       )
     }))
   }
-
-  useEffect(() => {
-    const loadRegions = async () => {
-      try {
-        setRegionsLoading(true)
-        const response = await fetch('/api/regions')
-        if (response.ok) {
-          const result = await response.json()
-          const regionList = result?.data || []
-          setRegions(regionList)
-          if (regionList.length > 0) {
-            setEventData(prev => prev.region_slug ? prev : ({ ...prev, region_slug: regionList[0].slug }))
-          } else {
-            setEventData(prev => ({ ...prev, region_slug: '' }))
-          }
-        } else {
-          setRegions([])
-        }
-      } catch (error) {
-        console.error('Failed to load regions', error)
-        setRegions([])
-      } finally {
-        setRegionsLoading(false)
-      }
-    }
-
-    loadRegions()
-  }, [])
 
   const addPrice = () => {
     setEventData(prev => ({
@@ -172,8 +155,9 @@ export default function NewEventWizardPage() {
         return
       }
 
-      if (!eventData.region_slug) {
-        setError('Please select a region')
+      const resolvedRegionId = merchantRegion?.id || merchantUser.region_id
+      if (!resolvedRegionId) {
+        setError('Your merchant profile is missing a region assignment. Please contact an administrator.')
         setIsSubmitting(false)
         return
       }
@@ -217,7 +201,7 @@ export default function NewEventWizardPage() {
           location: eventData.location,
           poster_url: eventData.posterPreview,
           merchant_id: merchantId,
-          region_slug: eventData.region_slug,
+          region_id: resolvedRegionId,
           prices: validPrices.map(price => ({
             name: price.name,
             amount_cents: Math.round(parseFloat(price.amount_cents) * 100), // 将美元转换为分
@@ -608,50 +592,25 @@ export default function NewEventWizardPage() {
                     />
                   </div>
 
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: 'rgba(255, 255, 255, 0.9)', marginBottom: '0.5rem' }}>
-                      Region *
-                    </label>
-                    {regionsLoading ? (
-                      <div style={{ padding: '0.75rem 1rem', borderRadius: '0.5rem', border: '1px dashed rgba(255, 255, 255, 0.2)', color: 'rgba(255, 255, 255, 0.65)' }}>
-                        Loading regions...
-                      </div>
-                    ) : regions.length > 0 ? (
-                      <select
-                        value={eventData.region_slug}
-                        onChange={(e) => updateEventData('region_slug', e.target.value)}
+                  {merchantRegion && (
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: 'rgba(255, 255, 255, 0.9)', marginBottom: '0.5rem' }}>
+                        Region
+                      </label>
+                      <div
                         style={{
-                          width: '100%',
                           padding: '0.75rem 1rem',
-                          border: '1px solid rgba(255, 255, 255, 0.2)',
                           borderRadius: '0.5rem',
-                          color: 'white',
+                          border: '1px solid rgba(255, 255, 255, 0.2)',
                           backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                          fontSize: '1rem',
-                          outline: 'none',
-                          cursor: 'pointer'
-                        }}
-                        onFocus={(e) => {
-                          e.target.style.borderColor = '#7c3aed'
-                          e.target.style.boxShadow = '0 0 0 3px rgba(124, 58, 237, 0.2)'
-                        }}
-                        onBlur={(e) => {
-                          e.target.style.borderColor = 'rgba(255, 255, 255, 0.2)'
-                          e.target.style.boxShadow = 'none'
+                          color: 'rgba(255, 255, 255, 0.85)',
+                          fontWeight: 600,
                         }}
                       >
-                        {regions.map((region) => (
-                          <option key={region.id} value={region.slug} style={{ color: '#111827' }}>
-                            {region.name}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <div style={{ padding: '0.75rem 1rem', borderRadius: '0.5rem', border: '1px dashed rgba(248, 113, 113, 0.4)', background: 'rgba(248, 113, 113, 0.1)', color: '#fca5a5' }}>
-                        No active regions available yet.
+                        {merchantRegion.name}
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

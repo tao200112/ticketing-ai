@@ -29,12 +29,14 @@ export default function MerchantEventsPage() {
         
         const data = await response.json()
         if (data.success && data.merchant) {
-          // 设置商家信息
+          const inferredRegionId = data.merchant.region_id || data.merchant.region?.id || null
           setMerchantUser({
             id: data.merchant.id,
             email: data.merchant.email,
             name: data.merchant.name,
-            merchant_id: data.merchant.id
+            merchant_id: data.merchant.id,
+            region_id: inferredRegionId,
+            region_slug: data.merchant.region?.slug || null
           })
         } else {
           router.push('/merchant/auth/login?next=/merchant/events')
@@ -64,7 +66,11 @@ export default function MerchantEventsPage() {
       }
       
       // 从 API 加载活动
-      const response = await fetch('/api/events')
+      const eventsEndpoint =
+        merchantUser.region_slug
+          ? `/api/events?region=${encodeURIComponent(merchantUser.region_slug)}`
+          : '/api/events'
+      const response = await fetch(eventsEndpoint)
       const result = await response.json()
 
       if (result.success && result.data) {
@@ -77,10 +83,12 @@ export default function MerchantEventsPage() {
         let merchantEvents = []
         
         if (merchantId) {
-          // 如果有 merchant_id，过滤出该商家的活动
-          merchantEvents = result.data.filter(event => 
-            event.merchant_id === merchantId
-          )
+          // 如果有 merchant_id，过滤出该商家的活动，同时确保区域一致
+          merchantEvents = result.data.filter(event => {
+            const matchesMerchant = event.merchant_id === merchantId
+            const matchesRegion = merchantUser.region_id ? event.region_id === merchantUser.region_id : true
+            return matchesMerchant && matchesRegion
+          })
         } else {
           // 如果没有 merchant_id，显示所有活动（临时方案）
           merchantEvents = result.data

@@ -27,6 +27,7 @@ export async function GET() {
         status,
         verified,
         max_events,
+        region_id,
         created_at,
         updated_at
       `)
@@ -40,8 +41,34 @@ export async function GET() {
       )
     }
 
+    let enrichedMerchants = merchants || []
+    const regionIds = Array.from(
+      new Set(
+        (enrichedMerchants || [])
+          .map((merchant) => merchant.region_id)
+          .filter(Boolean)
+      )
+    )
+
+    if (regionIds.length > 0) {
+      const { data: regions, error: regionsError } = await supabaseAdmin
+        .from('regions')
+        .select('id, name, slug')
+        .in('id', regionIds)
+
+      if (regionsError) {
+        console.warn('⚠️ Failed to load region metadata for merchants', regionsError)
+      } else {
+        const regionMap = new Map(regions.map((region) => [region.id, region]))
+        enrichedMerchants = enrichedMerchants.map((merchant) => ({
+          ...merchant,
+          region: regionMap.get(merchant.region_id) || null,
+        }))
+      }
+    }
+
     // 返回干净的 JSON 数据
-    return NextResponse.json(merchants || [])
+    return NextResponse.json(enrichedMerchants)
   } catch (error) {
     console.error('Error fetching merchants:', error)
     return NextResponse.json(

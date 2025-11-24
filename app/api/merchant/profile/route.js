@@ -66,7 +66,7 @@ export async function GET(request) {
     // 首先尝试通过 owner_supabase_uid 查找
     const { data: merchantByUid, error: errorByUid } = await supabase
       .from('merchants')
-      .select('id, email, name, verified, status, created_at, owner_supabase_uid')
+      .select('id, email, name, verified, status, created_at, owner_supabase_uid, region_id')
       .eq('owner_supabase_uid', authUserId)
       .maybeSingle()
 
@@ -91,7 +91,7 @@ export async function GET(request) {
       
       const { data: merchantByEmail, error: errorByEmail } = await supabase
         .from('merchants')
-        .select('id, email, name, verified, status, created_at, owner_supabase_uid')
+        .select('id, email, name, verified, status, created_at, owner_supabase_uid, region_id')
         .eq('email', normalizedEmail)
         .maybeSingle()
 
@@ -155,6 +155,10 @@ export async function GET(request) {
       )
     }
 
+    if (merchant) {
+      merchant = await attachRegionMetadata(merchant, supabase)
+    }
+
     return NextResponse.json({
       success: true,
       merchant
@@ -162,6 +166,31 @@ export async function GET(request) {
 
   } catch (error) {
     return handleApiError(error, request, logger)
+  }
+}
+
+async function attachRegionMetadata(merchant, supabaseClient) {
+  if (!merchant?.region_id || !supabaseClient) {
+    return merchant
+  }
+
+  try {
+    const { data: region } = await supabaseClient
+      .from('regions')
+      .select('id, name, slug')
+      .eq('id', merchant.region_id)
+      .maybeSingle()
+
+    return {
+      ...merchant,
+      region,
+    }
+  } catch (error) {
+    console.warn('[merchant-profile-api] Failed to load region metadata', error)
+    return {
+      ...merchant,
+      region: null,
+    }
   }
 }
 

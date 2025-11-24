@@ -1,18 +1,17 @@
 'use client'
 export const dynamic = 'force-dynamic'
 
-import { useState, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { getTicketKindDisplayName } from '@/lib/ticket-helpers'
+import { useMerchant } from '@/hooks/use-merchant'
 
 export default function NewEventWizardPage() {
   const router = useRouter()
   const [currentStep, setCurrentStep] = useState(1)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
-  const [merchantUser, setMerchantUser] = useState(null)
-  const [isLoadingAuth, setIsLoadingAuth] = useState(true)
-  const [merchantRegion, setMerchantRegion] = useState(null)
+  const { merchant, loading: merchantLoading } = useMerchant()
   const [eventData, setEventData] = useState({
     title: '',
     description: '',
@@ -26,59 +25,14 @@ export default function NewEventWizardPage() {
     ]
   })
 
-  useEffect(() => {
-    // 检查商家登录状态 - 使用 Supabase Auth
-    const checkMerchantAuth = async () => {
-      setIsLoadingAuth(true)
-      
-      try {
-        // 检查 Supabase Auth 会话
-        const response = await fetch('/api/merchant/profile', {
-          credentials: 'include'
-        })
-        
-        if (!response.ok) {
-          // 未登录或不是商家，跳转到登录页
-          router.push('/merchant/auth/login?next=/merchant/events/new')
-          return
-        }
-        
-        const data = await response.json()
-        if (data.success && data.merchant) {
-          const inferredRegionId = data.merchant.region_id || data.merchant.region?.id || null
-          if (!inferredRegionId) {
-            setError('Your merchant profile is missing a region assignment. Please contact an administrator.')
-            setMerchantUser(null)
-            return
-          }
-
-          setMerchantRegion({
-            id: inferredRegionId,
-            name: data.merchant.region?.name || 'Assigned Region',
-            slug: data.merchant.region?.slug || null
-          })
-
-          // 设置商家信息（包含merchant_id用于创建活动）
-          setMerchantUser({
-            id: data.merchant.id,
-            email: data.merchant.email,
-            name: data.merchant.name,
-            merchant_id: data.merchant.id,
-            region_id: inferredRegionId
-          })
-        } else {
-          router.push('/merchant/auth/login?next=/merchant/events/new')
-        }
-      } catch (err) {
-        console.error('Error checking merchant auth:', err)
-        router.push('/merchant/auth/login?next=/merchant/events/new')
-      } finally {
-        setIsLoadingAuth(false)
-      }
+  const merchantRegion = useMemo(() => {
+    if (!merchant) return null
+    return {
+      id: merchant.region_id,
+      name: merchant.region_name || 'Assigned Region',
+      slug: merchant.region_slug || null
     }
-    
-    checkMerchantAuth()
-  }, [router])
+  }, [merchant])
 
   const updateEventData = (field, value) => {
     setEventData(prev => ({
@@ -142,7 +96,7 @@ export default function NewEventWizardPage() {
     
     try {
       // 验证商家用户是否已加载
-      if (!merchantUser) {
+      if (!merchant) {
         setError('Merchant information is not loaded. Please refresh the page.')
         setIsSubmitting(false)
         return
@@ -155,7 +109,7 @@ export default function NewEventWizardPage() {
         return
       }
 
-      const resolvedRegionId = merchantRegion?.id || merchantUser.region_id
+      const resolvedRegionId = merchantRegion?.id || merchant?.region_id
       if (!resolvedRegionId) {
         setError('Your merchant profile is missing a region assignment. Please contact an administrator.')
         setIsSubmitting(false)
@@ -179,7 +133,7 @@ export default function NewEventWizardPage() {
       }
 
       // 获取 merchant_id
-      const merchantId = merchantUser.merchant_id || merchantUser.id || null
+      const merchantId = merchant?.id || null
       
       if (!merchantId) {
         setError('Merchant ID is required. Please ensure you are logged in as a merchant.')
@@ -239,7 +193,7 @@ export default function NewEventWizardPage() {
   ]
 
   // 如果正在加载认证信息，显示加载状态
-  if (isLoadingAuth) {
+  if (merchantLoading) {
     return (
       <div style={{ 
         minHeight: '100vh', 
@@ -278,7 +232,7 @@ export default function NewEventWizardPage() {
   }
 
   // 如果商家用户未加载，不显示表单
-  if (!merchantUser) {
+  if (!merchant) {
     return (
       <div style={{ 
         minHeight: '100vh', 

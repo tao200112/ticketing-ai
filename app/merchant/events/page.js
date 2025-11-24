@@ -1,112 +1,63 @@
 'use client'
 export const dynamic = 'force-dynamic'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import MerchantNavbar from '@/components/MerchantNavbar'
+import { useMerchant } from '@/hooks/use-merchant'
 
 export default function MerchantEventsPage() {
   const router = useRouter()
+  const { merchant, loading: merchantLoading, error: merchantError } = useMerchant()
   const [events, setEvents] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [merchantUser, setMerchantUser] = useState(null)
+  const [eventsLoading, setEventsLoading] = useState(true)
+  const [eventsError, setEventsError] = useState('')
 
-  useEffect(() => {
-    // 检查商家登录状态 - 使用 Supabase Auth
-    const checkMerchantAuth = async () => {
-      try {
-        // 检查 Supabase Auth 会话
-        const response = await fetch('/api/merchant/profile', {
-          credentials: 'include'
-        })
-        
-        if (!response.ok) {
-          // 未登录或不是商家，跳转到登录页
-          router.push('/merchant/auth/login?next=/merchant/events')
-          return
-        }
-        
-        const data = await response.json()
-        if (data.success && data.merchant) {
-          const inferredRegionId = data.merchant.region_id || data.merchant.region?.id || null
-          setMerchantUser({
-            id: data.merchant.id,
-            email: data.merchant.email,
-            name: data.merchant.name,
-            merchant_id: data.merchant.id,
-            region_id: inferredRegionId,
-            region_slug: data.merchant.region?.slug || null
-          })
-        } else {
-          router.push('/merchant/auth/login?next=/merchant/events')
-        }
-      } catch (err) {
-        console.error('Error checking merchant auth:', err)
-        router.push('/merchant/auth/login?next=/merchant/events')
-      }
+  const loadEvents = useCallback(async () => {
+    if (!merchant) {
+      setEvents([])
+      setEventsLoading(false)
+      return
     }
-    
-    checkMerchantAuth()
-  }, [router])
 
-  useEffect(() => {
-    if (merchantUser) {
-      loadEvents()
-    }
-  }, [merchantUser])
-
-  const loadEvents = async () => {
     try {
-      setLoading(true)
-      
-      if (!merchantUser) {
-        setEvents([])
-        return
-      }
-      
-      // 从 API 加载活动
-      const eventsEndpoint =
-        merchantUser.region_slug
-          ? `/api/events?region=${encodeURIComponent(merchantUser.region_slug)}`
-          : '/api/events'
+      setEventsLoading(true)
+      setEventsError('')
+
+      const eventsEndpoint = merchant.region_slug
+        ? `/api/events?region=${encodeURIComponent(merchant.region_slug)}`
+        : '/api/events'
       const response = await fetch(eventsEndpoint)
       const result = await response.json()
 
-      if (result.success && result.data) {
-        // 过滤出当前商家的活动
-        const merchantId = merchantUser.merchant_id || merchantUser.id
-        console.log('🔍 商家 ID:', merchantId)
-        console.log('🔍 商家用户数据:', { id: merchantUser.id, merchant_id: merchantUser.merchant_id })
-        console.log('🔍 所有活动数量:', result.data.length)
-        
-        let merchantEvents = []
-        
-        if (merchantId) {
-          // 如果有 merchant_id，过滤出该商家的活动，同时确保区域一致
-          merchantEvents = result.data.filter(event => {
-            const matchesMerchant = event.merchant_id === merchantId
-            const matchesRegion = merchantUser.region_id ? event.region_id === merchantUser.region_id : true
-            return matchesMerchant && matchesRegion
-          })
-        } else {
-          // 如果没有 merchant_id，显示所有活动（临时方案）
-          merchantEvents = result.data
-          console.warn('⚠️ 未找到 merchant_id，显示所有活动')
-        }
-        
-        console.log('✅ 匹配的活动数量:', merchantEvents.length)
+      if (result.success && Array.isArray(result.data)) {
+        const merchantId = merchant.id
+        const merchantRegionId = merchant.region_id
+
+        const merchantEvents = result.data.filter(event => {
+          const matchesMerchant = event.merchant_id === merchantId
+          const matchesRegion = merchantRegionId ? event.region_id === merchantRegionId : true
+          return matchesMerchant && matchesRegion
+        })
+
         setEvents(merchantEvents)
       } else {
         setEvents([])
       }
     } catch (err) {
-        setError('Failed to load events')
-        console.error('Error loading events:', err)
+      console.error('Error loading events:', err)
+      setEventsError('Failed to load events')
+      setEvents([])
     } finally {
-      setLoading(false)
+      setEventsLoading(false)
     }
-  }
+  }, [merchant])
+
+  useEffect(() => {
+    if (merchant) {
+      loadEvents()
+    }
+  }, [merchant, loadEvents])
 
   const handleEditEvent = (eventId) => {
     // 跳转到编辑页面
@@ -139,7 +90,49 @@ export default function MerchantEventsPage() {
     loadEvents()
   }
 
-  if (loading) {
+  const isBusy = merchantLoading || eventsLoading
+  const errorMessage = eventsError || (merchantError ?? '')
+
+  if (isBusy) {
+  if (!merchant) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #0f172a 0%, #7c3aed 50%, #0f172a 100%)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}>
+        <div style={{
+          background: 'rgba(255, 255, 255, 0.05)',
+          backdropFilter: 'blur(12px)',
+          borderRadius: '16px',
+          padding: '40px',
+          textAlign: 'center',
+          color: 'white'
+        }}>
+          <div style={{ fontSize: '18px', marginBottom: '20px' }}>Please log in to view your events</div>
+          <button
+            onClick={() => router.push('/merchant/auth/login?next=/merchant/events')}
+            style={{
+              padding: '12px 24px',
+              borderRadius: '8px',
+              border: 'none',
+              background: 'linear-gradient(135deg, #7c3aed 0%, #ec4899 100%)',
+              color: 'white',
+              fontSize: '16px',
+              fontWeight: '600',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease'
+            }}
+          >
+            Go to Login
+          </button>
+        </div>
+      </div>
+    )
+  }
+
     return (
       <div style={{ 
         minHeight: '100vh', 
@@ -164,7 +157,7 @@ export default function MerchantEventsPage() {
     )
   }
 
-  if (error) {
+  if (errorMessage) {
     return (
       <div style={{ 
         minHeight: '100vh', 
@@ -182,7 +175,7 @@ export default function MerchantEventsPage() {
           <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: 'white', marginBottom: '0.5rem' }}>
             Loading Failed
           </h2>
-          <p style={{ color: 'rgba(255, 255, 255, 0.8)', marginBottom: '1.5rem' }}>{error}</p>
+          <p style={{ color: 'rgba(255, 255, 255, 0.8)', marginBottom: '1.5rem' }}>{errorMessage}</p>
           <button 
             onClick={loadEvents}
             style={{

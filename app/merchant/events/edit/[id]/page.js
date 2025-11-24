@@ -1,8 +1,9 @@
 'use client'
 export const dynamic = 'force-dynamic'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
+import { useMerchant } from '@/hooks/use-merchant'
 
 export default function EditEventPage() {
   const router = useRouter()
@@ -11,50 +12,11 @@ export default function EditEventPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [merchantUser, setMerchantUser] = useState(null)
   const [uploadingImage, setUploadingImage] = useState(false)
+  const { merchant, loading: merchantLoading } = useMerchant()
 
-  useEffect(() => {
-    // 检查商家登录状态 - 使用 Supabase Auth
-    const checkMerchantAuth = async () => {
-      try {
-        // 检查 Supabase Auth 会话
-        const response = await fetch('/api/merchant/profile', {
-          credentials: 'include'
-        })
-        
-        if (!response.ok) {
-          // 未登录或不是商家，跳转到登录页
-          router.push(`/merchant/auth/login?next=/merchant/events/edit/${params.id}`)
-          return
-        }
-        
-        const data = await response.json()
-        if (data.success && data.merchant) {
-          const merchantData = {
-            id: data.merchant.id,
-            email: data.merchant.email,
-            name: data.merchant.name,
-            merchant_id: data.merchant.id,
-            region_id: data.merchant.region_id || data.merchant.region?.id || null
-          }
-          setMerchantUser(merchantData)
-          
-          // 从API加载事件数据
-          loadEventData(params.id, merchantData)
-        } else {
-          router.push(`/merchant/auth/login?next=/merchant/events/edit/${params.id}`)
-        }
-      } catch (err) {
-        console.error('Error checking merchant auth:', err)
-        router.push(`/merchant/auth/login?next=/merchant/events/edit/${params.id}`)
-      }
-    }
-    
-    checkMerchantAuth()
-  }, [params.id, router])
-
-  const loadEventData = async (eventId, user) => {
+  const loadEventData = useCallback(async (eventId) => {
+    if (!merchant) return
     try {
       setLoading(true)
       setError('')
@@ -72,13 +34,13 @@ export default function EditEventPage() {
       const event = result.data
       
       // 检查权限：只能编辑自己的事件，并确保区域匹配
-      const merchantId = user.merchant_id || user.id
+      const merchantId = merchant.id
       if (merchantId && event.merchant_id !== merchantId) {
         setError('You do not have permission to edit this event')
         setLoading(false)
         return
       }
-      if (user.region_id && event.region_id && user.region_id !== event.region_id) {
+      if (merchant.region_id && event.region_id && merchant.region_id !== event.region_id) {
         setError('You cannot edit events outside of your assigned region')
         setLoading(false)
         return
@@ -109,7 +71,16 @@ export default function EditEventPage() {
       console.error('Error loading event:', err)
       setLoading(false)
     }
-  }
+  }, [merchant])
+
+  useEffect(() => {
+    if (merchantLoading) return
+    if (!merchant) {
+      router.push(`/merchant/auth/login?next=/merchant/events/edit/${params.id}`)
+      return
+    }
+    loadEventData(params.id)
+  }, [merchant, merchantLoading, loadEventData, params.id, router])
 
   const handleSave = async () => {
     setIsSubmitting(true)
@@ -152,7 +123,7 @@ export default function EditEventPage() {
           endTime: eventData.endTime,
           location: eventData.location,
           poster_url: eventData.posterPreview,
-          region_id: merchantUser?.region_id,
+          region_id: merchant?.region_id,
           prices: validPrices.map(price => ({
             name: price.name,
             amount_cents: Math.round(parseFloat(price.amount_cents) * 100), // 将美元转换为分存储

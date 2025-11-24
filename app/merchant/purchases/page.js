@@ -1,68 +1,29 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { useMerchant } from '@/hooks/use-merchant'
 
 export default function MerchantPurchasesPage() {
   const router = useRouter()
+  const { merchant, loading: merchantLoading, error: merchantError } = useMerchant()
   const [purchases, setPurchases] = useState([])
   const [loading, setLoading] = useState(true)
-  const [merchantUser, setMerchantUser] = useState(null)
   const [filter, setFilter] = useState('all') // all, today, week, month
   const [searchTerm, setSearchTerm] = useState('')
 
   useEffect(() => {
-    // 检查商家登录状态 - 使用 Supabase Auth
-    const checkMerchantAuth = async () => {
-      try {
-        // 检查 Supabase Auth 会话
-        const response = await fetch('/api/merchant/profile', {
-          credentials: 'include'
-        })
-        
-        if (!response.ok) {
-          // 未登录或不是商家，跳转到登录页
-          router.push('/merchant/auth/login?next=/merchant/purchases')
-          return
-        }
-        
-        const data = await response.json()
-        if (data.success && data.merchant) {
-          // 设置商家信息
-          setMerchantUser({
-            id: data.merchant.id,
-            email: data.merchant.email,
-            name: data.merchant.name,
-            merchant_id: data.merchant.id
-          })
-        } else {
-          router.push('/merchant/auth/login?next=/merchant/purchases')
-        }
-      } catch (err) {
-        console.error('Error checking merchant auth:', err)
-        router.push('/merchant/auth/login?next=/merchant/purchases')
-      }
+    if (merchantError === 'AUTHENTICATION_REQUIRED') {
+      router.replace('/merchant/auth/login?next=/merchant/purchases')
     }
-    
-    checkMerchantAuth()
-  }, [router])
+  }, [merchantError, router])
 
-  useEffect(() => {
-    if (merchantUser) {
-      loadPurchases()
-    }
-  }, [merchantUser])
-
-  const loadPurchases = async () => {
+  const loadPurchases = useCallback(async () => {
+    if (!merchant) return
     try {
       setLoading(true)
-      
-      if (!merchantUser) {
-        setPurchases([])
-        return
-      }
-      
+
       // 从 API 加载票据数据
       const response = await fetch('/api/admin/tickets')
       const result = await response.json()
@@ -78,7 +39,7 @@ export default function MerchantPurchasesPage() {
         const eventsResponse = await fetch('/api/events')
         const eventsResult = await eventsResponse.json()
         const allEvents = eventsResult.success ? eventsResult.data : []
-        const merchantId = merchantUser.merchant_id || merchantUser.id
+        const merchantId = merchant.id
         const merchantEvents = allEvents.filter(event => event.merchant_id === merchantId)
         const merchantEventIds = merchantEvents.map(event => event.id)
         
@@ -144,7 +105,13 @@ export default function MerchantPurchasesPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [merchant])
+
+  useEffect(() => {
+    if (merchant && !merchantLoading) {
+      loadPurchases()
+    }
+  }, [merchant, merchantLoading, loadPurchases])
 
   const handleLogout = async () => {
     try {
@@ -253,14 +220,14 @@ export default function MerchantPurchasesPage() {
             </div>
             
             {/* 用户信息和登出按钮 */}
-            {merchantUser && (
+            {merchant && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ color: 'white', fontWeight: '500', fontSize: '0.875rem' }}>
-                    {merchantUser.name}
+                    {merchant.name || merchant.email}
                   </div>
                   <div style={{ color: '#94a3b8', fontSize: '0.75rem' }}>
-                    {merchantUser.email}
+                    {merchant.email}
                   </div>
                 </div>
                 <button

@@ -1,58 +1,37 @@
 'use client'
 export const dynamic = 'force-dynamic'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import MerchantNavbar from '@/components/MerchantNavbar'
 import Link from 'next/link'
+import { useMerchant } from '@/hooks/use-merchant'
 
 export default function MerchantBossPage() {
   const router = useRouter()
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [merchantUser, setMerchantUser] = useState(null)
-  const [userRole, setUserRole] = useState(null)
+  const { merchant, loading: merchantLoading, error: merchantError } = useMerchant()
+  const userRole = merchant ? 'boss' : null
   const [isBossVerified, setIsBossVerified] = useState(false)
   const [bossPassword, setBossPassword] = useState('')
   const [passwordError, setPasswordError] = useState('')
 
   useEffect(() => {
-    const checkMerchantAuth = async () => {
-      try {
-        const response = await fetch('/api/merchant/profile', {
-          credentials: 'include'
-        })
-        const data = await response.json()
-        
-        if (response.ok && data.success) {
-          const merchantInfo = {
-            id: data.merchant.id,
-            email: data.merchant.email,
-            name: data.merchant.name,
-            merchant: data.merchant,
-            merchant_id: data.merchant.id
-          }
-          setMerchantUser(merchantInfo)
-          setUserRole('boss')
-          
-          // 检查是否已经通过Boss验证
-          const bossVerified = sessionStorage.getItem('bossVerified') === 'true'
-          if (bossVerified) {
-            setIsBossVerified(true)
-            loadStats()
-          }
-        } else {
-          router.push('/merchant/auth/login')
-        }
-      } catch (error) {
-        console.error('Error checking merchant auth:', error)
-        router.push('/merchant/auth/login')
+    if (merchantError === 'AUTHENTICATION_REQUIRED') {
+      router.replace('/merchant/auth/login?next=/merchant/boss')
+    }
+  }, [merchantError, router])
+
+  useEffect(() => {
+    if (!merchantLoading && merchant) {
+      const bossVerified = sessionStorage.getItem('bossVerified') === 'true'
+      if (bossVerified) {
+        setIsBossVerified(true)
       }
     }
-    
-    checkMerchantAuth()
-  }, [router])
+  }, [merchant, merchantLoading])
 
   const handleBossPasswordSubmit = (e) => {
     e.preventDefault()
@@ -63,20 +42,18 @@ export default function MerchantBossPage() {
     if (bossPassword === correctPassword) {
       setIsBossVerified(true)
       sessionStorage.setItem('bossVerified', 'true')
-      loadStats()
     } else {
       setPasswordError('Incorrect password, please try again')
       setBossPassword('')
     }
   }
 
-  const loadStats = async () => {
+  const loadStats = useCallback(async () => {
+    if (!merchant) return
     try {
       setLoading(true)
       
-      const currentMerchant = merchantUser || {}
-      const merchantId = currentMerchant.merchant_id || currentMerchant.merchant?.id || currentMerchant.id
-      
+      const merchantId = merchant.id
       const ordersResponse = await fetch('/api/admin/tickets')
       const ordersData = await ordersResponse.json()
       
@@ -128,6 +105,28 @@ export default function MerchantBossPage() {
     } finally {
       setLoading(false)
     }
+  }, [merchant])
+
+  useEffect(() => {
+    if (isBossVerified) {
+      loadStats()
+    }
+  }, [isBossVerified, loadStats])
+
+  if (merchantLoading || !merchant) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #0f172a 0%, #7c3aed 50%, #0f172a 100%)',
+        paddingTop: '80px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}>
+        <MerchantNavbar userRole={null} />
+        <div style={{ color: 'white', fontSize: '1.25rem' }}>Loading...</div>
+      </div>
+    )
   }
 
   // 密码验证界面

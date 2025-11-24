@@ -249,7 +249,7 @@ export async function POST(request) {
 
     // 2.1 解析商家所属区域
     const defaultRegion = await getDefaultRegion()
-    if (!defaultRegion) {
+    if (!defaultRegion?.id) {
       return NextResponse.json(
         { error: 'No default region configured' },
         { status: 500 }
@@ -258,35 +258,43 @@ export async function POST(request) {
 
     let regionId = defaultRegion.id
     if (inviteCodeData.region_slug) {
-      const inviteRegionId = await ensureRegionId({ regionSlug: inviteCodeData.region_slug })
-      if (inviteRegionId) {
-        regionId = inviteRegionId
+      const inviteRegionId = await ensureRegionId({
+        regionSlug: inviteCodeData.region_slug,
+        requireMatch: true
+      })
+      if (!inviteRegionId) {
+        return NextResponse.json(
+          { error: 'Invalid invite region' },
+          { status: 400 }
+        )
       }
+      regionId = inviteRegionId
     }
 
     // 4. 在 merchants 表中创建商家记录（不再存储 password_hash）
     // 设置 owner_supabase_uid 关联 Supabase Auth 用户
     const supabaseAuthUserId = createdUser.id
     
-    let merchantPayload = {
-      email: normalizedEmail,
-      name: name.trim(),
-      verified: false,
-      status: 'active',
-      region_id: regionId
-    }
-    
-    // 设置 owner_supabase_uid（关联 Supabase Auth 用户的关键字段）
-    if (supabaseAuthUserId) {
-      merchantPayload.owner_supabase_uid = supabaseAuthUserId
-      logger.info('Setting owner_supabase_uid for merchant', { 
-        merchantEmail: normalizedEmail,
-        authUserId: supabaseAuthUserId 
-      })
-    } else {
+    if (!supabaseAuthUserId) {
       logger.error('supabaseAuthUserId is null, cannot associate merchant with auth user', {
         email: normalizedEmail
       })
+      return NextResponse.json(
+        { error: 'Unable to associate merchant with auth user' },
+        { status: 500 }
+      )
+    }
+
+    let merchantPayload = {
+      name: name.trim(),
+      contact_phone: null,
+      email: normalizedEmail,
+      status: 'active',
+      verified: false,
+      max_events: inviteCodeData.max_events || 10,
+      temp_password: password,
+      auth_user_id: supabaseAuthUserId,
+      region_id: regionId
     }
     
     // 不再存储 temp_password，所有密码由 Supabase Auth 处理

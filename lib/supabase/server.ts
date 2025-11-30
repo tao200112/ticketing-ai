@@ -34,7 +34,10 @@ export function createSupabaseServerClient() {
   }
 
   try {
-    return createServerComponentClient<Database>({ cookies })
+    const cookieStore = cookies()
+    return createServerComponentClient<Database>({
+      cookies: () => cookieStore,
+    })
   } catch (error) {
     console.error('[createSupabaseServerClient] Failed to create Supabase client:', error)
     return null
@@ -51,7 +54,10 @@ export function createSupabaseRouteHandlerClient() {
   }
 
   try {
-    return createRouteHandlerClient<Database>({ cookies })
+    const cookieStore = cookies()
+    return createRouteHandlerClient<Database>({
+      cookies: () => cookieStore,
+    })
   } catch (error) {
     console.error('[createSupabaseRouteHandlerClient] Failed to create Supabase client:', error)
     return null

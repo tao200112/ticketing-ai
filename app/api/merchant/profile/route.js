@@ -7,8 +7,7 @@
 import { NextResponse } from 'next/server'
 import { ErrorHandler, handleApiError } from '@/lib/error-handler'
 import { createLogger } from '@/lib/logger'
-import { cookies } from 'next/headers'
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
+import { createSupabaseRouteHandlerClient } from '@/lib/supabase/server'
 
 const logger = createLogger('merchant-profile-api')
 
@@ -29,15 +28,10 @@ const MERCHANT_FIELDS = `
 
 export async function GET(request) {
   try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-    if (!supabaseUrl || !supabaseAnonKey) {
+    const supabase = createSupabaseRouteHandlerClient()
+    if (!supabase) {
       throw ErrorHandler.configurationError('CONFIG_ERROR', 'Supabase 未配置')
     }
-
-    const supabase = createRouteHandlerClient({
-      cookies,
-    })
 
     const {
       data: { session },

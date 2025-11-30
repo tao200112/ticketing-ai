@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { ErrorHandler, handleApiError } from '@/lib/error-handler'
 import { createLogger } from '@/lib/logger'
-import { requireSupabaseUser } from '@/lib/supabase/server'
+import { createSupabaseRouteHandlerClient, requireSupabaseUser } from '@/lib/supabase/server'
 
 const logger = createLogger('checkout-sessions-api')
 
@@ -43,10 +43,35 @@ export async function POST(request) {
     const { event_id, price_id, quantity = 1, customer_email, customer_name, customer_age, customerAge } = body
 
     // 获取当前登录用户（基于 Supabase server auth）
-    // requireSupabaseUser() 会抛出 AUTHENTICATION_ERROR 如果用户未登录
+    // 使用统一的 @supabase/ssr 客户端确保 cookie 格式一致
+    const supabase = createSupabaseRouteHandlerClient()
+    if (!supabase) {
+      throw ErrorHandler.configurationError(
+        'CONFIG_ERROR',
+        'Supabase is not configured'
+      )
+    }
+
+    // 获取用户会话
     let user
     try {
-      user = await requireSupabaseUser()
+      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser()
+      
+      if (authError || !authUser) {
+        logger.warn('[CHECKOUT_SESSIONS] Session missing or invalid', {
+          error: authError?.message || 'No user found'
+        })
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'AUTHENTICATION_REQUIRED',
+            message: 'You must be logged in to create a checkout session'
+          },
+          { status: 401 }
+        )
+      }
+
+      user = authUser
       logger.info('[CHECKOUT_SESSIONS] user loaded', {
         id: user.id,
         email: user.email

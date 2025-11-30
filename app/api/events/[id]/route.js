@@ -3,6 +3,7 @@ import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase-api'
 import { ErrorHandler, handleApiError } from '@/lib/error-handler'
 import { createLogger } from '@/lib/logger'
 import { ensureRegionId } from '@/lib/regions'
+import { getSupabaseUser } from '@/lib/supabase/server'
 
 const logger = createLogger('event-detail-api')
 
@@ -254,7 +255,6 @@ export async function PUT(request, { params }) {
       }
       
       if (existingEvent?.merchant_id) {
-        const { getSupabaseUser } = await import('@/lib/supabase/server')
         const user = await getSupabaseUser()
         
         if (user) {

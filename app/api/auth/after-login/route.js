@@ -10,7 +10,7 @@
  */
 
 import { NextResponse } from 'next/server';
-import { getSupabaseUser, createSupabaseServerClient } from '@/lib/supabase/server';
+import { getSupabaseUser } from '@/lib/supabase/server';
 import { createSupabaseClient } from '@/lib/supabase-api';
 import { ErrorHandler, handleApiError } from '@/lib/error-handler';
 import { createLogger } from '@/lib/logger';

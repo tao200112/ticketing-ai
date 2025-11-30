@@ -5,11 +5,14 @@
  * 
  * 使用单例模式确保整个应用只有一个 GoTrueClient 实例
  * 多个实例会导致 "Auth session missing!" 错误
+ * 
+ * 使用 @supabase/ssr 的 createBrowserClient 统一管理 cookies
  */
 
 'use client'
 
 import { createBrowserClient } from '@supabase/ssr'
+import type { Database } from '@/types/db'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -18,7 +21,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables')
 }
 
-let browserSupabaseClient: ReturnType<typeof createBrowserClient> | null = null
+let browserSupabaseClient: ReturnType<typeof createBrowserClient<Database>> | null = null
 
 /**
  * 获取浏览器端 Supabase 客户端（单例）
@@ -35,7 +38,7 @@ let browserSupabaseClient: ReturnType<typeof createBrowserClient> | null = null
  */
 export function getSupabaseBrowserClient() {
   if (!browserSupabaseClient) {
-    browserSupabaseClient = createBrowserClient(supabaseUrl, supabaseAnonKey, {
+    browserSupabaseClient = createBrowserClient<Database>(supabaseUrl, supabaseAnonKey, {
       auth: {
         autoRefreshToken: true,
         persistSession: true,
@@ -46,3 +49,11 @@ export function getSupabaseBrowserClient() {
   return browserSupabaseClient
 }
 
+/**
+ * 创建浏览器端 Supabase 客户端（别名，用于向后兼容）
+ * 
+ * @deprecated 使用 getSupabaseBrowserClient() 代替
+ */
+export function createSupabaseBrowserClient() {
+  return getSupabaseBrowserClient()
+}

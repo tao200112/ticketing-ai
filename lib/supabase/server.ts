@@ -1,16 +1,15 @@
 /**
  * 服务端 Supabase 客户端统一入口
  *
- * 所有 Route Handler / Server Component / Middleware 都应该从这里获取 Supabase client 和 user
+ * 所有 Route Handler / Server Component 都应该从这里获取 Supabase client 和 user
  *
  * 这是项目中唯一的服务端 Supabase 认证来源
+ * 
+ * 使用 @supabase/ssr 的 createServerClient 统一管理 cookies
  */
 
 import { cookies } from 'next/headers'
-import {
-  createRouteHandlerClient,
-  createServerComponentClient,
-} from '@supabase/auth-helpers-nextjs'
+import { createServerClient } from '@supabase/ssr'
 import type { Database } from '@/types/db'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -24,32 +23,11 @@ function isSupabaseConfigured() {
   return true
 }
 
-function buildSupabaseCookieConfig() {
-  const cookieStore = cookies()
-  return {
-    cookies: () => cookieStore,
-  }
-}
-
-/**
- * 创建 Supabase 服务端客户端（Server Component）
- */
-export function createSupabaseServerClient() {
-  if (!isSupabaseConfigured()) {
-    console.warn('[createSupabaseServerClient] Supabase environment variables missing')
-    return null
-  }
-
-  try {
-    return createServerComponentClient<Database>(buildSupabaseCookieConfig())
-  } catch (error) {
-    console.error('[createSupabaseServerClient] Failed to create Supabase client:', error)
-    return null
-  }
-}
-
 /**
  * 创建 Route Handler Supabase 客户端（API Routes）
+ * 
+ * 使用 @supabase/ssr 的 createServerClient 统一管理 cookies
+ * 确保与浏览器端使用相同的 cookie 格式
  */
 export function createSupabaseRouteHandlerClient() {
   if (!isSupabaseConfigured()) {
@@ -58,9 +36,83 @@ export function createSupabaseRouteHandlerClient() {
   }
 
   try {
-    return createRouteHandlerClient<Database>(buildSupabaseCookieConfig())
+    const cookieStore = cookies()
+    return createServerClient<Database>(
+      supabaseUrl!,
+      supabaseAnonKey!,
+      {
+        cookies: {
+          get(name: string) {
+            return cookieStore.get(name)?.value
+          },
+          set(name: string, value: string, options: any) {
+            try {
+              cookieStore.set({ name, value, ...options })
+            } catch (error) {
+              // 在 Route Handler 中，cookies() 返回的是 ReadonlyRequestCookies
+              // 某些情况下可能无法写入，这是正常的
+              console.warn('[createSupabaseRouteHandlerClient] Failed to set cookie:', name)
+            }
+          },
+          remove(name: string, options: any) {
+            try {
+              cookieStore.set({ name, value: '', ...options })
+            } catch (error) {
+              console.warn('[createSupabaseRouteHandlerClient] Failed to remove cookie:', name)
+            }
+          },
+        },
+      }
+    )
   } catch (error) {
     console.error('[createSupabaseRouteHandlerClient] Failed to create Supabase client:', error)
+    return null
+  }
+}
+
+/**
+ * 创建 Server Component Supabase 客户端
+ * 
+ * 使用 @supabase/ssr 的 createServerClient 统一管理 cookies
+ * 确保与浏览器端使用相同的 cookie 格式
+ */
+export function createSupabaseServerClient() {
+  if (!isSupabaseConfigured()) {
+    console.warn('[createSupabaseServerClient] Supabase environment variables missing')
+    return null
+  }
+
+  try {
+    const cookieStore = cookies()
+    return createServerClient<Database>(
+      supabaseUrl!,
+      supabaseAnonKey!,
+      {
+        cookies: {
+          get(name: string) {
+            return cookieStore.get(name)?.value
+          },
+          set(name: string, value: string, options: any) {
+            try {
+              cookieStore.set({ name, value, ...options })
+            } catch (error) {
+              // 在 Server Component 中，cookies() 返回的是 ReadonlyRequestCookies
+              // 某些情况下可能无法写入，这是正常的
+              console.warn('[createSupabaseServerClient] Failed to set cookie:', name)
+            }
+          },
+          remove(name: string, options: any) {
+            try {
+              cookieStore.set({ name, value: '', ...options })
+            } catch (error) {
+              console.warn('[createSupabaseServerClient] Failed to remove cookie:', name)
+            }
+          },
+        },
+      }
+    )
+  } catch (error) {
+    console.error('[createSupabaseServerClient] Failed to create Supabase client:', error)
     return null
   }
 }
@@ -126,4 +178,3 @@ export async function requireSupabaseUser() {
 
   return user
 }
-

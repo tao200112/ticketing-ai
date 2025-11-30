@@ -1,26 +1,24 @@
-import { createClient } from '@supabase/supabase-js'
+/**
+ * 浏览器端 Supabase 客户端（向后兼容）
+ * 
+ * ⚠️ DEPRECATED: Use getSupabaseBrowserClient() from '@/lib/supabase/client' instead
+ * 
+ * This file is kept for backward compatibility but will be removed in the future.
+ * All new code should use '@/lib/supabase/client'
+ */
 
-let clientInstance: ReturnType<typeof createClient> | null = null
+import { getSupabaseBrowserClient } from './supabase/client'
 
+/**
+ * @deprecated Use getSupabaseBrowserClient() from '@/lib/supabase/client' instead
+ */
 export function getSupabaseClient() {
-  if (!clientInstance) {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-    if (!supabaseUrl || !supabaseAnonKey) {
-      throw new Error('Missing Supabase environment variables')
-    }
-
-    clientInstance = createClient(supabaseUrl, supabaseAnonKey, {
-      auth: {
-        autoRefreshToken: true,
-        persistSession: true,
-        detectSessionInUrl: true
-      }
-    })
-  }
-
-  return clientInstance
+  return getSupabaseBrowserClient()
 }
 
-export { getSupabaseClient as createSupabaseBrowserClient }
+/**
+ * @deprecated Use getSupabaseBrowserClient() from '@/lib/supabase/client' instead
+ */
+export function createSupabaseBrowserClient() {
+  return getSupabaseBrowserClient()
+}

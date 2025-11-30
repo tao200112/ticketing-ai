@@ -4,6 +4,7 @@ import { ErrorHandler, handleApiError } from '@/lib/error-handler'
 import { createLogger } from '@/lib/logger'
 import { ensureRegionId } from '@/lib/regions'
 import { ensureMerchantRegion } from '@/lib/db/ensureMerchantRegion'
+import { getSupabaseUser } from '@/lib/supabase/server'
 
 const logger = createLogger('events-api')
 
@@ -244,7 +245,6 @@ export async function POST(request) {
     // 如果提供了merchant_id，验证当前用户是否有权限为该商家创建活动
     if (merchant_id) {
       try {
-        const { getSupabaseUser } = await import('@/lib/supabase/server')
         const user = await getSupabaseUser()
 
         const { data: merchant, error: merchantError } = await supabase

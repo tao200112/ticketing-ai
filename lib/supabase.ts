@@ -1,21 +1,25 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js'
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+/**
+ * Supabase 客户端（向后兼容）
+ * 
+ * ⚠️ DEPRECATED: 
+ * - For browser/client components: Use getSupabaseBrowserClient() from '@/lib/supabase/client'
+ * - For server components: Use createSupabaseServerClient() from '@/lib/supabase/server'
+ * - For API routes: Use createSupabaseRouteHandlerClient() from '@/lib/supabase/server'
+ * 
+ * This file is kept for backward compatibility but will be removed in the future.
+ */
+
+'use client'
+
+import { getSupabaseBrowserClient } from './supabase/client'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 /**
- * 客户端 Supabase 客户端（用于客户端组件）
+ * @deprecated Use getSupabaseBrowserClient() from '@/lib/supabase/client' instead
  */
 export function getSupabaseClient(): SupabaseClient | null {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-  if (!supabaseUrl || !supabaseAnonKey) {
-    console.warn('⚠️ Supabase 环境变量缺失，客户端未初始化')
-    return null
-  }
-
   try {
-    return createClient(supabaseUrl, supabaseAnonKey)
+    return getSupabaseBrowserClient()
   } catch (error) {
     console.error('❌ Supabase 客户端创建失败:', error)
     return null
@@ -23,43 +27,11 @@ export function getSupabaseClient(): SupabaseClient | null {
 }
 
 /**
- * 服务端 Supabase 客户端（用于 API 路由和服务器组件）
- * 使用 createServerClient 和 cookies 进行正确的会话管理
+ * @deprecated Use createSupabaseServerClient() from '@/lib/supabase/server' instead
  */
 export async function createServerSupabaseClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-  if (!supabaseUrl || !supabaseAnonKey) {
-    console.warn('⚠️ Supabase 环境变量缺失，服务端客户端未初始化')
-    return null
-  }
-
-  try {
-    const cookieStore = await cookies()
-    return createServerClient(
-      supabaseUrl,
-      supabaseAnonKey,
-      {
-        cookies: {
-          get: (name: string) => {
-            return cookieStore.get(name)?.value
-          },
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          set: (name: string, value: string, options: any) => {
-            cookieStore.set({ name, value, ...options })
-          },
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          remove: (name: string, options: any) => {
-            cookieStore.set({ name, value: '', ...options })
-          },
-        },
-      }
-    )
-  } catch (error) {
-    console.error('❌ Supabase 服务端客户端创建失败:', error)
-    return null
-  }
+  const { createSupabaseServerClient } = await import('./supabase/server')
+  return createSupabaseServerClient()
 }
 
 // 导出默认客户端实例（向后兼容）

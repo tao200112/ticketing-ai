@@ -75,7 +75,13 @@ export async function GET(request) {
         query = query.eq('status', 'published')
       }
 
-      if (regionFilterId) {
+      if (regionSlugParam) {
+        const regionFilters = [`region.eq.${regionSlugParam}`]
+        if (regionFilterId) {
+          regionFilters.push(`region_id.eq.${regionFilterId}`)
+        }
+        query = query.or(regionFilters.join(','))
+      } else if (regionFilterId) {
         query = query.eq('region_id', regionFilterId)
       }
 
@@ -228,10 +234,11 @@ export async function POST(request) {
       prices,
       status = 'published',
       region_id: bodyRegionId,
-      region_slug: regionSlug
+      region_slug: regionSlug,
     } = body
 
     let merchantRegionId = null
+    let merchantRegionSlug = null
 
     // 如果提供了merchant_id，验证当前用户是否有权限为该商家创建活动
     if (merchant_id) {
@@ -241,7 +248,7 @@ export async function POST(request) {
 
         const { data: merchant, error: merchantError } = await supabase
           .from('merchants')
-          .select('id, owner_supabase_uid, email, region_id')
+          .select('id, owner_supabase_uid, email, region_id, region')
           .eq('id', merchant_id)
           .maybeSingle()
 
@@ -249,6 +256,7 @@ export async function POST(request) {
           logger.warn('Error checking merchant ownership', { error: merchantError, merchant_id })
         } else if (merchant) {
           merchantRegionId = merchant.region_id
+          merchantRegionSlug = merchant.region || null
 
           if (user) {
             // 验证所有权：通过 owner_supabase_uid 或 email
@@ -285,6 +293,8 @@ export async function POST(request) {
     }
 
     let resolvedRegionId = null
+    let resolvedRegionSlug = null
+
     if (merchant_id) {
       if (!merchantRegionId) {
         throw ErrorHandler.validationError(
@@ -293,8 +303,10 @@ export async function POST(request) {
         )
       }
       resolvedRegionId = merchantRegionId
+      resolvedRegionSlug = merchantRegionSlug
     } else {
       resolvedRegionId = await ensureRegionId({ regionId: bodyRegionId, regionSlug })
+      resolvedRegionSlug = regionSlug || null
     }
 
     if (!resolvedRegionId) {
@@ -302,6 +314,15 @@ export async function POST(request) {
         'INVALID_REGION',
         'Region is required'
       )
+    }
+
+    if (resolvedRegionId && !resolvedRegionSlug) {
+      const { data: regionRecord } = await supabase
+        .from('regions')
+        .select('slug')
+        .eq('id', resolvedRegionId)
+        .maybeSingle()
+      resolvedRegionSlug = regionRecord?.slug || null
     }
 
     const { data: event, error: eventError } = await supabase
@@ -319,7 +340,8 @@ export async function POST(request) {
           status: status,
           max_attendees: null,
           current_attendees: 0,
-          region_id: resolvedRegionId
+          region_id: resolvedRegionId,
+          region: resolvedRegionSlug || 'Unknown'
         }
       ])
       .select()

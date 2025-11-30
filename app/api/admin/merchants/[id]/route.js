@@ -17,6 +17,8 @@ async function updateMerchant(request, params) {
       )
     }
 
+    const supabase = createClient(supabaseUrl, supabaseKey)
+
     const updateData = {}
 
     if (max_events !== undefined && max_events !== null) {
@@ -37,7 +39,21 @@ async function updateMerchant(request, params) {
           { status: 400 }
         )
       }
-      updateData.region_id = region_id
+      const { data: regionRecord, error: regionLookupError } = await supabase
+        .from('regions')
+        .select('id, slug')
+        .eq('id', region_id)
+        .maybeSingle()
+
+      if (regionLookupError || !regionRecord) {
+        return NextResponse.json(
+          { error: 'Region not found' },
+          { status: 400 }
+        )
+      }
+
+      updateData.region_id = regionRecord.id
+      updateData.region = regionRecord.slug
     }
 
     if (Object.keys(updateData).length === 0) {
@@ -46,8 +62,6 @@ async function updateMerchant(request, params) {
         { status: 400 }
       )
     }
-
-    const supabase = createClient(supabaseUrl, supabaseKey)
 
     const { data, error } = await supabase
       .from('merchants')

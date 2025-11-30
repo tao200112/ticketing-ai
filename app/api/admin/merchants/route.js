@@ -28,6 +28,7 @@ export async function GET() {
         verified,
         max_events,
         region_id,
+        region,
         created_at,
         updated_at
       `)
@@ -62,7 +63,7 @@ export async function GET() {
         const regionMap = new Map(regions.map((region) => [region.id, region]))
         enrichedMerchants = enrichedMerchants.map((merchant) => ({
           ...merchant,
-          region: regionMap.get(merchant.region_id) || null,
+          region_meta: regionMap.get(merchant.region_id) || null,
         }))
       }
     }

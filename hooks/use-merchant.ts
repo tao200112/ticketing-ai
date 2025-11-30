@@ -12,6 +12,7 @@ type MerchantProfile = {
   verified: boolean
   max_events: number | null
   region_id: string | null
+  region?: string | null
   region_slug?: string | null
   region_name?: string | null
   created_at?: string | null

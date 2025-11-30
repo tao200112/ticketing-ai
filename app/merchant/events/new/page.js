@@ -155,7 +155,6 @@ export default function NewEventWizardPage() {
           location: eventData.location,
           poster_url: eventData.posterPreview,
           merchant_id: merchantId,
-          region_id: resolvedRegionId,
           prices: validPrices.map(price => ({
             name: price.name,
             amount_cents: Math.round(parseFloat(price.amount_cents) * 100), // 将美元转换为分

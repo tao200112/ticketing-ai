@@ -68,6 +68,12 @@ serve(async (req) => {
     const qrPayload = body?.qr_payload as string | undefined
     const redeem = Boolean(body?.redeem)
 
+    const authHeader = req.headers.get('Authorization') || ''
+    const authToken = authHeader.startsWith('Bearer ')
+      ? authHeader.slice(7).trim()
+      : null
+    let currentUserId: string | null = null
+
     if (!qrPayload) {
       return response(
         {
@@ -92,6 +98,18 @@ serve(async (req) => {
     }
 
     const { ticketId } = verification
+
+    if (authToken) {
+      const { data: userData, error: userError } = await supabase
+        .auth
+        .getUser(authToken)
+
+      if (userError) {
+        console.warn('[validate-ticket] Failed to resolve auth user', userError.message)
+      } else {
+        currentUserId = userData.user?.id ?? null
+      }
+    }
 
     const {
       data: ticket,
@@ -215,6 +233,81 @@ serve(async (req) => {
       ticket.status !== 'refunded' &&
       ticket.status !== 'cancelled'
     ) {
+      if (!currentUserId) {
+        return response(
+          {
+            success: false,
+            error: 'AUTHENTICATION_REQUIRED',
+            message: 'Merchant authentication is required to redeem tickets',
+          },
+          401,
+        )
+      }
+
+      if (!event || !event.merchant_id) {
+        return response(
+          {
+            success: false,
+            error: 'TICKET_NO_MERCHANT',
+            message: 'Ticket is not associated with a merchant',
+          },
+          400,
+        )
+      }
+
+      const merchantId = event.merchant_id
+      const [{ data: merchant, error: merchantError }, { data: member, error: memberError }] = await Promise.all([
+        supabase
+          .from('merchants')
+          .select('id, owner_supabase_uid')
+          .eq('id', merchantId)
+          .maybeSingle(),
+        supabase
+          .from('merchant_members')
+          .select('merchant_id')
+          .eq('merchant_id', merchantId)
+          .eq('supabase_uid', currentUserId)
+          .maybeSingle(),
+      ])
+
+      if (merchantError) {
+        console.error('[validate-ticket] Merchant lookup failed', merchantError)
+        return response(
+          {
+            success: false,
+            error: 'MERCHANT_LOOKUP_FAILED',
+            message: 'Unable to verify merchant ownership',
+          },
+          500,
+        )
+      }
+
+      if (memberError && memberError.code !== 'PGRST116') {
+        console.error('[validate-ticket] Merchant member lookup failed', memberError)
+        return response(
+          {
+            success: false,
+            error: 'MERCHANT_LOOKUP_FAILED',
+            message: 'Unable to verify merchant membership',
+          },
+          500,
+        )
+      }
+
+      const isOwner = merchant?.owner_supabase_uid === currentUserId
+      const isMember = !!member && member.merchant_id === merchantId
+
+      if (!isOwner && !isMember) {
+        return response(
+          {
+            success: false,
+            error: 'NOT_YOUR_MERCHANT_TICKET',
+            message: 'This ticket does not belong to your merchant',
+          },
+          403,
+        )
+      }
+
       const verificationCount = Number(updateData.verification_count) || 1
       if (verificationCount >= MAX_REDEMPTIONS) {
         updateData.status = 'used'

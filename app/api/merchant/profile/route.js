@@ -22,6 +22,7 @@ const MERCHANT_FIELDS = `
   verified,
   max_events,
   region_id,
+  region,
   created_at,
   updated_at
 `
@@ -95,6 +96,7 @@ export async function GET(request) {
 
     const merchantResponse = {
       ...merchant,
+      region: merchant.region || regionSlug,
       region_slug: regionSlug,
       region_name: regionName
     }

@@ -9,6 +9,7 @@ type RegionCardProps = {
   subtitle?: string
   imageUrl?: string
   badge?: string
+  onSelect?: (slug: string) => void
 }
 
 export default function RegionCard({
@@ -17,6 +18,7 @@ export default function RegionCard({
   subtitle,
   imageUrl,
   badge,
+  onSelect,
 }: RegionCardProps) {
   const backgroundStyles: CSSProperties = imageUrl
     ? {
@@ -28,114 +30,137 @@ export default function RegionCard({
         background: 'linear-gradient(135deg, rgba(124,58,237,0.7), rgba(14,165,233,0.7))',
       }
 
-  return (
-    <Link href={`/${slug}`} style={{ textDecoration: 'none' }}>
+  const card = (
+    <div
+      style={{
+        position: 'relative',
+        borderRadius: '24px',
+        overflow: 'hidden',
+        minHeight: '240px',
+        border: '1px solid rgba(255, 255, 255, 0.12)',
+        boxShadow: '0 20px 50px rgba(15, 23, 42, 0.45)',
+        transform: 'translateY(0)',
+        transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.transform = 'translateY(-6px)'
+        e.currentTarget.style.boxShadow = '0 30px 60px rgba(15, 23, 42, 0.55)'
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.transform = 'translateY(0)'
+        e.currentTarget.style.boxShadow = '0 20px 50px rgba(15, 23, 42, 0.45)'
+      }}
+    >
+      <div
+        style={{
+          ...backgroundStyles,
+          position: 'absolute',
+          inset: 0,
+          filter: 'brightness(0.9)',
+        }}
+      />
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background: 'linear-gradient(145deg, rgba(15, 23, 42, 0.9), rgba(88, 28, 135, 0.35))',
+        }}
+      />
       <div
         style={{
           position: 'relative',
-          borderRadius: '24px',
-          overflow: 'hidden',
-          minHeight: '240px',
-          border: '1px solid rgba(255, 255, 255, 0.12)',
-          boxShadow: '0 20px 50px rgba(15, 23, 42, 0.45)',
-          transform: 'translateY(0)',
-          transition: 'transform 0.3s ease, box-shadow 0.3s ease',
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.transform = 'translateY(-6px)'
-          e.currentTarget.style.boxShadow = '0 30px 60px rgba(15, 23, 42, 0.55)'
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.transform = 'translateY(0)'
-          e.currentTarget.style.boxShadow = '0 20px 50px rgba(15, 23, 42, 0.45)'
+          zIndex: 2,
+          padding: '28px',
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
         }}
       >
-        <div
-          style={{
-            ...backgroundStyles,
-            position: 'absolute',
-            inset: 0,
-            filter: 'brightness(0.9)',
-          }}
-        />
-        <div
-          style={{
-            position: 'absolute',
-            inset: 0,
-            background: 'linear-gradient(145deg, rgba(15, 23, 42, 0.9), rgba(88, 28, 135, 0.35))',
-          }}
-        />
-        <div
-          style={{
-            position: 'relative',
-            zIndex: 2,
-            padding: '28px',
-            height: '100%',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'space-between',
-          }}
-        >
-          <div>
-            {badge && (
-              <span
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '6px 12px',
-                  borderRadius: '999px',
-                  background: 'rgba(255, 255, 255, 0.15)',
-                  color: 'white',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  marginBottom: '16px',
-                }}
-              >
-                {badge}
-              </span>
-            )}
-            <h3
+        <div>
+          {badge && (
+            <span
               style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 12px',
+                borderRadius: '999px',
+                background: 'rgba(255, 255, 255, 0.15)',
                 color: 'white',
-                fontSize: '1.75rem',
-                fontWeight: 700,
-                marginBottom: '8px',
+                fontSize: '12px',
+                fontWeight: 600,
+                marginBottom: '16px',
               }}
             >
-              {title}
-            </h3>
-            {subtitle && (
-              <p
-                style={{
-                  color: 'rgba(226, 232, 240, 0.85)',
-                  fontSize: '1rem',
-                  margin: 0,
-                }}
-              >
-                {subtitle}
-              </p>
-            )}
-          </div>
-          <div
+              {badge}
+            </span>
+          )}
+          <h3
             style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px',
-              marginTop: '24px',
-              color: '#a855f7',
-              fontWeight: 600,
-              fontSize: '0.95rem',
-              padding: '10px 16px',
-              borderRadius: '999px',
-              background: 'rgba(255, 255, 255, 0.08)',
-              alignSelf: 'flex-start',
+              color: 'white',
+              fontSize: '1.75rem',
+              fontWeight: 700,
+              marginBottom: '8px',
             }}
           >
-            Enter Region →
-          </div>
+            {title}
+          </h3>
+          {subtitle && (
+            <p
+              style={{
+                color: 'rgba(226, 232, 240, 0.85)',
+                fontSize: '1rem',
+                margin: 0,
+              }}
+            >
+              {subtitle}
+            </p>
+          )}
+        </div>
+        <div
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            marginTop: '24px',
+            color: '#a855f7',
+            fontWeight: 600,
+            fontSize: '0.95rem',
+            padding: '10px 16px',
+            borderRadius: '999px',
+            background: 'rgba(255, 255, 255, 0.08)',
+            alignSelf: 'flex-start',
+          }}
+        >
+          Enter Region →
         </div>
       </div>
+    </div>
+  )
+
+  if (onSelect) {
+    return (
+      <button
+        type="button"
+        onClick={() => onSelect(slug)}
+        style={{
+          background: 'transparent',
+          border: 'none',
+          padding: 0,
+          textAlign: 'left',
+          cursor: 'pointer',
+          width: '100%',
+        }}
+      >
+        {card}
+      </button>
+    )
+  }
+
+  return (
+    <Link href={`/${slug}`} style={{ textDecoration: 'none' }}>
+      {card}
     </Link>
   )
 }

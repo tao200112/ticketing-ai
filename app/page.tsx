@@ -1,6 +1,10 @@
-import { redirect } from 'next/navigation'
+import RegionPicker from '@/components/regions/RegionPicker'
+import { fetchActiveRegions } from '@/lib/regions'
 
-export default function HomeRedirect() {
-  redirect('/regions')
+export const dynamic = 'force-dynamic'
+
+export default async function HomePage() {
+  const regions = await fetchActiveRegions()
+  return <RegionPicker regions={regions} variant="home" />
 }
 

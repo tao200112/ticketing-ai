@@ -7,6 +7,7 @@ import { NextResponse } from 'next/server'
 import { ErrorHandler, handleApiError } from '@/lib/error-handler'
 import { createLogger } from '@/lib/logger'
 import { createSupabaseRouteHandlerClient } from '@/lib/supabase/server'
+import { ensureMerchantRegionByAuthId } from '@/lib/db/ensureMerchantRegion'
 
 const logger = createLogger('merchant-login-api')
 
@@ -163,6 +164,27 @@ export async function POST(request: Request) {
     })
 
     await supabase.auth.getSession()
+
+    // 确保商家有 region_id（如果缺失则自动分配）
+    try {
+      const ensuredRegionId = await ensureMerchantRegionByAuthId(data.user.id)
+      if (ensuredRegionId) {
+        logger.info('Merchant region ensured after login', {
+          userId: data.user.id,
+          regionId: ensuredRegionId
+        })
+      } else {
+        logger.warn('Failed to ensure merchant region after login', {
+          userId: data.user.id
+        })
+      }
+    } catch (regionError) {
+      // 非阻塞性错误：登录成功，region 修复失败不影响登录流程
+      logger.warn('Error ensuring merchant region after login (non-blocking)', {
+        userId: data.user.id,
+        error: regionError instanceof Error ? regionError.message : String(regionError)
+      })
+    }
 
     return NextResponse.json({
       success: true,

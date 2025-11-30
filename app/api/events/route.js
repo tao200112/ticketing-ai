@@ -3,6 +3,7 @@ import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase-api'
 import { ErrorHandler, handleApiError } from '@/lib/error-handler'
 import { createLogger } from '@/lib/logger'
 import { ensureRegionId } from '@/lib/regions'
+import { ensureMerchantRegion } from '@/lib/db/ensureMerchantRegion'
 
 const logger = createLogger('events-api')
 
@@ -296,12 +297,40 @@ export async function POST(request) {
     let resolvedRegionSlug = null
 
     if (merchant_id) {
+      // 如果 merchant 没有 region_id，尝试自动修复
       if (!merchantRegionId) {
-        throw ErrorHandler.validationError(
-          'INVALID_MERCHANT_REGION',
-          'Merchant is missing a region assignment'
-        )
+        logger.warn('Merchant missing region_id, attempting to auto-patch', { merchant_id })
+        
+        // 尝试自动修复
+        const patchedRegionId = await ensureMerchantRegion(merchant_id)
+        
+        if (patchedRegionId) {
+          // 修复成功，重新查询 merchant 获取 region 信息
+          const { data: updatedMerchant } = await supabase
+            .from('merchants')
+            .select('id, region_id, region')
+            .eq('id', merchant_id)
+            .maybeSingle()
+          
+          if (updatedMerchant) {
+            merchantRegionId = updatedMerchant.region_id
+            merchantRegionSlug = updatedMerchant.region || null
+            logger.info('Successfully auto-patched merchant region', {
+              merchant_id,
+              regionId: patchedRegionId
+            })
+          }
+        }
+        
+        // 如果修复后仍然没有 region_id，返回错误
+        if (!merchantRegionId) {
+          throw ErrorHandler.validationError(
+            'INVALID_MERCHANT_REGION',
+            'Merchant has no region and automatic patching failed.'
+          )
+        }
       }
+      
       resolvedRegionId = merchantRegionId
       resolvedRegionSlug = merchantRegionSlug
     } else {

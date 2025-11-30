@@ -9,6 +9,7 @@ import { ErrorHandler, handleApiError } from '@/lib/error-handler'
 import { createLogger } from '@/lib/logger'
 import { createClient } from '@supabase/supabase-js'
 import { getDefaultRegion, ensureRegionId } from '@/lib/regions'
+import { ensureMerchantRegion } from '@/lib/db/ensureMerchantRegion'
 
 const logger = createLogger('merchant-register-api')
 
@@ -308,6 +309,26 @@ export async function POST(request) {
     if (merchantError) {
       logger.error('Error creating merchant', { error: merchantError, email: normalizedEmail })
       throw ErrorHandler.fromSupabaseError(merchantError, 'MERCHANT_CREATION_FAILED')
+    }
+
+    // 4.1 确保商家有 region_id（如果创建时 region_id 为 null，自动分配）
+    if (!newMerchant.region_id) {
+      logger.info('Merchant created without region_id, attempting to assign default', {
+        merchantId: newMerchant.id
+      })
+      const ensuredRegionId = await ensureMerchantRegion(newMerchant.id)
+      if (ensuredRegionId) {
+        // 更新 newMerchant 对象以便后续使用
+        newMerchant.region_id = ensuredRegionId
+        logger.info('Successfully assigned region to merchant after creation', {
+          merchantId: newMerchant.id,
+          regionId: ensuredRegionId
+        })
+      } else {
+        logger.warn('Failed to assign region to merchant after creation', {
+          merchantId: newMerchant.id
+        })
+      }
     }
 
     // 5. 标记邀请码为已使用

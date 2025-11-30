@@ -1,7 +1,5 @@
 /**
  * 商家个人信息 API（受保护）
- * 
- * 基于 Supabase Auth 会话 + merchants 表
  */
 
 import { NextResponse } from 'next/server'
@@ -26,7 +24,20 @@ const MERCHANT_FIELDS = `
   updated_at
 `
 
-export async function GET(request) {
+async function unauthorizedResponse() {
+  return NextResponse.json(
+    {
+      success: false,
+      error: 'AUTHENTICATION_REQUIRED',
+      message: '请先登录',
+      type: 'AUTHENTICATION_ERROR',
+      session_user_id: null,
+    },
+    { status: 401 }
+  )
+}
+
+export async function GET(request: Request) {
   try {
     const supabase = createSupabaseRouteHandlerClient()
     if (!supabase) {
@@ -40,16 +51,7 @@ export async function GET(request) {
 
     if (sessionError || !session?.user?.id) {
       logger.warn('Merchant profile: user not authenticated', { error: sessionError })
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'AUTHENTICATION_REQUIRED',
-          message: '请先登录',
-          type: 'AUTHENTICATION_ERROR',
-          session_user_id: null,
-        },
-        { status: 401 }
-      )
+      return unauthorizedResponse()
     }
 
     const authUserId = session.user.id
@@ -76,14 +78,15 @@ export async function GET(request) {
       )
     }
 
-    let regionSlug = null
-    let regionName = null
+    let regionSlug: string | null = null
+    let regionName: string | null = null
     if (merchant.region_id) {
       const { data: regionRecord } = await supabase
         .from('regions')
         .select('slug, name')
         .eq('id', merchant.region_id)
         .maybeSingle()
+
       regionSlug = regionRecord?.slug || null
       regionName = regionRecord?.name || null
     }
@@ -92,7 +95,7 @@ export async function GET(request) {
       ...merchant,
       region: merchant.region || regionSlug,
       region_slug: regionSlug,
-      region_name: regionName
+      region_name: regionName,
     }
 
     return NextResponse.json({
@@ -100,7 +103,6 @@ export async function GET(request) {
       merchant: merchantResponse,
       session_user_id: authUserId,
     })
-
   } catch (error) {
     return handleApiError(error, request, logger)
   }

@@ -24,6 +24,13 @@ function isSupabaseConfigured() {
   return true
 }
 
+function buildSupabaseCookieConfig() {
+  const cookieStore = cookies()
+  return {
+    cookies: () => cookieStore,
+  }
+}
+
 /**
  * 创建 Supabase 服务端客户端（Server Component）
  */
@@ -34,10 +41,7 @@ export function createSupabaseServerClient() {
   }
 
   try {
-    const cookieStore = cookies()
-    return createServerComponentClient<Database>({
-      cookies: () => cookieStore,
-    })
+    return createServerComponentClient<Database>(buildSupabaseCookieConfig())
   } catch (error) {
     console.error('[createSupabaseServerClient] Failed to create Supabase client:', error)
     return null
@@ -54,10 +58,7 @@ export function createSupabaseRouteHandlerClient() {
   }
 
   try {
-    const cookieStore = cookies()
-    return createRouteHandlerClient<Database>({
-      cookies: () => cookieStore,
-    })
+    return createRouteHandlerClient<Database>(buildSupabaseCookieConfig())
   } catch (error) {
     console.error('[createSupabaseRouteHandlerClient] Failed to create Supabase client:', error)
     return null

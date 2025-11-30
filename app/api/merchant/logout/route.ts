@@ -1,7 +1,5 @@
 /**
  * 商家登出 API
- * 
- * 使用 Supabase Auth 会话登出
  */
 
 import { NextResponse } from 'next/server'
@@ -20,7 +18,7 @@ export async function POST() {
 
   return NextResponse.json({
     success: true,
-    message: '登出成功'
+    message: '登出成功',
   })
 }
 

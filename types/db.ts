@@ -65,3 +65,11 @@ export interface TicketWithDetails extends Ticket {
   event: Event
   price: Price
 }
+
+export type Database = {
+  public: {
+    Tables: Record<string, unknown>
+    Views: Record<string, unknown>
+    Functions: Record<string, unknown>
+  }
+}

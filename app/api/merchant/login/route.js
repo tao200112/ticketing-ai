@@ -30,9 +30,10 @@ export async function POST(request) {
       throw ErrorHandler.configurationError('CONFIG_ERROR', 'Supabase 未配置')
     }
 
-    // 使用 Supabase Auth Helpers 让 Supabase 自动写入会话 cookie
+    // 使用 Supabase Auth Helpers（注意：cookies 必须是函数，不能直接传对象）
+    const cookieStore = cookies();
     const supabase = createRouteHandlerClient({
-      cookies,
+      cookies: () => cookieStore
     })
 
     const normalizedEmail = email.trim().toLowerCase()
@@ -49,7 +50,7 @@ export async function POST(request) {
     })
 
     if (error) {
-      // 详细记录错误信息用于调试
+      // 详细记录错误
       logger.warn('Merchant login failed via Supabase Auth', { 
         email: normalizedEmail, 
         error: error.message,
@@ -58,15 +59,12 @@ export async function POST(request) {
         fullError: JSON.stringify(error, Object.getOwnPropertyNames(error))
       })
       
-      // 提供更详细的错误信息
-      // 注意：商家账号不应该遇到邮箱未验证的错误，因为注册时已自动确认
       if (error.message?.includes('Email not confirmed') || error.message?.includes('email_not_confirmed')) {
-        logger.error('Merchant login failed due to unconfirmed email - this should not happen', {
+        logger.error('Merchant login failed due to unconfirmed email', {
           email: normalizedEmail,
           error: error.message
         })
-        // 对于商家账号，如果遇到邮箱未验证错误，尝试自动确认
-        // 这可能是注册时自动确认失败的情况
+
         try {
           const { createClient } = await import('@supabase/supabase-js')
           const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -76,22 +74,28 @@ export async function POST(request) {
               supabaseServiceKey,
               { auth: { autoRefreshToken: false, persistSession: false } }
             )
-            // 查找用户并确认邮箱
+
             const { data: { users } } = await admin.auth.admin.listUsers()
             const user = users.find(u => u.email?.toLowerCase() === normalizedEmail)
+
             if (user) {
               await admin.auth.admin.updateUserById(user.id, { email_confirm: true })
               logger.info('Auto-confirmed merchant email during login retry', { email: normalizedEmail })
-              // 重试登录
+
               const { data: retryData, error: retryError } = await supabase.auth.signInWithPassword({
                 email: normalizedEmail,
                 password,
               })
+
               if (!retryError && retryData?.user) {
                 logger.info('Merchant login successful after auto-confirm', {
                   userId: retryData.user.id,
                   email: retryData.user.email,
                 })
+
+                // 🔥 关键：自动确认后需要刷新 session cookie
+                await supabase.auth.getSession();
+
                 return NextResponse.json({
                   success: true,
                   message: '登录成功',
@@ -113,15 +117,13 @@ export async function POST(request) {
       }
       
       if (error.message?.includes('Invalid login credentials') || error.message?.includes('invalid_credentials')) {
-        // 记录更详细的错误信息
-        logger.error('Invalid credentials - checking if user exists in Supabase Auth', {
+        logger.error('Invalid credentials', {
           email: normalizedEmail,
           errorDetails: error
         })
         throw ErrorHandler.authenticationError('INVALID_CREDENTIALS', '邮箱或密码错误')
       }
       
-      // 记录未知错误
       logger.error('Unknown login error', {
         email: normalizedEmail,
         error: error.message,
@@ -145,11 +147,17 @@ export async function POST(request) {
       email: data.user.email,
     })
 
-    // 可选：这里不直接检查 merchants 表，由 RSC/layout 统一做商家身份鉴权
+    // -----------------------------
+    // 🔥🔥🔥【关键补丁：写入 Supabase Cookie】🔥🔥🔥
+    // -----------------------------
+    await supabase.auth.getSession();
+    // -----------------------------
+
     return NextResponse.json({
       success: true,
       message: '登录成功',
     })
+
   } catch (error) {
     return handleApiError(error, request, logger)
   }

@@ -44,7 +44,27 @@ export async function POST(request) {
 
     // 获取当前登录用户（基于 Supabase server auth）
     // requireSupabaseUser() 会抛出 AUTHENTICATION_ERROR 如果用户未登录
-    const user = await requireSupabaseUser()
+    let user
+    try {
+      user = await requireSupabaseUser()
+      logger.info('[CHECKOUT_SESSIONS] user loaded', {
+        id: user.id,
+        email: user.email
+      })
+    } catch (authError) {
+      // 如果会话缺失，返回清晰的 401 错误
+      logger.warn('[CHECKOUT_SESSIONS] Session missing or invalid', {
+        error: authError instanceof Error ? authError.message : String(authError)
+      })
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'AUTHENTICATION_REQUIRED',
+          message: 'You must be logged in to create a checkout session'
+        },
+        { status: 401 }
+      )
+    }
     
     logger.info('[CHECKOUT_SESSIONS] Authenticated user:', {
       id: user.id,

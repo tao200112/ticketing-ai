@@ -1,12 +1,13 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { generateRequestId } from './lib/logger'
 import { getPortalFromHostname, DOMAINS } from './lib/domain-detector'
-import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { ensureMerchantRegionByAuthId } from '@/lib/db/ensureMerchantRegion'
 
 /**
  * Middleware - Handle path-based and domain-based routing, redirects, and request ID
- * Also refreshes Supabase session cookies (except during merchant login to avoid overwriting)
+ * 
+ * IMPORTANT: This middleware does NOT interact with Supabase or session cookies.
+ * All Supabase session management is handled in API routes using createSupabaseRouteHandlerClient.
+ * This prevents cookie corruption from repeated session refresh operations.
  */
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
@@ -19,35 +20,6 @@ export async function middleware(request: NextRequest) {
       headers: request.headers,
     },
   })
-
-  try {
-    const isMerchantLoginAttempt =
-      pathname === '/api/merchant/login' && request.method === 'POST'
-
-    if (!isMerchantLoginAttempt) {
-      const supabase = createSupabaseServerClient()
-      if (supabase) {
-        const { data: { user } } = await supabase.auth.getUser()
-        
-        // 如果是商家相关路径且有有效用户，静默检查并修复 region
-        if (user && (pathname.startsWith('/merchant') || pathname.startsWith('/api/merchant'))) {
-          try {
-            await ensureMerchantRegionByAuthId(user.id)
-            // 静默修复，不记录日志（避免日志过多）
-          } catch (regionError) {
-            // 静默失败，不影响请求流程
-            // 只在开发环境记录警告
-            if (process.env.NODE_ENV === 'development') {
-              console.warn('[middleware] Failed to ensure merchant region (non-blocking):', 
-                regionError instanceof Error ? regionError.message : String(regionError))
-            }
-          }
-        }
-      }
-    }
-  } catch (error) {
-    console.warn('[middleware] Session refresh failed:', error instanceof Error ? error.message : error)
-  }
 
   response.headers.set('x-request-id', requestId)
   response.headers.set('x-portal', portal)

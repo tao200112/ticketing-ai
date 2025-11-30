@@ -1,7 +1,5 @@
 'use client'
 
-import NavbarPartyTix from '@/components/NavbarPartyTix'
-
 const SUPPORT_EMAIL = 'support@partytix.app'
 
 export default function ContactPage() {
@@ -12,8 +10,6 @@ export default function ContactPage() {
       paddingTop: '80px',
       paddingBottom: '40px'
     }}>
-      <NavbarPartyTix />
-      
       <div style={{
         maxWidth: '800px',
         margin: '0 auto',

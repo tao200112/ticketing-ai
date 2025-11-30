@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import NavbarPartyTix from '@/components/NavbarPartyTix'
 import TicketCard from '@/components/tickets/TicketCard'
 import type { RedemptionState, TicketRecord } from '@/components/tickets/types'
 import { useAuth } from '@/lib/auth-context'
@@ -345,7 +344,6 @@ export default function TicketsClient() {
         background: 'linear-gradient(135deg, #040614 0%, #6d28d9 50%, #0f172a 100%)',
       }}
     >
-      <NavbarPartyTix />
       <main
         style={{
           paddingTop: '120px',

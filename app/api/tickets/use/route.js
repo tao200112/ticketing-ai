@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server'
-import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase-api'
 import { ErrorHandler, handleApiError } from '@/lib/error-handler'
 import { createLogger } from '@/lib/logger'
 import { getTicketRedemptionLocation } from '@/lib/ticket-helpers'
-import { requireSupabaseUser } from '@/lib/supabase/server'
+import { createSupabaseRouteHandlerClient, requireSupabaseUser } from '@/lib/supabase/server'
 
 const logger = createLogger('ticket-use-api')
 
@@ -19,17 +18,17 @@ export async function POST(request) {
       )
     }
 
-    if (!isSupabaseConfigured()) {
+    // Get current user from Supabase Auth (server-side)
+    const user = await requireSupabaseUser()
+    
+    // Use unified route handler client for database queries with user session
+    const supabase = createSupabaseRouteHandlerClient()
+    if (!supabase) {
       throw ErrorHandler.configurationError(
         'CONFIG_ERROR',
         'Supabase is not configured'
       )
     }
-
-    const supabase = createSupabaseClient()
-
-    // Get current user from Supabase Auth (server-side)
-    const user = await requireSupabaseUser()
     const authUserId = user.id // Unified identity: Supabase Auth UID
     const userEmail = user.email
 

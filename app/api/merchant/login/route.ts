@@ -21,18 +21,13 @@ async function attemptAutoConfirmAndRetry(
   normalizedEmail: string,
   password: string
 ) {
-  const { createClient } = await import('@supabase/supabase-js')
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!supabaseServiceKey) {
+  const { supabaseAdmin } = await import('@/lib/supabase-admin')
+  if (!supabaseAdmin) {
     logger.error('缺少 Supabase service role key，无法自动确认邮箱', { email: normalizedEmail })
     return null
   }
 
-  const admin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL as string,
-    supabaseServiceKey,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
+  const admin = supabaseAdmin
 
   const { data: { users } = { users: [] } } = await admin.auth.admin.listUsers()
   const user = users?.find(u => u.email?.toLowerCase() === normalizedEmail)

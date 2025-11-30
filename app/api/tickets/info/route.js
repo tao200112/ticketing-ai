@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
-import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase-api'
 import { ErrorHandler, handleApiError } from '@/lib/error-handler'
 import { createLogger } from '@/lib/logger'
 import { verifyTicketQRPayload } from '@/lib/qr-crypto'
+import { supabaseAdmin } from '@/lib/supabase-admin'
 
 const logger = createLogger('ticket-info-api')
 
@@ -18,14 +18,14 @@ export async function GET(request) {
       )
     }
 
-    if (!isSupabaseConfigured()) {
+    // Use admin client for public ticket info queries (no user session required)
+    const supabase = supabaseAdmin
+    if (!supabase) {
       throw ErrorHandler.configurationError(
         'CONFIG_ERROR',
         'Supabase is not configured'
       )
     }
-
-    const supabase = createSupabaseClient()
 
     // Try to parse token as QR payload or use as short_id
     let ticketId = null

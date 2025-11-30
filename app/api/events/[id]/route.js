@@ -130,13 +130,9 @@ export async function GET(request, { params }) {
       if (error.code === '42501' || error.message?.includes('permission') || error.message?.includes('RLS')) {
         logger.error('RLS permission error', { eventId: finalId, error })
         // 尝试使用 service role key 重新查询
-        const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-        if (serviceKey) {
-          const { createClient } = require('@supabase/supabase-js')
-          const adminSupabase = createClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL,
-            serviceKey
-          )
+        const { supabaseAdmin } = await import('@/lib/supabase-admin')
+        if (supabaseAdmin) {
+          const adminSupabase = supabaseAdmin
           const { data: adminEvent, error: adminError } = await adminSupabase
             .from('events')
             .select(`

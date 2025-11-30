@@ -1,7 +1,5 @@
 'use client'
 
-import NavbarPartyTix from '@/components/NavbarPartyTix'
-
 const faqs = [
   {
     question: 'How do I buy a ticket?',
@@ -33,8 +31,6 @@ export default function HelpPage() {
       paddingTop: '80px',
       paddingBottom: '40px'
     }}>
-      <NavbarPartyTix />
-      
       <div style={{
         maxWidth: '800px',
         margin: '0 auto',

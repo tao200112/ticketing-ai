@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
 import Stripe from 'stripe'
+import { supabaseAdmin } from '@/lib/supabase-admin'
 import { generateShortTicketId } from '@/lib/ticket-utils'
 import {
   getComboTicketKinds,
@@ -13,8 +13,6 @@ const stripe = stripeSecretKey
   ? new Stripe(stripeSecretKey, { apiVersion: '2023-10-16' })
   : null
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
 export const runtime = 'nodejs'
 
@@ -41,7 +39,7 @@ export async function POST(request: NextRequest) {
     return errorResponse('Stripe not configured', 500, 'CONFIGURATION_ERROR')
   }
 
-  if (!supabaseUrl || !supabaseServiceRoleKey) {
+  if (!supabaseAdmin) {
     console.error('[stripe/webhook] Supabase not configured')
     return errorResponse('Supabase not configured', 500, 'CONFIGURATION_ERROR')
   }
@@ -77,7 +75,10 @@ export async function POST(request: NextRequest) {
   const session = event.data.object as Stripe.Checkout.Session
 
   try {
-    const supabase = createClient(supabaseUrl, supabaseServiceRoleKey)
+    const supabase = supabaseAdmin
+    if (!supabase) {
+      return errorResponse('Supabase not configured', 500, 'CONFIGURATION_ERROR')
+    }
 
     const { data: existingOrder } = await supabase
       .from('orders')

@@ -12,6 +12,18 @@ import { getPortalFromHostname, DOMAINS } from './lib/domain-detector'
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
+  // Protect /internal routes with token authentication
+  if (pathname.startsWith('/internal')) {
+    const internalToken = request.headers.get('x-internal-token')
+    const expectedToken = process.env.INTERNAL_TOKEN
+    if (!expectedToken || internalToken !== expectedToken) {
+      return NextResponse.json(
+        { error: 'Forbidden' },
+        { status: 403 }
+      )
+    }
+  }
+
   const requestId = request.headers.get('x-request-id') || generateRequestId()
   const portal = getPortalFromHostname(request)
 

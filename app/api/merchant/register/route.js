@@ -7,23 +7,11 @@
 import { NextResponse } from 'next/server'
 import { ErrorHandler, handleApiError } from '@/lib/error-handler'
 import { createLogger } from '@/lib/logger'
-import { createClient } from '@supabase/supabase-js'
 import { getDefaultRegion, ensureRegionId } from '@/lib/regions'
 import { ensureMerchantRegion } from '@/lib/db/ensureMerchantRegion'
+import { supabaseAdmin } from '@/lib/supabase-admin'
 
 const logger = createLogger('merchant-register-api')
-
-// 使用 Service Role 进行受 RLS 保护的数据写入（仅服务端）
-function createServiceRoleClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!supabaseUrl || !supabaseServiceKey) {
-    throw ErrorHandler.configurationError('CONFIG_ERROR', 'Supabase Service Role Key 未配置')
-  }
-  return createClient(supabaseUrl, supabaseServiceKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  })
-}
 
 export async function POST(request) {
   try {
@@ -59,7 +47,10 @@ export async function POST(request) {
 
     // 1. 验证邀请码
     // 使用 Service Role 客户端绕过 RLS 访问 admin_invite_codes 表
-    const admin = createServiceRoleClient()
+    const admin = supabaseAdmin
+    if (!admin) {
+      throw ErrorHandler.configurationError('CONFIG_ERROR', 'Supabase Service Role Key 未配置')
+    }
     const normalizedInviteCode = inviteCode.trim().toUpperCase()
 
     logger.info('Validating invite code', { code: normalizedInviteCode })

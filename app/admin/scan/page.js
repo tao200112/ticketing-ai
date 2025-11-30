@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import AdminNavbar from '@/components/AdminNavbar'
 import jsQR from 'jsqr'
+import { invokeValidateTicket } from '@/lib/tickets/validation-client'
 
 export default function AdminScanPage() {
   const router = useRouter()
@@ -16,6 +17,30 @@ export default function AdminScanPage() {
   const scanIntervalRef = useRef(null)
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
+
+  const getOrCreateDeviceId = () => {
+    if (typeof window === 'undefined') return undefined
+    const storageKey = 'admin_scan_device_id'
+    const existing = window.localStorage.getItem(storageKey)
+    if (existing) {
+      return existing
+    }
+    const fallback = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    const nextId =
+      typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : fallback
+    window.localStorage.setItem(storageKey, nextId)
+    return nextId
+  }
+
+  const buildScanContext = () => ({
+    deviceId: getOrCreateDeviceId(),
+    scanUuid:
+      typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `${Date.now()}`,
+  })
 
   useEffect(() => {
     // Check admin login status
@@ -113,39 +138,41 @@ export default function AdminScanPage() {
     try {
       setLoading(true)
       setError('')
-      
-      const response = await fetch('/api/tickets/verify', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          qr_payload: qrData,
-          redeem: false 
-        }),
+
+      const context = buildScanContext()
+      const validation = await invokeValidateTicket({
+        qrPayload: qrData,
+        redeem: false,
+        deviceId: context.deviceId,
+        scanUuid: context.scanUuid,
       })
 
-      const result = await response.json()
+      if (validation.success && validation.data) {
+        const { ticket, event, validity } = validation.data
 
-      if (response.ok && result.success) {
-        const { ticket, event, validity } = result.data
-        
-        // Determine validity status: invalid if ticket is used, expired, or validity check failed
         let validityStatus = 'valid'
-        if (!validity.valid || ticket.status === 'used' || ticket.status === 'refunded' || ticket.status === 'cancelled') {
+        if (
+          !validity?.valid ||
+          ticket.status === 'used' ||
+          ticket.status === 'refunded' ||
+          ticket.status === 'cancelled'
+        ) {
           validityStatus = 'invalid'
         }
-        
+
         setScanResult({
           ticket_id: ticket.short_id || ticket.id,
           ticket_tier: ticket.tier || 'N/A',
           holder_name: ticket.holder_name || 'Unknown',
           event_name: event?.title || 'Unknown Event',
           validity_status: validityStatus,
-          validity_message: validity.message || 'Ticket verification completed'
+          validity_message:
+            validity?.message || 'Ticket verification completed',
         })
       } else {
-        setError(result.message || result.error || 'Ticket verification failed')
+        setError(
+          validation.message || validation.error || 'Ticket verification failed',
+        )
         setScanResult(null)
       }
     } catch (err) {

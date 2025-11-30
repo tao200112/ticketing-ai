@@ -10,6 +10,9 @@
   "functions": {
     "app/api/**/*.js": {
       "maxDuration": 30
+    },
+    "app/api/**/*.ts": {
+      "maxDuration": 30
     }
   },
   "headers": [
@@ -39,12 +42,7 @@
       ]
     }
   ],
-  "rewrites": [
-    {
-      "source": "/api/backend/(.*)",
-      "destination": "https://your-backend-domain.railway.app/v1/$1"
-    }
-  ],
+  "rewrites": [],
   "redirects": [
     {
       "source": "/test-email",

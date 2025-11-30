@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import MerchantNavbar from '@/components/MerchantNavbar'
 import { useMerchant } from '@/hooks/use-merchant'
 import jsQR from 'jsqr'
+import { invokeValidateTicket } from '@/lib/tickets/validation-client'
 
 export default function MerchantScanPage() {
   const router = useRouter()
@@ -20,6 +21,30 @@ export default function MerchantScanPage() {
   const canvasRef = useRef(null)
   const streamRef = useRef(null)
   const scanIntervalRef = useRef(null)
+
+  const getOrCreateDeviceId = () => {
+    if (typeof window === 'undefined') return undefined
+    const storageKey = 'merchant_scan_device_id'
+    const existing = window.localStorage.getItem(storageKey)
+    if (existing) {
+      return existing
+    }
+    const fallback = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    const nextId =
+      typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : fallback
+    window.localStorage.setItem(storageKey, nextId)
+    return nextId
+  }
+
+  const buildScanContext = () => ({
+    deviceId: getOrCreateDeviceId(),
+    scanUuid:
+      typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `${Date.now()}`,
+  })
 
   // 添加调试日志函数
   const addDebugLog = (message, type = 'info') => {
@@ -288,124 +313,126 @@ export default function MerchantScanPage() {
     try {
       setLoading(true)
       setError('')
-      
+
       if (!merchant) {
         setError('Please login first')
         return
       }
 
-      // 先验证票务信息（不核销）
-      const verifyResponse = await fetch('/api/tickets/verify', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          qr_payload: qrData,
-          redeem: false
-        }),
+      const scanContext = buildScanContext()
+      const validation = await invokeValidateTicket({
+        qrPayload: qrData,
+        redeem: false,
+        deviceId: scanContext.deviceId,
+        scanUuid: scanContext.scanUuid,
       })
-      
-      const verifyResult = await verifyResponse.json()
-      
-              if (verifyResponse.ok && verifyResult.success) {
-          const { ticket, event, validity } = verifyResult.data
-          
-          // Debug: Log received ticket data
-          console.log('🔍 Ticket verification response:', {
-            holder_name: ticket.holder_name,
-            holder_age: ticket.holder_age,
-            full_ticket: ticket
-          })
-          addDebugLog(`📋 Ticket holder_name: ${ticket.holder_name || 'NULL'}, holder_age: ${ticket.holder_age ?? 'NULL'}`, 'info')
-          
-          // 检查商家权限（检查票务是否属于当前商家）
-        let isOwnMerchantTicket = true
-        let merchantError = null
-        
-        if (event?.merchant_id) {
-          // 检查当前用户是否是该商家的成员或拥有者
-          const merchantId = event.merchant_id
-          const currentMerchantId = merchant.id
-          
-          // 如果当前用户有merchant_id，检查是否匹配
-          if (currentMerchantId && currentMerchantId !== merchantId) {
-            isOwnMerchantTicket = false
-            merchantError = 'This ticket belongs to another merchant. You do not have permission to redeem it.'
-          }
-        }
-        
-        // 检查票务状态
-        const isUsed = ticket.status === 'used'
-        const isRefunded = ticket.status === 'refunded'
-        const isCancelled = ticket.status === 'cancelled'
-        
-        // 检查有效期
-        const isExpired = validity?.status === 'expired'
-        const isNotYetValid = validity?.status === 'not_yet_valid'
-        
-        // 综合判断是否有效
-        const isValid = validity?.valid && !isUsed && !isRefunded && !isCancelled && isOwnMerchantTicket && !isExpired && !isNotYetValid
-        
-        // 生成错误原因
-        let errorReason = null
-                 if (!isOwnMerchantTicket) {
-           errorReason = 'This ticket belongs to another merchant'
-         } else if (isUsed) {
-           errorReason = 'This ticket has already been redeemed'
-         } else if (isRefunded || isCancelled) {
-           errorReason = `This ticket has been ${isRefunded ? 'refunded' : 'cancelled'}`
-         } else if (isExpired) {
-           errorReason = 'This ticket has expired'
-         } else if (isNotYetValid) {
-           errorReason = 'This ticket is not yet valid'
-         }
-        
-        // 显示票务信息（无论是否有效，都显示详细信息）
-        setScanResult({
-          qr_data: qrData, // 保存二维码数据用于核销
-          ticket_id: ticket.short_id || ticket.id,
-          holder_name: ticket.holder_name || 'Unknown',
-          holder_age: ticket.holder_age || null,
-          tier: ticket.tier || 'N/A',
-          status: ticket.status,
-          event_name: event?.title || 'Unknown Event',
-          event_venue: event?.venue_name || 'N/A',
-          valid_from: validity?.validFrom || validity?.valid_from || ticket.validity_start_time || null,
-          valid_until: validity?.validUntil || validity?.valid_until || ticket.validity_end_time || null,
-          is_valid: isValid,
-          is_used: isUsed,
-          used_at: ticket.used_at || null,
-          redeemed_at: ticket.redeemed_at || null,
-          can_redeem: isValid && !isUsed && !isRefunded && !isCancelled && isOwnMerchantTicket,
-          error_reason: errorReason,
-          validity_message: validity?.message || null
-        })
-        
-        // 如果有错误原因，显示错误信息
-        if (errorReason) {
-          setError(errorReason)
-          addDebugLog(`⚠️ Ticket verification: ${errorReason}`, 'error')
-        } else {
-          setError('')
-          addDebugLog('✅ Ticket verified successfully - Ready to redeem', 'success')
-        }
-      } else {
-        const errorCode = verifyResult.error || verifyResult.code
-        let errorMessage = verifyResult.message || 'Ticket verification failed'
-        
-                  if (errorCode === 'INVALID_QR_FORMAT') {
-            errorMessage = 'Invalid QR code format'
-          } else if (errorCode === 'TICKET_NOT_FOUND') {
-            errorMessage = 'Ticket not found'
-          }
-        
+
+      if (!validation.success || !validation.data) {
+        const errorMessage =
+          validation.message || validation.error || 'Ticket verification failed'
         setError(errorMessage)
         setScanResult(null)
         addDebugLog(`❌ Verification failed: ${errorMessage}`, 'error')
+        return
+      }
+
+      const { ticket, event, validity } = validation.data
+
+      addDebugLog(
+        `📋 Ticket holder_name: ${ticket?.holder_name || 'NULL'}, holder_age: ${
+          ticket?.holder_age ?? 'NULL'
+        }`,
+        'info',
+      )
+
+      let isOwnMerchantTicket = true
+      let merchantError = null
+
+      if (event?.merchant_id) {
+        const merchantId = event.merchant_id
+        const currentMerchantId = merchant.id
+        if (currentMerchantId && currentMerchantId !== merchantId) {
+          isOwnMerchantTicket = false
+          merchantError =
+            'This ticket belongs to another merchant. You do not have permission to redeem it.'
+        }
+      }
+
+      const isUsed = ticket?.status === 'used'
+      const isRefunded = ticket?.status === 'refunded'
+      const isCancelled = ticket?.status === 'cancelled'
+      const isExpired = validity?.status === 'expired'
+      const isNotYetValid = validity?.status === 'not_yet_valid'
+
+      const isValid =
+        validity?.valid &&
+        !isUsed &&
+        !isRefunded &&
+        !isCancelled &&
+        isOwnMerchantTicket &&
+        !isExpired &&
+        !isNotYetValid
+
+      let errorReason = null
+      if (!isOwnMerchantTicket) {
+        errorReason = 'This ticket belongs to another merchant'
+      } else if (isUsed) {
+        errorReason = 'This ticket has already been redeemed'
+      } else if (isRefunded || isCancelled) {
+        errorReason = `This ticket has been ${
+          isRefunded ? 'refunded' : 'cancelled'
+        }`
+      } else if (isExpired) {
+        errorReason = 'This ticket has expired'
+      } else if (isNotYetValid) {
+        errorReason = 'This ticket is not yet valid'
+      }
+
+      setScanResult({
+        qr_data: qrData,
+        ticket_id: ticket?.short_id || ticket?.id,
+        holder_name: ticket?.holder_name || 'Unknown',
+        holder_age: ticket?.holder_age || null,
+        tier: ticket?.tier || 'N/A',
+        status: ticket?.status,
+        event_name: event?.title || 'Unknown Event',
+        event_venue: event?.venue_name || 'N/A',
+        valid_from:
+          validity?.validFrom ||
+          validity?.valid_from ||
+          ticket?.validity_start_time ||
+          null,
+        valid_until:
+          validity?.validUntil ||
+          validity?.valid_until ||
+          ticket?.validity_end_time ||
+          null,
+        is_valid: Boolean(isValid),
+        is_used: isUsed,
+        used_at: ticket?.used_at || null,
+        redeemed_at: ticket?.redeemed_at || null,
+        can_redeem:
+          Boolean(isValid) &&
+          !isUsed &&
+          !isRefunded &&
+          !isCancelled &&
+          isOwnMerchantTicket,
+        error_reason: errorReason,
+        validity_message: validity?.message || null,
+      })
+
+      if (errorReason) {
+        setError(errorReason)
+        addDebugLog(`⚠️ Ticket verification: ${errorReason}`, 'error')
+      } else {
+        setError('')
+        addDebugLog(
+          '✅ Ticket verified successfully - Ready to redeem',
+          'success',
+        )
       }
     } catch (err) {
-              setError(err.message || 'Ticket verification error, please try again')
+      setError(err.message || 'Ticket verification error, please try again')
       console.error('Verification error:', err)
       setScanResult(null)
       addDebugLog(`❌ Verification error: ${err.message}`, 'error')
@@ -419,80 +446,26 @@ export default function MerchantScanPage() {
       setLoading(true)
       setError('')
       addDebugLog('🔄 Starting ticket redemption...', 'info')
-      
+
       if (!merchant) {
         setError('Please login first')
         addDebugLog('❌ Not logged in', 'error')
         return
       }
-      
-      addDebugLog(`📤 Sending redemption request for QR: ${qrData.substring(0, 30)}...`, 'info')
-      
-      // 核销票务
-      const response = await fetch('/api/merchant/redeem', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          qr_payload: qrData
-        }),
+
+      const redemptionContext = buildScanContext()
+      const redemption = await invokeValidateTicket({
+        qrPayload: qrData,
+        redeem: true,
+        deviceId: redemptionContext.deviceId,
+        scanUuid: redemptionContext.scanUuid,
       })
-      
-      const result = await response.json()
-      addDebugLog(`📥 Redemption response: ${response.ok ? 'Success' : 'Failed'}`, response.ok ? 'success' : 'error')
-      
-      if (response.ok && result.success) {
-        addDebugLog('✅ Ticket redeemed successfully!', 'success')
-        // 核销成功后，重新获取票务信息（此时status应该是'used'）
-        const verifyResponse = await fetch('/api/tickets/verify', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            qr_payload: qrData,
-            redeem: false
-          }),
-        })
-        
-        const verifyResult = await verifyResponse.json()
-        
-        if (verifyResponse.ok && verifyResult.success) {
-          const { ticket, event, validity } = verifyResult.data
-          
-          // Debug: Log received ticket data after redemption
-          console.log('🔍 Ticket data after redemption:', {
-            holder_name: ticket.holder_name,
-            holder_age: ticket.holder_age,
-            full_ticket: ticket
-          })
-          addDebugLog(`📋 After redemption - holder_name: ${ticket.holder_name || 'NULL'}, holder_age: ${ticket.holder_age ?? 'NULL'}`, 'info')
-          
-          setScanResult({
-            qr_data: qrData, // 保存二维码数据
-            ticket_id: ticket.short_id || ticket.id,
-            holder_name: ticket.holder_name || 'Unknown',
-            holder_age: ticket.holder_age || null,
-            tier: ticket.tier || 'N/A',
-            status: ticket.status, // 应该是 'used'
-            event_name: event?.title || 'Unknown Event',
-            event_venue: event?.venue_name || 'N/A',
-            valid_from: validity?.validFrom || validity?.valid_from || null,
-            valid_until: validity?.validUntil || validity?.valid_until || null,
-            is_valid: false,
-            is_used: true, // 已使用
-            used_at: ticket.used_at || result.data?.redeemed_at || new Date().toISOString(),
-            redeemed_at: ticket.redeemed_at || result.data?.redeemed_at || new Date().toISOString(),
-            can_redeem: false
-          })
-          addDebugLog(`✅ Ticket status updated: ${ticket.status}`, 'success')
-        }
-        setError('')
-      } else {
-        const errorCode = result.error || result.code
-        let errorMessage = result.message || 'Ticket redemption failed'
-        
+
+      if (!redemption.success) {
+        const errorCode = redemption.error
+        let errorMessage =
+          redemption.message || 'Ticket redemption failed'
+
         if (errorCode === 'TICKET_ALREADY_USED') {
           errorMessage = 'Ticket has already been redeemed'
         } else if (errorCode === 'NOT_YOUR_MERCHANT_TICKET') {
@@ -500,10 +473,60 @@ export default function MerchantScanPage() {
         } else if (errorCode === 'TICKET_CANNOT_BE_REDEEMED') {
           errorMessage = 'Cannot redeem a cancelled or refunded ticket'
         }
-        
+
         setError(errorMessage)
         addDebugLog(`❌ Redemption failed: ${errorMessage}`, 'error')
+        return
       }
+
+      addDebugLog('✅ Ticket redeemed successfully!', 'success')
+
+      const refreshContext = buildScanContext()
+      const refreshed = await invokeValidateTicket({
+        qrPayload: qrData,
+        redeem: false,
+        deviceId: refreshContext.deviceId,
+        scanUuid: refreshContext.scanUuid,
+      })
+
+      if (refreshed.success && refreshed.data) {
+        const { ticket, event, validity } = refreshed.data
+        addDebugLog(
+          `📋 After redemption - holder_name: ${
+            ticket?.holder_name || 'NULL'
+          }, holder_age: ${ticket?.holder_age ?? 'NULL'}`,
+          'info',
+        )
+
+        setScanResult({
+          qr_data: qrData,
+          ticket_id: ticket?.short_id || ticket?.id,
+          holder_name: ticket?.holder_name || 'Unknown',
+          holder_age: ticket?.holder_age || null,
+          tier: ticket?.tier || 'N/A',
+          status: ticket?.status,
+          event_name: event?.title || 'Unknown Event',
+          event_venue: event?.venue_name || 'N/A',
+          valid_from:
+            validity?.validFrom ||
+            validity?.valid_from ||
+            ticket?.validity_start_time ||
+            null,
+          valid_until:
+            validity?.validUntil ||
+            validity?.valid_until ||
+            ticket?.validity_end_time ||
+            null,
+          is_valid: false,
+          is_used: true,
+          used_at: ticket?.used_at || new Date().toISOString(),
+          redeemed_at: ticket?.redeemed_at || new Date().toISOString(),
+          can_redeem: false,
+        })
+        addDebugLog(`✅ Ticket status updated: ${ticket?.status}`, 'success')
+      }
+
+      setError('')
     } catch (err) {
       const errorMsg = err.message || 'Ticket redemption error, please try again'
       setError(errorMsg)

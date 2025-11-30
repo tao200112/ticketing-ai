@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import jsQR from 'jsqr'
+import { invokeValidateTicket } from '@/lib/tickets/validation-client'
 
 export default function QRScannerPage() {
   const router = useRouter()
@@ -16,6 +17,30 @@ export default function QRScannerPage() {
   const [stream, setStream] = useState(null)
   const scanIntervalRef = useRef(null)
   const [permissionStatus, setPermissionStatus] = useState(null)
+
+  const getOrCreateDeviceId = () => {
+    if (typeof window === 'undefined') return undefined
+    const storageKey = 'qr_scanner_device_id'
+    const existing = window.localStorage.getItem(storageKey)
+    if (existing) {
+      return existing
+    }
+    const fallback = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    const nextId =
+      typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : fallback
+    window.localStorage.setItem(storageKey, nextId)
+    return nextId
+  }
+
+  const buildScanContext = () => ({
+    deviceId: getOrCreateDeviceId(),
+    scanUuid:
+      typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `${Date.now()}`,
+  })
 
   useEffect(() => {
     // Check permission status on mount
@@ -290,112 +315,109 @@ export default function QRScannerPage() {
     try {
       setLoading(true)
       setError('')
-      
-      const response = await fetch('/api/tickets/verify', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          qr_payload: qrData,
-          redeem: redeem 
-        }),
+
+      const context = buildScanContext()
+      const validation = await invokeValidateTicket({
+        qrPayload: qrData,
+        redeem,
+        deviceId: context.deviceId,
+        scanUuid: context.scanUuid,
       })
 
-      const result = await response.json()
+      if (validation.success && validation.data) {
+        const { ticket, event, validity } = validation.data
+        const validFrom =
+          validity?.validFrom ||
+          validity?.valid_from ||
+          ticket?.validity_start_time ||
+          event?.start_at ||
+          null
+        const validUntil =
+          validity?.validUntil ||
+          validity?.valid_until ||
+          ticket?.validity_end_time ||
+          validity?.eventEnd ||
+          event?.end_at ||
+          null
 
-      if (response.ok && result.success) {
-        try {
-          const { ticket, event, validity } = result.data
-          
-          // Safely extract validity fields
-          const validFrom = validity?.validFrom || validity?.valid_from || ticket?.validity_start_time || event?.start_at || null
-          const validUntil = validity?.validUntil || validity?.valid_until || ticket?.validity_end_time || validity?.eventEnd || event?.end_at || null
-          
-          // Handle redemption success - show success message
-          if (redeem && ticket.status === 'used') {
-            setScanResult({
-              ticket_id: ticket.short_id || ticket.id,
-              ticket_tier: ticket.tier || 'N/A',
-              holder_name: ticket.holder_name || 'Unknown',
-              holder_age: ticket.holder_age || null,
-              event_name: event?.title || 'Unknown Event',
-              event_venue: event?.venue_name || 'N/A',
-              validity_status: 'redeemed',
-              validity_message: 'Ticket redeemed successfully',
-              valid_from: validFrom,
-              valid_until: validUntil,
-              verification_count: ticket.verification_count || 1,
-              scanned_at: result.data.scanned_at || new Date().toISOString(),
-              redeemed: true,
-              ticket_status: 'used',
-              used_at: ticket.used_at || null
-            })
-            
-            setError('')
-            stopScanning()
-          } else {
-            // Normal verification result
-            // Determine validity status: invalid if ticket is used, expired, or validity check failed
-            let validityStatus = 'valid'
-            if (!validity?.valid || ticket.status === 'used' || ticket.status === 'refunded' || ticket.status === 'cancelled') {
-              validityStatus = 'invalid'
-            }
-            
-            setScanResult({
-              ticket_id: ticket.short_id || ticket.id,
-              ticket_tier: ticket.tier || 'N/A',
-              holder_name: ticket.holder_name || 'Unknown',
-              holder_age: ticket.holder_age || null,
-              event_name: event?.title || 'Unknown Event',
-              event_venue: event?.venue_name || 'N/A',
-              validity_status: validityStatus,
-              validity_message: validity?.message || 'Ticket verification completed',
-              valid_from: validFrom,
-              valid_until: validUntil,
-              verification_count: ticket.verification_count || 1,
-              scanned_at: result.data.scanned_at || new Date().toISOString(),
-              redeemed: redeem || false,
-              ticket_status: ticket.status || 'unknown',
-              used_at: ticket.used_at || null
-            })
-            
-            setError('')
-            stopScanning()
+        if (redeem && ticket.status === 'used') {
+          setScanResult({
+            ticket_id: ticket.short_id || ticket.id,
+            ticket_tier: ticket.tier || 'N/A',
+            holder_name: ticket.holder_name || 'Unknown',
+            holder_age: ticket.holder_age || null,
+            event_name: event?.title || 'Unknown Event',
+            event_venue: event?.venue_name || 'N/A',
+            validity_status: 'redeemed',
+            validity_message: 'Ticket redeemed successfully',
+            valid_from: validFrom,
+            valid_until: validUntil,
+            verification_count: ticket.verification_count || 1,
+            scanned_at:
+              validation.data.scanned_at || new Date().toISOString(),
+            redeemed: true,
+            ticket_status: 'used',
+            used_at: ticket.used_at || null,
+          })
+
+          setError('')
+          stopScanning()
+        } else {
+          let validityStatus = 'valid'
+          if (
+            !validity?.valid ||
+            ticket.status === 'used' ||
+            ticket.status === 'refunded' ||
+            ticket.status === 'cancelled'
+          ) {
+            validityStatus = 'invalid'
           }
-        } catch (parseError) {
-          // If parsing response data fails, log but don't show error if redeem succeeded
-          console.error('Error parsing response data:', parseError)
-          if (redeem) {
-            // If redeem was requested, assume success if we got a 200 response
-            setError('Redemption successful, but page update failed. Please refresh to check status.')
-          } else {
-            setError('Error processing verification result, please try again')
-          }
+
+          setScanResult({
+            ticket_id: ticket.short_id || ticket.id,
+            ticket_tier: ticket.tier || 'N/A',
+            holder_name: ticket.holder_name || 'Unknown',
+            holder_age: ticket.holder_age || null,
+            event_name: event?.title || 'Unknown Event',
+            event_venue: event?.venue_name || 'N/A',
+            validity_status: validityStatus,
+            validity_message:
+              validity?.message || 'Ticket verification completed',
+            valid_from: validFrom,
+            valid_until: validUntil,
+            verification_count: ticket.verification_count || 1,
+            scanned_at:
+              validation.data.scanned_at || new Date().toISOString(),
+            redeemed: redeem || false,
+            ticket_status: ticket.status || 'unknown',
+            used_at: ticket.used_at || null,
+          })
+
+          setError('')
+          stopScanning()
         }
       } else {
-        // Check for specific error codes
-        const errorCode = result.error || result.code
-        let errorMessage = result.message || result.error || 'Ticket verification failed'
-        
-        // Show Chinese message for "not your merchant ticket" error
-        if (errorCode === 'NOT_YOUR_MERCHANT_TICKET' || errorMessage.includes('not your merchant')) {
+        const errorCode = validation.error || ''
+        let errorMessage =
+          validation.message || errorCode || 'Ticket verification failed'
+
+        if (
+          errorCode === 'NOT_YOUR_MERCHANT_TICKET' ||
+          errorMessage.toLowerCase().includes('not your merchant')
+        ) {
           errorMessage = 'This ticket does not belong to your merchant'
         }
-        
+
         setError(errorMessage)
         setScanResult(null)
       }
     } catch (err) {
-      // Don't show error if redemption was successful but there was a UI update issue
       if (redeem && !err.message?.includes('REDEEM_FAILED')) {
-        // Check if ticket was actually redeemed by checking current state
         console.warn('Post-redemption UI update issue (non-critical):', err)
       } else {
         setError(err.message || 'Ticket verification error, please try again')
       }
       console.error('Verification error:', err)
-      // Don't clear scanResult if it was already set and redemption succeeded
       if (!redeem || !scanResult) {
         setScanResult(null)
       }

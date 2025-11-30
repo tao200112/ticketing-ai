@@ -61,48 +61,6 @@ function makeRequest(url, options = {}) {
     });
 }
 
-// 检查后端健康状态
-async function checkBackendHealth(backendUrl) {
-    try {
-        log('INFO', `检查后端健康状态: ${backendUrl}`);
-        
-        const response = await makeRequest(`${backendUrl}/health`);
-        
-        if (response.statusCode === 200) {
-            const data = JSON.parse(response.body);
-            log('SUCCESS', `后端健康检查通过: ${data.status}`);
-            return { status: 'healthy', data };
-        } else {
-            log('ERROR', `后端健康检查失败: HTTP ${response.statusCode}`);
-            return { status: 'unhealthy', error: `HTTP ${response.statusCode}` };
-        }
-    } catch (error) {
-        log('ERROR', `后端健康检查失败: ${error.message}`);
-        return { status: 'unhealthy', error: error.message };
-    }
-}
-
-// 检查后端 API
-async function checkBackendAPI(backendUrl) {
-    try {
-        log('INFO', `检查后端 API: ${backendUrl}/v1/events`);
-        
-        const response = await makeRequest(`${backendUrl}/v1/events`);
-        
-        if (response.statusCode === 200) {
-            const data = JSON.parse(response.body);
-            log('SUCCESS', `后端 API 检查通过: 返回 ${data.data?.length || 0} 个活动`);
-            return { status: 'healthy', data };
-        } else {
-            log('ERROR', `后端 API 检查失败: HTTP ${response.statusCode}`);
-            return { status: 'unhealthy', error: `HTTP ${response.statusCode}` };
-        }
-    } catch (error) {
-        log('ERROR', `后端 API 检查失败: ${error.message}`);
-        return { status: 'unhealthy', error: error.message };
-    }
-}
-
 // 检查前端
 async function checkFrontend(frontendUrl) {
     try {
@@ -129,28 +87,49 @@ async function checkFrontend(frontendUrl) {
     }
 }
 
-// 检查数据库连接（通过后端 API）
-async function checkDatabase(backendUrl) {
+// Next.js API 健康检查
+async function checkNextApi(siteUrl) {
     try {
-        log('INFO', `检查数据库连接: ${backendUrl}/v1/events`);
+        log('INFO', `检查 Next.js API: ${siteUrl}/api/health`);
         
-        const response = await makeRequest(`${backendUrl}/v1/events`);
+        const response = await makeRequest(`${siteUrl}/api/health`);
+        
+        if (response.statusCode === 200) {
+            const data = JSON.parse(response.body);
+            log('SUCCESS', 'Next.js API 健康检查通过');
+            return { status: 'healthy', data };
+        } else {
+            log('ERROR', `Next.js API 检查失败: HTTP ${response.statusCode}`);
+            return { status: 'unhealthy', error: `HTTP ${response.statusCode}` };
+        }
+    } catch (error) {
+        log('ERROR', `Next.js API 检查失败: ${error.message}`);
+        return { status: 'unhealthy', error: error.message };
+    }
+}
+
+// 活动列表 API（用于检测 Supabase）
+async function checkEventsApi(siteUrl) {
+    try {
+        log('INFO', `检查活动 API: ${siteUrl}/api/events`);
+        
+        const response = await makeRequest(`${siteUrl}/api/events`);
         
         if (response.statusCode === 200) {
             const data = JSON.parse(response.body);
             if (data.success) {
-                log('SUCCESS', '数据库连接正常');
+                log('SUCCESS', `活动 API 检查通过: 返回 ${data.data?.length || 0} 个活动`);
                 return { status: 'healthy', data };
             } else {
-                log('ERROR', `数据库连接失败: ${data.error}`);
+                log('ERROR', `活动 API 返回错误: ${data.error}`);
                 return { status: 'unhealthy', error: data.error };
             }
         } else {
-            log('ERROR', `数据库检查失败: HTTP ${response.statusCode}`);
+            log('ERROR', `活动 API 检查失败: HTTP ${response.statusCode}`);
             return { status: 'unhealthy', error: `HTTP ${response.statusCode}` };
         }
     } catch (error) {
-        log('ERROR', `数据库检查失败: ${error.message}`);
+        log('ERROR', `活动 API 检查失败: ${error.message}`);
         return { status: 'unhealthy', error: error.message };
     }
 }
@@ -163,9 +142,8 @@ function generateReport(results) {
     
     const components = [
         { name: '前端', result: results.frontend },
-        { name: '后端健康检查', result: results.backendHealth },
-        { name: '后端 API', result: results.backendAPI },
-        { name: '数据库', result: results.database }
+        { name: 'Next.js API', result: results.apiHealth },
+        { name: '活动 API / Supabase', result: results.events }
     ];
     
     let allHealthy = true;
@@ -206,26 +184,22 @@ async function main() {
     console.log(colors.cyan + '🔍 PartyTix 健康检查开始...' + colors.reset + '\n');
     
     // 从环境变量或命令行参数获取 URL
-    const frontendUrl = process.env.FRONTEND_URL || process.argv[2] || 'http://localhost:3000';
-    const backendUrl = process.env.BACKEND_URL || process.argv[3] || 'http://localhost:3001';
+    const siteUrl = process.env.SITE_URL || process.env.FRONTEND_URL || process.argv[2] || 'http://localhost:3000';
     
-    log('INFO', `前端 URL: ${frontendUrl}`);
-    log('INFO', `后端 URL: ${backendUrl}`);
+    log('INFO', `站点 URL: ${siteUrl}`);
     
     try {
         // 并行执行所有检查
-        const [frontend, backendHealth, backendAPI, database] = await Promise.all([
-            checkFrontend(frontendUrl),
-            checkBackendHealth(backendUrl),
-            checkBackendAPI(backendUrl),
-            checkDatabase(backendUrl)
+        const [frontend, apiHealth, events] = await Promise.all([
+            checkFrontend(siteUrl),
+            checkNextApi(siteUrl),
+            checkEventsApi(siteUrl)
         ]);
         
         const results = {
             frontend,
-            backendHealth,
-            backendAPI,
-            database
+            apiHealth,
+            events
         };
         
         // 生成报告
@@ -249,9 +223,8 @@ if (require.main === module) {
 }
 
 module.exports = {
-    checkBackendHealth,
-    checkBackendAPI,
     checkFrontend,
-    checkDatabase,
+    checkNextApi,
+    checkEventsApi,
     generateReport
 };

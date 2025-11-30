@@ -5,7 +5,7 @@ import React, { useState, useEffect, useCallback } from "react"
 import NavbarPartyTix from "@/components/NavbarPartyTix"
 import EventCard from "@/components/events/EventCard"
 import { SkeletonGrid } from "@/components/events/SkeletonCard"
-import { useEvents } from "@/lib/hooks/use-api"
+import { useEvents } from "@/lib/hooks/use-events-improved"
 import type { RegionRecord } from "@/lib/regions"
 
 type RegionExperienceProps = {

@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import EventCard from '@/components/events/EventCard'
-import { useEvents } from '../../lib/hooks/use-api'
+import { useEvents } from '@/lib/hooks/use-events-improved'
 import { useDefaultRegionSlug } from '@/hooks/use-default-region-slug'
 
 export default function EventsPage() {

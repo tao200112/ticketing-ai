@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import MerchantNavbar from '@/components/MerchantNavbar'
 import { useMerchant } from '@/hooks/use-merchant'
 import jsQR from 'jsqr'
+import { invokeValidateTicket } from '@/lib/tickets/validation-client'
 
 export default function MerchantStaffPage() {
   const router = useRouter()
@@ -31,6 +32,30 @@ export default function MerchantStaffPage() {
   const scanIntervalRef = useRef(null)
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
+
+  const getOrCreateDeviceId = () => {
+    if (typeof window === 'undefined') return undefined
+    const storageKey = 'merchant_staff_device_id'
+    const existing = window.localStorage.getItem(storageKey)
+    if (existing) {
+      return existing
+    }
+    const fallback = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    const nextId =
+      typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : fallback
+    window.localStorage.setItem(storageKey, nextId)
+    return nextId
+  }
+
+  const buildScanContext = () => ({
+    deviceId: getOrCreateDeviceId(),
+    scanUuid:
+      typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `${Date.now()}`,
+  })
 
   useEffect(() => {
     if (!merchantLoading && !merchant) {
@@ -337,87 +362,85 @@ export default function MerchantStaffPage() {
     try {
       setLoading(true)
       setError('')
-      
+
       if (!merchant) {
         setError('Please login first')
         return
       }
 
-      const response = await fetch('/api/merchant/redeem', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          qr_payload: qrData
-        }),
+      const redemptionContext = buildScanContext()
+      const redemption = await invokeValidateTicket({
+        qrPayload: qrData,
+        redeem: true,
+        deviceId: redemptionContext.deviceId,
+        scanUuid: redemptionContext.scanUuid,
       })
-      
-      const result = await response.json()
-      
-      if (response.ok && result.success) {
-        // Use the verify API to get detailed ticket information
-        const verifyResponse = await fetch('/api/tickets/verify', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            qr_payload: qrData,
-            redeem: false
-          }),
-        })
-        
-        const verifyResult = await verifyResponse.json()
-        
-        if (verifyResponse.ok && verifyResult.success) {
-          const { ticket, event, validity } = verifyResult.data
-          
-          // Determine validity status
-          let validityStatus = 'valid'
-          let validityMessage = validity?.message || 'Ticket verification completed'
-          
-          if (!validity?.valid || ticket.status === 'used' || ticket.status === 'refunded' || ticket.status === 'cancelled') {
-            validityStatus = 'invalid'
-            // Update message to be more specific
-            if (ticket.status === 'used') {
-              validityMessage = 'Ticket has already been redeemed'
-            } else if (validity?.status === 'expired') {
-              validityMessage = 'Ticket has expired'
-            } else if (ticket.status === 'refunded' || ticket.status === 'cancelled') {
-              validityMessage = 'Ticket has been cancelled or refunded'
-            }
-          }
-          
-          setScanResult({
-            ticket_id: ticket.short_id || ticket.id,
-            status: ticket.status,
-            redeemed_at: ticket.used_at || result.data.redeemed_at,
-            validity_status: validityStatus,
-            validity_message: validityMessage,
-            success: true
-          })
-        } else {
-          // Fallback to original result if verify API fails
-          setScanResult({
-            ticket_id: result.data.ticket_id,
-            status: result.data.status,
-            redeemed_at: result.data.redeemed_at,
-            success: true
-          })
-        }
-        setError('')
-      } else {
-        const errorCode = result.error || result.code
-        let errorMessage = result.message || 'Ticket verification failed'
-        
-        if (errorCode === 'NOT_YOUR_MERCHANT_TICKET' || errorMessage.includes('Not your merchant')) {
+
+      if (!redemption.success) {
+        let errorMessage =
+          redemption.message || 'Ticket verification failed'
+        if (
+          redemption.error === 'NOT_YOUR_MERCHANT_TICKET' ||
+          errorMessage.includes('Not your merchant')
+        ) {
           errorMessage = 'This ticket does not belong to your merchant'
         }
-        
         setError(errorMessage)
         setScanResult(null)
+        return
       }
+
+      const detailContext = buildScanContext()
+      const details = await invokeValidateTicket({
+        qrPayload: qrData,
+        redeem: false,
+        deviceId: detailContext.deviceId,
+        scanUuid: detailContext.scanUuid,
+      })
+
+      if (details.success && details.data) {
+        const { ticket, validity } = details.data
+        let validityStatus = 'valid'
+        let validityMessage =
+          validity?.message || 'Ticket verification completed'
+
+        if (
+          !validity?.valid ||
+          ticket.status === 'used' ||
+          ticket.status === 'refunded' ||
+          ticket.status === 'cancelled'
+        ) {
+          validityStatus = 'invalid'
+          if (ticket.status === 'used') {
+            validityMessage = 'Ticket has already been redeemed'
+          } else if (validity?.status === 'expired') {
+            validityMessage = 'Ticket has expired'
+          } else if (
+            ticket.status === 'refunded' ||
+            ticket.status === 'cancelled'
+          ) {
+            validityMessage = 'Ticket has been cancelled or refunded'
+          }
+        }
+
+        setScanResult({
+          ticket_id: ticket.short_id || ticket.id,
+          status: ticket.status,
+          redeemed_at: ticket.used_at || new Date().toISOString(),
+          validity_status: validityStatus,
+          validity_message: validityMessage,
+          success: true,
+        })
+      } else {
+        setScanResult({
+          ticket_id: redemption.data?.ticket?.short_id || qrData,
+          status: redemption.data?.ticket?.status || 'used',
+          redeemed_at: new Date().toISOString(),
+          success: true,
+        })
+      }
+
+      setError('')
     } catch (err) {
       setError(err.message || 'Ticket verification error, please try again')
       console.error('Verification error:', err)

@@ -1,5 +1,7 @@
 {
   "expo": {
+    "sdkVersion": "51.0.0",
+    "runtimeVersion": "51.0.0",
     "owner": "taoliu0711",
     "name": "PartyTix",
     "slug": "partytix",
@@ -8,11 +10,13 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "scheme": "partytix",
+
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
       "backgroundColor": "#000000"
     },
+
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.partytix.client",
@@ -25,14 +29,15 @@
         ]
       }
     },
+
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#000000"
       },
-      "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false,
+
       "package": "com.partytix.client",
+
       "intentFilters": [
         {
           "action": "VIEW",
@@ -47,18 +52,18 @@
         }
       ]
     },
+
     "web": {
       "favicon": "./assets/favicon.png"
     },
+
     "extra": {
+      "siteUrl": "https://ticketing-ai-six.vercel.app",
       "supabaseUrl": "https://htaqcvnyipiqdbmvvfvj.supabase.co",
       "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh0YXFjdm55aXBpcWRibXZ2ZnZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEwNzYwOTgsImV4cCI6MjA3NjY1MjA5OH0.5fPm5rvK_41wc9XZhzqaVupMlD9EEo4wwjaguQkCRKw",
       "eas": {
         "projectId": "045b791d-584c-4ad8-a7e0-c4f2603e0b45"
       }
-    },
-    "plugins": [
-      "expo-web-browser"
-    ]
+    }
   }
 }

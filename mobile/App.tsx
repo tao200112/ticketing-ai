@@ -1,83 +1,82 @@
 /**
  * PartyTix Mobile App
- * Integrated native Google login, no longer uses WebView for login
+ * Full native implementation with React Navigation
  */
 
-import React, { useState } from 'react';
-import { StyleSheet, Platform, View, ActivityIndicator } from 'react-native';
+import React, { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { AuthProvider, useAuth } from './context/AuthContext';
-import LoginScreen from './screens/LoginScreen';
-import ForgotPasswordScreen from './screens/ForgotPasswordScreen';
-import MainWebView, { WEB_APP_URL } from './components/MainWebView';
+import * as Linking from 'expo-linking';
+import { AuthProvider } from './context/AuthContext';
+import RootNavigator from './navigation/RootNavigator';
+import { parseDeepLink } from './lib/deep-link';
+import { CONFIG } from './lib/config';
 
-function AppContent() {
-  const { session, loading, isInitialized } = useAuth();
-  const [showForgotPassword, setShowForgotPassword] = useState(false);
+/**
+ * Deep Link Handler Component
+ * Handles Stripe checkout redirect and other deep links
+ */
+function DeepLinkHandler({ children }: { children: React.ReactNode }) {
+  const [initialUrl, setInitialUrl] = useState<string | null>(null);
+  const [isReady, setIsReady] = useState(false);
 
-  if (!isInitialized || loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <StatusBar style="light" />
-        <ActivityIndicator size="large" color="#7C3AED" />
-      </View>
-    );
+  useEffect(() => {
+    // Get initial URL when app opens
+    Linking.getInitialURL().then((url) => {
+      if (url) {
+        setInitialUrl(url);
+      }
+      setIsReady(true);
+    });
+
+    // Listen for deep links when app is already open
+    const subscription = Linking.addEventListener('url', handleDeepLink);
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
+  const handleDeepLink = async (event: { url: string }) => {
+    const { path, params } = parseDeepLink(event.url);
+    
+    console.log('[DeepLink] Received:', { path, params, url: event.url });
+
+    // Handle Stripe checkout success callback
+    if (path === 'success' || event.url.includes('success')) {
+      const sessionId = params.session_id || 
+                        new URLSearchParams(event.url.split('?')[1]).get('session_id');
+      
+      if (sessionId) {
+        console.log('[DeepLink] Stripe checkout success, session_id:', sessionId);
+        // Navigation will be handled by RootNavigator
+        // The session_id will be passed through route params
+      }
+    }
+
+    // Handle auth callback
+    if (path === 'auth-callback') {
+      console.log('[DeepLink] Auth callback received');
+      // Auth context will handle this automatically via Supabase
+    }
+  };
+
+  if (!isReady) {
+    return null;
   }
 
-  if (!session || !session.user) {
-    console.log('[AuthContext] session is null, falling back to LoginScreen');
-    return (
-      <View style={styles.container}>
-        <StatusBar style="light" />
-        {showForgotPassword ? (
-          <ForgotPasswordScreen onBack={() => setShowForgotPassword(false)} />
-        ) : (
-          <LoginScreen onForgotPassword={() => setShowForgotPassword(true)} />
-        )}
-      </View>
-    );
-  }
-
-  if (Platform.OS === 'web') {
-    return (
-      <View style={styles.container}>
-        <StatusBar style="dark" />
-        <iframe
-          src={WEB_APP_URL}
-          style={{
-            width: '100%',
-            height: '100%',
-            border: 'none',
-          }}
-          title="PartyTix Web App"
-        />
-      </View>
-    );
-  }
-
-  return <MainWebView session={session} />;
+  return <>{children}</>;
 }
 
 /**
- * Root component: wraps AuthProvider
+ * Root component
  */
 export default function App() {
   return (
     <AuthProvider>
-      <AppContent />
+      <DeepLinkHandler>
+        <StatusBar style="light" />
+        <RootNavigator />
+      </DeepLinkHandler>
     </AuthProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#000',
-  },
-  loadingContainer: {
-    flex: 1,
-    backgroundColor: '#000',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-});

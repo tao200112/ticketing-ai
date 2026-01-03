@@ -6,7 +6,14 @@
 import React, { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase.native';
-import { signInWithGoogle, signInWithEmailPassword, signOut } from '../lib/auth';
+import { 
+  signInWithGoogle, 
+  signInWithEmailPassword, 
+  signUpWithEmailPassword,
+  resetPassword as resetPasswordAuth,
+  updatePassword as updatePasswordAuth,
+  signOut 
+} from '../lib/auth';
 
 async function refreshSessionFromServer(
   mounted: boolean,
@@ -49,6 +56,9 @@ interface AuthContextType {
   isInitialized: boolean;
   signInWithGoogle: () => Promise<void>;
   signInWithEmailPassword: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string, metadata?: { name?: string; age?: number }) => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
+  updatePassword: (newPassword: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -144,6 +154,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const handleSignUp = async (
+    email: string,
+    password: string,
+    metadata?: { name?: string; age?: number }
+  ) => {
+    try {
+      const { error } = await signUpWithEmailPassword(email, password, metadata);
+      if (error) {
+        console.error('[AuthContext] Sign up error:', error);
+        throw error;
+      }
+      // Session will be automatically updated via onAuthStateChange
+    } catch (error) {
+      console.error('[AuthContext] Sign up failed:', error);
+      throw error;
+    }
+  };
+
+  const handleResetPassword = async (email: string) => {
+    try {
+      const { error } = await resetPasswordAuth(email);
+      if (error) {
+        console.error('[AuthContext] Reset password error:', error);
+        throw error;
+      }
+    } catch (error) {
+      console.error('[AuthContext] Reset password failed:', error);
+      throw error;
+    }
+  };
+
+  const handleUpdatePassword = async (newPassword: string) => {
+    try {
+      const { error } = await updatePasswordAuth(newPassword);
+      if (error) {
+        console.error('[AuthContext] Update password error:', error);
+        throw error;
+      }
+    } catch (error) {
+      console.error('[AuthContext] Update password failed:', error);
+      throw error;
+    }
+  };
+
   const handleSignOut = async () => {
     console.log('[AuthContext] handleSignOut called');
     try {
@@ -167,6 +221,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isInitialized,
     signInWithGoogle: handleSignInWithGoogle,
     signInWithEmailPassword: handleSignInWithEmailPassword,
+    signUp: handleSignUp,
+    resetPassword: handleResetPassword,
+    updatePassword: handleUpdatePassword,
     signOut: handleSignOut,
   };
 

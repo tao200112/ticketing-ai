@@ -25,8 +25,9 @@ import {
 } from 'react-native-webview';
 import type { Session } from '@supabase/supabase-js';
 import { useAuth } from '../context/AuthContext';
+import { CONFIG } from '../lib/config';
 
-export const WEB_APP_URL = 'https://ticketing-ai-six.vercel.app';
+export const WEB_APP_URL = CONFIG.SITE_URL;
 const SOURCE_PARAM_VALUE = 'mobile-app';
 const AUTH_EXACT_PATHS = ['/login', '/auth', '/auth/login', '/auth/sign-in', '/sign-in', '/oauth'];
 const AUTH_PREFIX_PATHS = ['/auth/'];

@@ -10,8 +10,9 @@ This is the mobile client (user-facing only) for PartyTix ticketing system. The 
 
 ## 技术栈
 
-- Expo ~54.0
-- React Native 0.81.5
+- Expo ~52.0.0
+- React Native 0.75.4
+- React 18.3.1
 - TypeScript
 - react-native-webview
 

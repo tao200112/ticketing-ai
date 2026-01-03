@@ -6,6 +6,7 @@
 import 'react-native-url-polyfill/auto';
 
 import * as WebBrowser from 'expo-web-browser';
+import Constants from 'expo-constants';
 
 import { supabase } from '../supabase.native';
 
@@ -175,6 +176,97 @@ export async function signInWithEmailPassword(email: string, password: string) {
     return { data };
   } catch (error) {
     console.error('[Auth] signInWithEmailPassword error:', error);
+    return { error: error instanceof Error ? error : new Error('Unknown error') };
+  }
+}
+
+/**
+ * Sign up with email and password
+ */
+export async function signUpWithEmailPassword(
+  email: string,
+  password: string,
+  metadata?: { name?: string; age?: number }
+) {
+  try {
+    console.log('[Auth] Attempting email/password sign up for:', email);
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: metadata,
+      },
+    });
+
+    if (error) {
+      console.error('[Auth] Email/password sign up error:', error);
+      return { error };
+    }
+
+    console.log(
+      '[Auth] Email/password sign up successful, hasSession:',
+      !!data.session,
+      'userId:',
+      data.user?.id
+    );
+
+    return { data };
+  } catch (error) {
+    console.error('[Auth] signUpWithEmailPassword error:', error);
+    return { error: error instanceof Error ? error : new Error('Unknown error') };
+  }
+}
+
+/**
+ * Reset password (forgot password)
+ */
+export async function resetPassword(email: string, redirectTo?: string) {
+  try {
+    console.log('[Auth] Attempting password reset for:', email);
+    const siteUrl = Constants.expoConfig?.extra?.siteUrl;
+    
+    if (!siteUrl) {
+      throw new Error("Missing siteUrl in app.json extra config");
+    }
+    
+    const defaultRedirectTo = `${siteUrl}/auth/update-password`;
+    
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: redirectTo || defaultRedirectTo,
+    });
+
+    if (error) {
+      console.error('[Auth] Password reset error:', error);
+      return { error };
+    }
+
+    console.log('[Auth] Password reset email sent successfully');
+    return { success: true };
+  } catch (error) {
+    console.error('[Auth] resetPassword error:', error);
+    return { error: error instanceof Error ? error : new Error('Unknown error') };
+  }
+}
+
+/**
+ * Update password (after reset link clicked)
+ */
+export async function updatePassword(newPassword: string) {
+  try {
+    console.log('[Auth] Attempting password update');
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword,
+    });
+
+    if (error) {
+      console.error('[Auth] Password update error:', error);
+      return { error };
+    }
+
+    console.log('[Auth] Password updated successfully');
+    return { success: true };
+  } catch (error) {
+    console.error('[Auth] updatePassword error:', error);
     return { error: error instanceof Error ? error : new Error('Unknown error') };
   }
 }

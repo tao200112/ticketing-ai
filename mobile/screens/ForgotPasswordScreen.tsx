@@ -17,6 +17,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { supabase } from '../lib/supabase.native';
+import { CONFIG } from '../lib/config';
 
 interface ForgotPasswordScreenProps {
   onBack: () => void;
@@ -43,8 +44,8 @@ export default function ForgotPasswordScreen({ onBack }: ForgotPasswordScreenPro
     try {
       setLoading(true);
       
-      // Use web-side password reset URL
-      const redirectTo = 'https://ticketing-ai-six.vercel.app/auth/update-password';
+      // Use web-side password reset URL from config
+      const redirectTo = `${CONFIG.SITE_URL}/auth/update-password`;
       
       const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
         redirectTo,
